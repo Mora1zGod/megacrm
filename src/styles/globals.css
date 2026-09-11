@@ -1,0 +1,242 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* =============================================================================
+   AMAI PARK · CRM Design System
+   ----------------------------------------------------------------------------
+   Base neutra grafite (não-verde) + AMAI green como ACCENT (item ativo, foco,
+   links, indicadores positivos, gráficos) — não como cor de fundo do app.
+   Densidade alta, raio contido (6-10px), sombra quase inexistente, hierarquia
+   por espaço/contraste de superfície em vez de caixa-dentro-de-caixa.
+   DARK MODE ONLY. Uma família tipográfica só (Plus Jakarta Sans), sem
+   dependência nova — Bricolage Grotesque (display quirky) foi removida: o
+   objetivo é personalidade de produto SaaS sério, não de protótipo/Dribbble.
+   ============================================================================= */
+
+@theme {
+  /* ---- Superfícies (neutras — nenhuma tem verde) -------------------------- */
+  --color-bg-primary: #0B0D10;       /* fundo do app inteiro */
+  --color-surface: #111318;          /* sidebar / topbar */
+  --color-surface-raised: #15181D;   /* cards, painéis, um nível acima do bg */
+  --color-surface-hover: #1B1F26;    /* hover de linha/item */
+  --color-bg-card: #15181D;          /* legado: mantido = surface-raised */
+
+  /* ---- Bordas (cinza neutro, baixíssimo contraste) ------------------------ */
+  --color-border-card: #23272E;
+  --color-border-soft: #1D2026;
+  --color-border-divider: #191C21;
+
+  /* ---- Accent — AMAI green/turquesa, só onde tem função ------------------- */
+  --color-accent-primary: #14B8AE;
+  --color-accent-secondary: #5EEAD4;
+  --color-accent-subtle: rgba(20, 184, 174, 0.12);
+
+  /* ---- CTA / destaque institucional (uso pontual, não decorativo) --------- */
+  --color-cta: #F0503F;
+  --color-highlight: #F2B937;
+
+  /* ---- Texto --------------------------------------------------------------- */
+  --color-text-primary: #F1F2F4;     /* off-white, não branco puro */
+  --color-text-secondary: #94989F;   /* cinza frio */
+  --color-text-label: #B4B8BF;
+  --color-text-muted: #6B7078;
+
+  /* ---- Semântico ------------------------------------------------------------ */
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* ---- Tipografia ------------------------------------------------------------ */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- Raio — contido, nunca "pill" em cards/painéis -------------------------- */
+  --radius-card: 10px;
+  --radius-control: 8px;
+}
+
+/* -----------------------------------------------------------------------------
+   Static accent tokens.
+   Components reference var(--accent-primary) / var(--accent-secondary) instead
+   of hard-coding hex so any future palette swap is one-file.
+   ----------------------------------------------------------------------------- */
+:root {
+  --accent-primary: #14B8AE;
+  --accent-secondary: #5EEAD4;
+  --cta: #F0503F;
+  --highlight: #F2B937;
+}
+
+/* -----------------------------------------------------------------------------
+   Base body — chapado, sem glow radial decorativo
+   ----------------------------------------------------------------------------- */
+html, body, #root {
+  min-height: 100vh;
+  /* 100dvh: em navegador de celular a barra de endereço aparece e some, e
+     100vh não acompanha — parte do app fica sob a barra. dvh mede a altura
+     REAL disponível. Fallback para 100vh em browsers antigos. */
+  min-height: 100dvh;
+  height: 100dvh;
+}
+
+/* PWA instalado no iPhone: respeita notch e barra de gestos. Sem isso a caixa
+   de digitar do inbox fica embaixo da barra inferior do sistema. */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* No celular o zoom automático do iOS ao focar um campo com fonte < 16px
+   desalinha o layout inteiro. 16px no input evita esse comportamento. */
+@media (max-width: 640px) {
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar — neutra, discreta (era turquesa) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-card);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2E333B;
+}
+
+/* -----------------------------------------------------------------------------
+   Superfícies planas — substituem glass-card/glass-surface (glassmorphism).
+   Sem blur, sem glow, sem gradiente. Hierarquia por contraste de fundo/borda.
+   ----------------------------------------------------------------------------- */
+@layer components {
+  /* Card padrão — um nível acima do fundo, borda de baixo contraste, raio 10px */
+  .surface-card {
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--radius-card);
+  }
+
+  .surface-card-hover:hover {
+    border-color: #2E333B;
+    background: var(--color-surface-hover);
+  }
+
+  /* Compat: código existente ainda referencia .glass-card/.glass-surface em
+     várias telas — mapeadas pro novo estilo plano para não quebrar nada
+     enquanto cada tela é migrada individualmente pra `surface-card`. */
+  .glass-card {
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--radius-card);
+    transition: border-color 150ms ease, background-color 150ms ease;
+  }
+
+  .glass-card-hover:hover,
+  .glass-card:hover {
+    border-color: #2E333B;
+    background: var(--color-surface-hover);
+  }
+
+  .glass-surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-card);
+  }
+
+  .text-display {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .text-stat {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Labels — reduzidas: não competem mais com o conteúdo principal */
+  .text-label {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+  }
+
+  .text-body {
+    font-weight: 400;
+    font-size: 0.875rem;
+    color: var(--color-text-primary);
+  }
+
+  .text-muted {
+    color: var(--color-text-secondary);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Native <select> dropdown legibility fix
+   ----------------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #15181D;
+  color: #F1F2F4;
+}
+
+/* -----------------------------------------------------------------------------
+   Focus ring — accent-aware, accessible
+   ----------------------------------------------------------------------------- */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* -----------------------------------------------------------------------------
+   Message entrance — aplicada só a mensagens novas (ver MessageThread). Roda
+   uma única vez na montagem do nó; como a key é estável, a troca balão
+   otimista→linha real NÃO re-dispara a animação.
+   ----------------------------------------------------------------------------- */
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-in {
+  animation: message-in 0.16s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-in {
+    animation: none;
+  }
+}
