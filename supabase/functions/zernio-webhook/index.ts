@@ -28,6 +28,7 @@ import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { getNumberInfo, loadZernioContext } from '../_shared/zernio.ts';
 import { getChannelByZernioAccount, type ChannelRow } from '../_shared/channels.ts';
 import { maybeAddLeadToFunnel } from '../_shared/funnel.ts';
+import { maybeRouteToJarvis } from '../_shared/jarvis-routing.ts';
 
 type DeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed';
 
@@ -654,9 +655,17 @@ Deno.serve(async (req) => {
   const errors: string[] = [];
   try {
     switch (event.type) {
-      case 'message.received':
+      case 'message.received': {
+        // Jarvis: mensagem vinda de um numero autorizado (whatsapp_hub.jarvis_users)
+        // nao e lead — vai para o agente pessoal e NAO entra no fluxo AMAIA.
+        // Com a tabela vazia isto e um no-op e o fluxo de cliente segue igual.
+        const paraJarvis = await maybeRouteToJarvis(admin, orgId, event.data, channel);
+        if (paraJarvis) {
+          return jsonResponse({ ok: true, routed: 'jarvis' });
+        }
         await handleMessageReceived(admin, orgId, event.data, errors, channel);
         break;
+      }
       case 'message.sent':
         await handleStatus(admin, orgId, 'sent', event.data);
         break;
