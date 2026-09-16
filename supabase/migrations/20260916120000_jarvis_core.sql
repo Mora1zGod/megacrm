@@ -21,10 +21,20 @@
 --
 -- NOTA sobre ai_usage_log: a tabela é LIDA pelo front (src/hooks/useAmaiaOverview.ts
 -- e src/hooks/useSalesDashboard.ts) mas NÃO é criada por nenhuma migration deste
--- repositório nem escrita por nenhuma Edge Function. Ou ela foi criada fora do
--- controle de migrations no projeto hneqnopjvvwquyqogwdu, ou ainda não existe.
--- Por isso tudo aqui é IF NOT EXISTS / ADD COLUMN IF NOT EXISTS: se já existir,
--- esta migration só garante as colunas que o Jarvis usa e não toca no resto.
+-- repositório nem escrita por nenhuma Edge Function — foi criada fora do controle
+-- de migrations. O shape real em produção (projeto hneqnopjvvwquyqogwdu) foi
+-- conferido no information_schema e está reproduzido abaixo:
+--
+--   id, org_id, conversation_id, message_id  uuid
+--   kind, provider, model                    text
+--   prompt_tokens, completion_tokens, total_tokens  integer
+--   estimated_cost_usd                       numeric
+--   created_at                               timestamptz
+--
+-- Ou seja: ela JÁ TEM org_id. Neste projeto o CREATE/ALTER abaixo são no-ops —
+-- eles existem para um projeto novo nascer com o mesmo shape, e para o caso de
+-- alguma instalação estar com colunas faltando. Tudo é IF NOT EXISTS /
+-- ADD COLUMN IF NOT EXISTS: nada de tipo alterado, nada de dado apagado.
 -- ============================================================================
 
 SET search_path TO whatsapp_hub, public;
@@ -123,13 +133,17 @@ CREATE TABLE IF NOT EXISTS whatsapp_hub.ai_usage_log (
   org_id             UUID REFERENCES whatsapp_hub.organizations(id) ON DELETE CASCADE,
   -- NULL no Jarvis: ele não roda dentro de uma conversa do CRM.
   conversation_id    UUID REFERENCES whatsapp_hub.conversations(id) ON DELETE SET NULL,
+  -- NULL no Jarvis: a mensagem dele não passa por whatsapp_hub.messages.
+  message_id         UUID REFERENCES whatsapp_hub.messages(id) ON DELETE SET NULL,
   -- Origem/tipo do gasto. O front filtra kind='chat' para contar mensagens do
   -- AMAIA; o Jarvis grava 'jarvis' e 'jarvis_transcription', então não
   -- contamina essa contagem.
   kind               TEXT NOT NULL DEFAULT 'chat',
+  provider           TEXT,
   model              TEXT,
   prompt_tokens      INTEGER,
   completion_tokens  INTEGER,
+  total_tokens       INTEGER,
   estimated_cost_usd NUMERIC(12,6) NOT NULL DEFAULT 0,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -140,17 +154,23 @@ CREATE TABLE IF NOT EXISTS whatsapp_hub.ai_usage_log (
 ALTER TABLE whatsapp_hub.ai_usage_log
   ADD COLUMN IF NOT EXISTS org_id             UUID,
   ADD COLUMN IF NOT EXISTS conversation_id    UUID,
+  ADD COLUMN IF NOT EXISTS message_id         UUID,
   ADD COLUMN IF NOT EXISTS kind               TEXT,
+  ADD COLUMN IF NOT EXISTS provider           TEXT,
   ADD COLUMN IF NOT EXISTS model              TEXT,
   ADD COLUMN IF NOT EXISTS prompt_tokens      INTEGER,
   ADD COLUMN IF NOT EXISTS completion_tokens  INTEGER,
+  ADD COLUMN IF NOT EXISTS total_tokens       INTEGER,
   ADD COLUMN IF NOT EXISTS estimated_cost_usd NUMERIC(12,6),
   ADD COLUMN IF NOT EXISTS created_at         TIMESTAMPTZ DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_ai_usage_log_kind_time
   ON whatsapp_hub.ai_usage_log(kind, created_at DESC);
 
--- Backfill ANTES de ligar a RLS. Se a tabela já existia SEM org_id, o ADD
+-- Backfill ANTES de ligar a RLS. Em produção a tabela JÁ TEM org_id, então isto
+-- costuma sair no primeiro IF (0 linhas órfãs). A rede de proteção continua
+-- valendo para linhas antigas que por acaso estejam com org_id NULL.
+-- Se a tabela já existia SEM org_id, o ADD
 -- COLUMN acima deixou org_id NULL em todas as linhas históricas — e a policy
 -- `org_id = current_org_id()` esconderia 100% delas de useAmaiaOverview,
 -- useSalesDashboard e da aba de logs. Ou seja: o histórico de custo sumiria do

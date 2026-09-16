@@ -67,14 +67,21 @@ export async function registrarUso(
     custoUsd: number;
   },
 ): Promise<void> {
+  const entrada = input.promptTokens ?? null;
+  const saida = input.completionTokens ?? null;
   const { error } = await admin.from('ai_usage_log').insert({
     org_id: input.orgId,
-    // O Jarvis não roda dentro de uma conversa do CRM.
+    // O Jarvis não roda dentro de uma conversa do CRM, e também não nasce de
+    // uma linha de whatsapp_hub.messages — o roteamento desvia antes disso.
     conversation_id: null,
+    message_id: null,
     kind: input.kind,
+    // O núcleo do Jarvis só fala com a OpenAI (tool calling + Whisper).
+    provider: 'openai',
     model: input.model,
-    prompt_tokens: input.promptTokens ?? null,
-    completion_tokens: input.completionTokens ?? null,
+    prompt_tokens: entrada,
+    completion_tokens: saida,
+    total_tokens: entrada !== null || saida !== null ? (entrada ?? 0) + (saida ?? 0) : null,
     estimated_cost_usd: input.custoUsd,
   });
   if (error) {
