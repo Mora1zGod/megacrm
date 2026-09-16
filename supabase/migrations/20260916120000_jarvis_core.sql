@@ -150,6 +150,39 @@ ALTER TABLE whatsapp_hub.ai_usage_log
 CREATE INDEX IF NOT EXISTS idx_ai_usage_log_kind_time
   ON whatsapp_hub.ai_usage_log(kind, created_at DESC);
 
+-- Backfill ANTES de ligar a RLS. Se a tabela já existia SEM org_id, o ADD
+-- COLUMN acima deixou org_id NULL em todas as linhas históricas — e a policy
+-- `org_id = current_org_id()` esconderia 100% delas de useAmaiaOverview,
+-- useSalesDashboard e da aba de logs. Ou seja: o histórico de custo sumiria do
+-- painel no deploy. Mesma receita de 20260810120001_mt_backfill para dado
+-- legado single-org: atribui à org 'principal' (ou à org ativa mais antiga).
+DO $$
+DECLARE
+  v_org    UUID;
+  v_orfas  BIGINT;
+BEGIN
+  SELECT count(*) INTO v_orfas FROM whatsapp_hub.ai_usage_log WHERE org_id IS NULL;
+  IF v_orfas = 0 THEN
+    RETURN;
+  END IF;
+
+  SELECT id INTO v_org FROM whatsapp_hub.organizations WHERE slug = 'principal';
+  IF v_org IS NULL THEN
+    v_org := whatsapp_hub.default_org_id();
+  END IF;
+  IF v_org IS NULL THEN
+    -- Sem org para atribuir, ligar RLS esconderia o histórico sem aviso.
+    -- Melhor falhar a migration do que perder dado de vista em silêncio.
+    RAISE EXCEPTION
+      'ai_usage_log tem % linha(s) sem org_id e nao ha organizacao ativa para atribuir. '
+      'Crie/ative a organizacao antes de rodar esta migration.', v_orfas;
+  END IF;
+
+  UPDATE whatsapp_hub.ai_usage_log SET org_id = v_org WHERE org_id IS NULL;
+  RAISE NOTICE 'ai_usage_log: % linha(s) legada(s) atribuida(s) a org %', v_orfas, v_org;
+END;
+$$;
+
 -- ----------------------------------------------------------------------------
 -- 5. RLS + grants
 -- ----------------------------------------------------------------------------

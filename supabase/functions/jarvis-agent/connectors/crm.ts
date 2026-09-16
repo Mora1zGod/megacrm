@@ -41,19 +41,56 @@ function brl(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function contar(rows: Array<Record<string, unknown>>, key: string): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const row of rows) {
-    const k = String(row[key] ?? 'indefinido');
-    out[k] = (out[k] ?? 0) + 1;
-  }
-  return out;
-}
-
 function listarContagem(mapa: Record<string, number>): string {
-  const entradas = Object.entries(mapa).sort((a, b) => b[1] - a[1]);
+  const entradas = Object.entries(mapa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   if (entradas.length === 0) return 'nenhum';
   return entradas.map(([k, v]) => `${k}: ${v}`).join(', ');
+}
+
+// ---------------------------------------------------------------------------
+// Limite do PostgREST
+// ---------------------------------------------------------------------------
+// supabase/config.toml define api.max_rows = 1000: um select sem range é
+// CORTADO em 1000 linhas silenciosamente. Contar no cliente em cima disso
+// devolveria número errado com cara de certo — exatamente o que este agente
+// não pode fazer. Então:
+//   · número puro  → contarExato() (count no servidor, sem trafegar linha);
+//   · precisa das linhas (somar valor por estágio) → buscarPaginado().
+const MAX_ROWS = 1000;
+// Teto de segurança da paginação: 20 páginas = 20k linhas.
+const MAX_PAGINAS = 20;
+
+type Resultado = { data: unknown; error: { message: string } | null; count?: number | null };
+
+/** Executa um select montado com { count: 'exact', head: true }. */
+async function contarExato(
+  query: PromiseLike<Resultado>,
+  contexto: string,
+): Promise<number> {
+  const { count, error } = await query;
+  if (error) throw new Error(`${contexto}: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Pagina com .range() até acabar. `truncado` avisa que o teto foi batido — o
+ * chamador DEVE dizer isso na resposta em vez de apresentar um total parcial
+ * como se fosse o total.
+ */
+async function buscarPaginado<T>(
+  pagina: (de: number, ate: number) => PromiseLike<Resultado>,
+  contexto: string,
+): Promise<{ rows: T[]; truncado: boolean }> {
+  const rows: T[] = [];
+  for (let p = 0; p < MAX_PAGINAS; p++) {
+    const de = p * MAX_ROWS;
+    const { data, error } = await pagina(de, de + MAX_ROWS - 1);
+    if (error) throw new Error(`${contexto}: ${error.message}`);
+    const lote = (data ?? []) as T[];
+    rows.push(...lote);
+    if (lote.length < MAX_ROWS) return { rows, truncado: false };
+  }
+  return { rows, truncado: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -68,20 +105,28 @@ const conversasNovas: JarvisTool = {
   parameters: periodoParam as unknown as Record<string, unknown>,
   async execute(params, ctx: JarvisToolContext) {
     const janela = resolverPeriodo(params.periodo as string | undefined, ctx.timezone);
-    const { data, error } = await ctx.admin
+    // Base comum: org + janela. Cada contagem é um count exato no servidor.
+    const base = () => ctx.admin
       .from('conversations')
-      .select('id, channel, status, created_at')
+      .select('id', { count: 'exact', head: true })
       .eq('org_id', ctx.orgId)
       .gte('created_at', janela.fromISO)
       .lt('created_at', janela.toISO);
-    if (error) throw new Error(`consulta conversations: ${error.message}`);
 
-    const rows = (data ?? []) as Array<Record<string, unknown>>;
-    if (rows.length === 0) return `Nenhuma conversa nova ${janela.label}.`;
+    const [total, whatsapp, instagram, comIA, humano, fechadas] = await Promise.all([
+      contarExato(base(), 'conversations'),
+      contarExato(base().eq('channel', 'whatsapp'), 'conversations/whatsapp'),
+      contarExato(base().eq('channel', 'instagram'), 'conversations/instagram'),
+      contarExato(base().eq('status', 'ai_active'), 'conversations/ai_active'),
+      contarExato(base().eq('status', 'human_active'), 'conversations/human_active'),
+      contarExato(base().eq('status', 'closed'), 'conversations/closed'),
+    ]);
+
+    if (total === 0) return `Nenhuma conversa nova ${janela.label}.`;
     return [
-      `Conversas novas ${janela.label}: ${rows.length}`,
-      `Por canal — ${listarContagem(contar(rows, 'channel'))}`,
-      `Por status atual — ${listarContagem(contar(rows, 'status'))}`,
+      `Conversas novas ${janela.label}: ${total}`,
+      `Por canal — ${listarContagem({ whatsapp, instagram })}`,
+      `Por status atual — ${listarContagem({ 'com a IA': comIA, 'atendimento humano': humano, fechadas })}`,
     ].join('\n');
   },
 };
@@ -97,34 +142,36 @@ const inboxAgora: JarvisTool = {
     + 'atendimento humano, quantas têm mensagem não lida e quantas estão sem resposta.',
   parameters: { type: 'object', properties: {} },
   async execute(_params, ctx: JarvisToolContext) {
-    const { data, error } = await ctx.admin
+    const abertas = () => ctx.admin
       .from('conversations')
-      .select('id, status, unread_count, ai_paused, assigned_to, last_message_at')
+      .select('id', { count: 'exact', head: true })
       .eq('org_id', ctx.orgId)
       .neq('status', 'closed');
-    if (error) throw new Error(`consulta conversations: ${error.message}`);
 
-    const rows = (data ?? []) as Array<{
-      status: string;
-      unread_count: number | null;
-      ai_paused: boolean | null;
-      assigned_to: string | null;
-      last_message_at: string | null;
-    }>;
-    if (rows.length === 0) return 'Nenhuma conversa aberta no inbox agora.';
+    const [total, comIA, humano, naoLidas, semDono, ultimaRes] = await Promise.all([
+      contarExato(abertas(), 'conversations'),
+      contarExato(abertas().eq('status', 'ai_active').eq('ai_paused', false), 'conversations/ia'),
+      contarExato(abertas().eq('status', 'human_active'), 'conversations/humano'),
+      contarExato(abertas().gt('unread_count', 0), 'conversations/nao_lidas'),
+      contarExato(
+        abertas().eq('status', 'human_active').is('assigned_to', null),
+        'conversations/sem_dono',
+      ),
+      ctx.admin
+        .from('conversations')
+        .select('last_message_at')
+        .eq('org_id', ctx.orgId)
+        .not('last_message_at', 'is', null)
+        .order('last_message_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    const comIA = rows.filter((r) => r.status === 'ai_active' && !r.ai_paused).length;
-    const humano = rows.filter((r) => r.status === 'human_active').length;
-    const naoLidas = rows.filter((r) => (r.unread_count ?? 0) > 0).length;
-    const semDono = rows.filter((r) => r.status === 'human_active' && !r.assigned_to).length;
-    const ultima = rows
-      .map((r) => r.last_message_at)
-      .filter((v): v is string => Boolean(v))
-      .sort()
-      .pop() ?? null;
+    if (total === 0) return 'Nenhuma conversa aberta no inbox agora.';
+    const ultima = (ultimaRes.data as { last_message_at: string } | null)?.last_message_at ?? null;
 
     return [
-      `Conversas abertas: ${rows.length}`,
+      `Conversas abertas: ${total}`,
       `Com a IA (AMAIA): ${comIA}`,
       `Em atendimento humano: ${humano} (sem operador atribuído: ${semDono})`,
       `Com mensagem não lida: ${naoLidas}`,
@@ -145,30 +192,27 @@ const mensagensPeriodo: JarvisTool = {
   parameters: periodoParam as unknown as Record<string, unknown>,
   async execute(params, ctx: JarvisToolContext) {
     const janela = resolverPeriodo(params.periodo as string | undefined, ctx.timezone);
-    const { data, error } = await ctx.admin
+    // Volume de mensagens estoura 1000 linhas fácil em 7/30 dias: contagem
+    // exata no servidor, nunca contar array truncado.
+    const base = () => ctx.admin
       .from('messages')
-      .select('id, direction, sender_type, conversation_id')
+      .select('id', { count: 'exact', head: true })
       .eq('org_id', ctx.orgId)
       .eq('is_private_note', false)
       .gte('created_at', janela.fromISO)
       .lt('created_at', janela.toISO);
-    if (error) throw new Error(`consulta messages: ${error.message}`);
 
-    const rows = (data ?? []) as Array<{
-      direction: string;
-      sender_type: string;
-      conversation_id: string;
-    }>;
-    if (rows.length === 0) return `Nenhuma mensagem registrada ${janela.label}.`;
+    const [total, recebidas, enviadas, daIA, deOperador] = await Promise.all([
+      contarExato(base(), 'messages'),
+      contarExato(base().eq('direction', 'inbound'), 'messages/inbound'),
+      contarExato(base().eq('direction', 'outbound'), 'messages/outbound'),
+      contarExato(base().eq('sender_type', 'ai'), 'messages/ai'),
+      contarExato(base().eq('sender_type', 'operator'), 'messages/operator'),
+    ]);
 
-    const recebidas = rows.filter((r) => r.direction === 'inbound').length;
-    const enviadas = rows.filter((r) => r.direction === 'outbound').length;
-    const daIA = rows.filter((r) => r.sender_type === 'ai').length;
-    const deOperador = rows.filter((r) => r.sender_type === 'operator').length;
-    const conversas = new Set(rows.map((r) => r.conversation_id)).size;
-
+    if (total === 0) return `Nenhuma mensagem registrada ${janela.label}.`;
     return [
-      `Mensagens ${janela.label}: ${rows.length} (em ${conversas} conversas)`,
+      `Mensagens ${janela.label}: ${total}`,
       `Recebidas de clientes: ${recebidas}`,
       `Enviadas: ${enviadas} — IA: ${daIA}, operador: ${deOperador}`,
     ].join('\n');
@@ -228,18 +272,23 @@ const funilLeads: JarvisTool = {
       is_lost: boolean;
     }>;
 
-    const { data: dealData, error: dealErr } = await ctx.admin
-      .from('deals')
-      .select('id, stage_id, pipeline_id, value, status')
-      .eq('org_id', ctx.orgId)
-      .eq('status', 'open')
-      .in('pipeline_id', pipelineIds);
-    if (dealErr) throw new Error(`consulta deals: ${dealErr.message}`);
-    const deals = (dealData ?? []) as Array<{
+    // Somar valor por estágio exige as linhas — então pagina, em vez de deixar
+    // o PostgREST cortar em 1000 e reportar um total parcial como se fosse o total.
+    const { rows: deals, truncado } = await buscarPaginado<{
       stage_id: string | null;
       pipeline_id: string | null;
       value: number | string | null;
-    }>;
+    }>(
+      (de, ate) => ctx.admin
+        .from('deals')
+        .select('id, stage_id, pipeline_id, value, status')
+        .eq('org_id', ctx.orgId)
+        .eq('status', 'open')
+        .in('pipeline_id', pipelineIds)
+        .order('id')
+        .range(de, ate),
+      'consulta deals',
+    );
 
     if (deals.length === 0) {
       return `Nenhum lead em aberto${filtroPipeline ? ` no funil "${filtroPipeline}"` : ''}.`;
@@ -268,6 +317,12 @@ const funilLeads: JarvisTool = {
       if (semStage > 0) linhas.push(`  · (sem estágio): ${semStage}`);
     }
     linhas.push(`TOTAL em aberto: ${qtdGeral} leads · ${brl(totalGeral)}`);
+    if (truncado) {
+      linhas.push(
+        `ATENÇÃO: passou de ${MAX_ROWS * MAX_PAGINAS} negócios e a leitura foi cortada — `
+        + 'os números acima são PARCIAIS. Diga isso ao responder.',
+      );
+    }
     return linhas.join('\n');
   },
 };
@@ -284,27 +339,29 @@ const vendasPeriodo: JarvisTool = {
   parameters: periodoParam as unknown as Record<string, unknown>,
   async execute(params, ctx: JarvisToolContext) {
     const janela = resolverPeriodo(params.periodo as string | undefined, ctx.timezone);
-    const [ganhos, perdidos] = await Promise.all([
-      ctx.admin
-        .from('deals')
-        .select('id, title, value, won_at')
-        .eq('org_id', ctx.orgId)
-        .eq('status', 'won')
-        .gte('won_at', janela.fromISO)
-        .lt('won_at', janela.toISO),
-      ctx.admin
-        .from('deals')
-        .select('id, title, value, lost_at')
-        .eq('org_id', ctx.orgId)
-        .eq('status', 'lost')
-        .gte('lost_at', janela.fromISO)
-        .lt('lost_at', janela.toISO),
-    ]);
-    if (ganhos.error) throw new Error(`consulta deals ganhos: ${ganhos.error.message}`);
-    if (perdidos.error) throw new Error(`consulta deals perdidos: ${perdidos.error.message}`);
+    type Deal = { title: string; value: number | string | null };
+    // Paginado pelo mesmo motivo do funil: o valor somado tem que ser o total.
+    const porStatus = (status: 'won' | 'lost', coluna: 'won_at' | 'lost_at') =>
+      buscarPaginado<Deal>(
+        (de, ate) => ctx.admin
+          .from('deals')
+          .select(`id, title, value, ${coluna}`)
+          .eq('org_id', ctx.orgId)
+          .eq('status', status)
+          .gte(coluna, janela.fromISO)
+          .lt(coluna, janela.toISO)
+          .order('id')
+          .range(de, ate),
+        `consulta deals ${status}`,
+      );
 
-    const g = (ganhos.data ?? []) as Array<{ title: string; value: number | string | null }>;
-    const p = (perdidos.data ?? []) as Array<{ title: string; value: number | string | null }>;
+    const [ganhos, perdidos] = await Promise.all([
+      porStatus('won', 'won_at'),
+      porStatus('lost', 'lost_at'),
+    ]);
+
+    const g = ganhos.rows;
+    const p = perdidos.rows;
     const valorG = g.reduce((s, d) => s + Number(d.value ?? 0), 0);
     const valorP = p.reduce((s, d) => s + Number(d.value ?? 0), 0);
 
@@ -318,6 +375,9 @@ const vendasPeriodo: JarvisTool = {
     ];
     if (g.length > 0 && g.length <= 10) {
       linhas.push(`Ganhos: ${g.map((d) => `${d.title} (${brl(Number(d.value ?? 0))})`).join('; ')}`);
+    }
+    if (ganhos.truncado || perdidos.truncado) {
+      linhas.push('ATENÇÃO: a leitura foi cortada no teto de páginas — números PARCIAIS. Diga isso ao responder.');
     }
     return linhas.join('\n');
   },

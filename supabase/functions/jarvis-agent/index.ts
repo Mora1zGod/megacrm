@@ -2,8 +2,8 @@
 // jarvis-agent  (service-role only)
 // ----------------------------------------------------------------------------
 // Agente pessoal do Gabriel. Só é acionado pelo desvio em _shared/jarvis-routing.ts,
-// que roda dentro do zernio-webhook quando o remetente está em
-// whatsapp_hub.jarvis_users. Cliente nunca chega aqui — e o AMAIA nunca vê a
+// que roda dentro do zernio-webhook e do uazapi-webhook quando o remetente está
+// em whatsapp_hub.jarvis_users. Cliente nunca chega aqui — e o AMAIA nunca vê a
 // mensagem que chega aqui.
 //
 // Fluxo:
@@ -38,6 +38,10 @@ interface JarvisRequest {
   text: string | null;
   media_url: string | null;
   content_type: string | null;
+  /** Webhook de origem: 'zernio' (default) ou 'uazapi'. */
+  provider: string | null;
+  /** Canal (whatsapp_hub.channels) que recebeu — usado no uazapi. */
+  channel_id: string | null;
   zernio_account_id: string | null;
   zernio_conversation_id: string | null;
   zernio_message_id: string | null;
@@ -196,9 +200,20 @@ Deno.serve(async (req) => {
 
     const creds = await loadAppCredentials(body.org_id);
     // Mesma credencial que já paga o AMAIA. Nenhuma chave nova.
-    const openaiKey = creds.llm_api_key ?? creds.openai_api_key;
+    //
+    // ATENÇÃO à ordem: chatWithTools e o Whisper falam SÓ com api.openai.com.
+    // Quando a org escolhe claude/gemini como provider do AMAIA,
+    // loadAppCredentials devolve a chave DAQUELE provider em llm_api_key —
+    // mandá-la para a OpenAI daria 401 em toda pergunta. Então openai_api_key
+    // primeiro (ela existe sempre: é a de embeddings/Whisper), e llm_api_key
+    // só serve de fallback quando o provider já é openai.
+    const openaiKey = creds.openai_api_key
+      ?? (creds.llm_provider === 'openai' ? creds.llm_api_key : null);
     if (!openaiKey) {
-      throw new Error('openai_api_key/llm_api_key não configurada em org_settings.');
+      throw new Error(
+        `openai_api_key não configurada em org_settings (llm_provider=${creds.llm_provider}). `
+        + 'O Jarvis usa a OpenAI para tool calling e transcrição.',
+      );
     }
 
     // --- entrada: texto ou áudio ---------------------------------------------
@@ -215,6 +230,8 @@ Deno.serve(async (req) => {
           orgId: body.org_id,
           phone: body.phone,
           zernioAccountId: body.zernio_account_id,
+          provider: body.provider,
+          channelId: body.channel_id,
           texto: 'Não consegui ouvir esse áudio. Manda por texto?',
         });
         return jsonResponse({ ok: true, skipped: 'transcricao_falhou' });
@@ -229,6 +246,8 @@ Deno.serve(async (req) => {
         orgId: body.org_id,
         phone: body.phone,
         zernioAccountId: body.zernio_account_id,
+        provider: body.provider,
+        channelId: body.channel_id,
         texto: aviso,
       });
       return jsonResponse({ ok: true, skipped: `sem_texto:${tipo}` });
@@ -307,6 +326,8 @@ Deno.serve(async (req) => {
       orgId: body.org_id,
       phone: body.phone,
       zernioAccountId: body.zernio_account_id,
+      provider: body.provider,
+      channelId: body.channel_id,
       texto: resposta,
     });
 
@@ -343,6 +364,8 @@ Deno.serve(async (req) => {
         orgId: body.org_id,
         phone: body.phone,
         zernioAccountId: body.zernio_account_id,
+        provider: body.provider,
+        channelId: body.channel_id,
         texto: 'Deu erro aqui do meu lado e não consegui responder. O log tem o detalhe.',
       });
     } catch { /* já logado acima */ }

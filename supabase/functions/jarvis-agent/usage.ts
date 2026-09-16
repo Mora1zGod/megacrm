@@ -33,7 +33,15 @@ export function estimarCustoChat(
   completionTokens: number,
 ): number {
   // Modelos com sufixo de data (gpt-4.1-mini-2025-04-14) caem no preço da base.
-  const base = Object.keys(PRECO_POR_MILHAO).find((k) => model === k || model.startsWith(`${k}-`));
+  //
+  // A ordem importa: 'gpt-4.1-mini' COMEÇA com 'gpt-4.1-', então uma busca na
+  // ordem de inserção casaria o preço do gpt-4.1 (5x mais caro) para o modelo
+  // default. Match exato primeiro; depois o prefixo MAIS LONGO.
+  const base = Object.keys(PRECO_POR_MILHAO).includes(model)
+    ? model
+    : Object.keys(PRECO_POR_MILHAO)
+      .filter((k) => model.startsWith(`${k}-`))
+      .sort((a, b) => b.length - a.length)[0];
   if (!base) {
     console.log(JSON.stringify({ event: 'jarvis_preco_desconhecido', model }));
     return 0;

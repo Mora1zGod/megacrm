@@ -27,6 +27,7 @@ import {
 } from '../_shared/channels.ts';
 import { uazapiContextFromChannel, uazapiGetChatDetails } from '../_shared/uazapi.ts';
 import { maybeAddLeadToFunnel } from '../_shared/funnel.ts';
+import { maybeRouteToJarvisUazapi } from '../_shared/jarvis-routing.ts';
 
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -411,6 +412,13 @@ Deno.serve(async (req) => {
       eventType.startsWith('connection') || eventType.includes('connection');
 
     if (isMessageEvent) {
+      // Jarvis: mensagem vinda de um numero autorizado (whatsapp_hub.jarvis_users)
+      // nao e lead — vai para o agente pessoal e NAO entra no fluxo AMAIA.
+      // Com a tabela vazia isto e um no-op e o fluxo de cliente segue igual.
+      const paraJarvis = await maybeRouteToJarvisUazapi(admin, orgId, channel, data);
+      if (paraJarvis) {
+        return jsonResponse({ ok: true, routed: 'jarvis' });
+      }
       await handleMessage(admin, orgId, channel, data, errors);
     } else if (isConnectionEvent) {
       console.log(JSON.stringify({ event: 'uazapi_connection', data: root.data ?? null }));

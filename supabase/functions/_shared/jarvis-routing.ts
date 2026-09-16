@@ -1,12 +1,17 @@
 // ============================================================================
 // _shared/jarvis-routing.ts
 // ----------------------------------------------------------------------------
-// Desvio do Jarvis no zernio-webhook.
+// Desvio do Jarvis nos webhooks de entrada.
 //
 // Regra única: se o telefone que mandou a mensagem estiver em
 // whatsapp_hub.jarvis_users (is_active), o evento NÃO segue para o fluxo de
-// lead (handleMessageReceived → insert em messages → trigger on_inbound_message
-// → process-ai-message/AMAIA). Ele é entregue à Edge Function jarvis-agent.
+// lead (insert em messages → trigger on_inbound_message → process-ai-message /
+// AMAIA). Ele é entregue à Edge Function jarvis-agent.
+//
+// Há um ponto de entrada por webhook, porque o shape do payload e as regras de
+// identidade são diferentes:
+//   · maybeRouteToJarvis        → zernio-webhook (Meta oficial / Instagram)
+//   · maybeRouteToJarvisUazapi  → uazapi-webhook (instância própria)
 //
 // Consequências assumidas (desejadas):
 //   · a mensagem do Gabriel não vira contact/conversation/message no CRM —
@@ -60,6 +65,14 @@ export function extractSenderPhone(data: Record<string, unknown>): string | null
   );
 }
 
+// Mesma extração do phoneFromJid do uazapi-webhook: o JID vira '+' + dígitos.
+function phoneFromJid(jid: string | null): string | null {
+  if (!jid) return null;
+  const digits = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  return `+${digits}`;
+}
+
 export async function findJarvisUserByPhone(
   admin: Admin,
   orgId: string,
@@ -81,8 +94,8 @@ export async function findJarvisUserByPhone(
   return (data as JarvisUserRow | null) ?? null;
 }
 
-// Dispara jarvis-agent sem bloquear a resposta ao Zernio (o Zernio re-tenta se
-// o webhook demorar/falhar; o agente leva segundos por causa do LLM).
+// Dispara jarvis-agent sem bloquear a resposta ao webhook (o provedor re-tenta
+// se demorar/falhar; o agente leva segundos por causa do LLM).
 function invokeJarvisAgent(payload: Record<string, unknown>): void {
   const url = Deno.env.get('SUPABASE_URL');
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -103,9 +116,9 @@ function invokeJarvisAgent(payload: Record<string, unknown>): void {
     .EdgeRuntime?.waitUntil?.(run);
 }
 
-// InboxWebhookMessage: { text, attachments:[{type,url}] } — mesma leitura do
-// decodeInbound do webhook, reduzida ao que o Jarvis precisa (texto ou áudio).
-function decodeForJarvis(message: Record<string, unknown>): {
+// InboxWebhookMessage (Zernio): { text, attachments:[{type,url}] } — mesma
+// leitura do decodeInbound do webhook, reduzida ao que o Jarvis precisa.
+function decodeZernio(message: Record<string, unknown>): {
   text: string | null;
   mediaUrl: string | null;
   contentType: string;
@@ -122,9 +135,29 @@ function decodeForJarvis(message: Record<string, unknown>): {
   return { text, mediaUrl, contentType: attType || 'document' };
 }
 
+// Mesma leitura do decodeContent do uazapi-webhook.
+function decodeUazapi(message: Record<string, unknown>): {
+  text: string | null;
+  mediaUrl: string | null;
+  contentType: string;
+} {
+  const text = str(message, ['text', 'caption', 'body']);
+  const mediaUrl = str(message, ['fileURL', 'fileUrl', 'file_url', 'mediaUrl']);
+  const type = (str(message, ['messageType', 'type']) ?? '').toLowerCase();
+  if (!mediaUrl) return { text: text ?? '', mediaUrl: null, contentType: 'text' };
+  if (type.includes('audio') || type.includes('ptt')) {
+    return { text: null, mediaUrl, contentType: 'audio' };
+  }
+  if (type.includes('image') || type.includes('sticker')) {
+    return { text, mediaUrl, contentType: 'image' };
+  }
+  if (type.includes('video')) return { text, mediaUrl, contentType: 'video' };
+  return { text, mediaUrl, contentType: 'document' };
+}
+
 /**
- * Devolve `true` quando o evento foi capturado pelo Jarvis e NÃO deve seguir
- * para o fluxo de cliente. `false` = segue o jogo normalmente.
+ * Zernio. Devolve `true` quando o evento foi capturado pelo Jarvis e NÃO deve
+ * seguir para o fluxo de cliente. `false` = segue o jogo normalmente.
  *
  * Só intercepta WhatsApp: DM de Instagram continua indo para o AMAIA.
  */
@@ -145,7 +178,7 @@ export async function maybeRouteToJarvis(
   const message = asObject(data.message ?? data);
   const conversation = asObject(data.conversation);
   const account = asObject(data.account);
-  const { text, mediaUrl, contentType } = decodeForJarvis(message);
+  const { text, mediaUrl, contentType } = decodeZernio(message);
 
   invokeJarvisAgent({
     org_id: orgId,
@@ -154,6 +187,8 @@ export async function maybeRouteToJarvis(
     text,
     media_url: mediaUrl,
     content_type: contentType,
+    provider: 'zernio',
+    channel_id: null,
     zernio_conversation_id: str(conversation, ['id']) ?? str(message, ['conversationId']),
     zernio_account_id:
       str(account, ['id', '_id', 'accountId']) ?? str(message, ['accountId', 'account_id']),
@@ -162,6 +197,69 @@ export async function maybeRouteToJarvis(
 
   console.log(JSON.stringify({
     event: 'jarvis_routed',
+    provider: 'zernio',
+    org_id: orgId,
+    jarvis_user_id: jarvisUser.id,
+    content_type: contentType,
+  }));
+  return true;
+}
+
+/**
+ * UAZAPI. Mesmo contrato do maybeRouteToJarvis.
+ *
+ * Diferenças que importam (todas espelhadas do handleMessage do uazapi-webhook):
+ *   · grupo e wasSentByApi são ignorados lá — aqui também;
+ *   · `fromMe` é o DONO do número digitando no celular para um lead. Isso NÃO
+ *     é conversa com o Jarvis (é atendimento), então nunca roteia — senão
+ *     quebraria o handoff (ai_paused) que o fluxo atual faz nesse caso;
+ *   · o telefone do outro lado vem do JID (chatid e variantes).
+ */
+export async function maybeRouteToJarvisUazapi(
+  admin: Admin,
+  orgId: string,
+  channel: { id: string },
+  data: Record<string, unknown>,
+): Promise<boolean> {
+  const message = asObject(data.message ?? data);
+  if (message.isGroup === true || message.wasSentByApi === true || message.fromMe === true) {
+    return false;
+  }
+
+  const phone =
+    phoneFromJid(str(message, ['chatid', 'chatId', 'chatID', 'remoteJid', 'remote_jid'])) ??
+    phoneFromJid(str(message, ['sender', 'from'])) ??
+    phoneFromJid(str(asObject(data.chat), ['id', 'wa_chatid', 'remoteJid'])) ??
+    // NOTA: o uazapi-webhook escreve este último fallback como
+    // `str(asObject(asObject(message.key), ['remoteJid']))` — os parênteses
+    // estão trocados, então `str` recebe 1 argumento e `keys` fica undefined.
+    // Se o fluxo chegasse até ali, seria TypeError. É um bug pré-existente do
+    // repositório (fora do escopo deste PR); aqui vai escrito certo.
+    phoneFromJid(str(asObject(message.key), ['remoteJid']));
+  if (!phone) return false;
+
+  const jarvisUser = await findJarvisUserByPhone(admin, orgId, phone);
+  if (!jarvisUser) return false;
+
+  const { text, mediaUrl, contentType } = decodeUazapi(message);
+
+  invokeJarvisAgent({
+    org_id: orgId,
+    jarvis_user_id: jarvisUser.id,
+    phone,
+    text,
+    media_url: mediaUrl,
+    content_type: contentType,
+    provider: 'uazapi',
+    channel_id: channel.id,
+    zernio_conversation_id: null,
+    zernio_account_id: null,
+    zernio_message_id: str(message, ['messageid', 'id']),
+  });
+
+  console.log(JSON.stringify({
+    event: 'jarvis_routed',
+    provider: 'uazapi',
     org_id: orgId,
     jarvis_user_id: jarvisUser.id,
     content_type: contentType,

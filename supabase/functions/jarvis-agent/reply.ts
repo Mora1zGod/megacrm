@@ -43,15 +43,22 @@ export async function responderWhatsApp(
     orgId: string;
     phone: string;
     zernioAccountId: string | null;
+    /** Provedor do webhook que trouxe a mensagem: 'zernio' (default) ou 'uazapi'. */
+    provider?: string | null;
+    /** Canal (whatsapp_hub.channels) que recebeu — obrigatório no uazapi. */
+    channelId?: string | null;
     texto: string;
   },
 ): Promise<void> {
   const partes = fatiarTexto(input.texto);
 
+  // A resposta volta pelo MESMO canal que recebeu a pergunta: o roteamento
+  // informa provider/channel_id, então uma pergunta que chegou por UAZAPI é
+  // respondida pela instância UAZAPI, não pelo número oficial.
   const sendCtx = await getSendContextForConversation(admin, {
     org_id: input.orgId,
-    channel_id: null,
-    provider: null, // sem conversa no CRM: cai no default 'zernio'
+    channel_id: input.channelId ?? null,
+    provider: input.provider ?? null, // null: cai no default 'zernio'
     zernio_account_id: input.zernioAccountId,
   });
 
