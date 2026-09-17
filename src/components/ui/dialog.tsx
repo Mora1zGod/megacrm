@@ -43,17 +43,17 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center px-4 py-8"
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm fade-in"
         onClick={onClose}
       />
       <div
         className={cn(
-          'relative w-full glass-card p-6 shadow-2xl max-h-[calc(100vh-4rem)] overflow-auto',
+          'fade-scale-in relative w-full glass-card p-6 shadow-[var(--shadow-lg)] max-h-[calc(100vh-4rem)] overflow-auto',
           // background-color sólida por baixo do gradiente translúcido do
           // glass-card: nada do fundo vaza, mantendo o tint azul e a borda.
           opaque && 'bg-[#0d101f]',
