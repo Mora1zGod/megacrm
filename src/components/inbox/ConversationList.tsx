@@ -1,6 +1,7 @@
 import { Bot, Inbox, Instagram, Lock, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { WhatsappProvider } from '@/hooks/useWhatsappProvider';
 import type { ConversationChannel, ConversationWithContact } from '@/types/inbox';
 
@@ -61,7 +62,20 @@ export function ConversationList({
   providerOf,
 }: ConversationListProps) {
   if (loading) {
-    return <div className="p-6 text-center text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+    return (
+      <div className="space-y-1 px-2 py-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-start gap-2.5 px-3 py-2.5">
+            <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+            <div className="flex-1 min-w-0 space-y-1.5 pt-0.5">
+              <Skeleton className="h-3.5 w-2/5" />
+              <Skeleton className="h-3 w-4/5" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
   if (conversations.length === 0) {
     return (
