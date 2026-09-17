@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { PERIOD_PRESETS, periodRange, type PeriodKey } from '@/lib/dashboard';
 import { useSalesDashboard } from '@/hooks/useSalesDashboard';
 import { useOperators } from '@/hooks/useOperators';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function formatBRL(v: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -36,7 +37,11 @@ export default function ReportsPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+        <div className="flex-1 space-y-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-4">
           <ReportSection title="Vendas">
