@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { LayoutDashboard, MessageSquare, Briefcase, CalendarClock, Percent, Clock3, Bot, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useSalesDashboard } from '@/hooks/useSalesDashboard';
 import { useDashboardPrefs } from '@/hooks/useDashboardPrefs';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
@@ -227,23 +228,14 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void refreshAll()}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 rounded-lg border border-[rgba(14,154,160,0.2)] px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+          <Button variant="outline" size="sm" onClick={() => void refreshAll()} loading={refreshing}>
+            <RefreshCw className="h-3.5 w-3.5" />
             Atualizar
-          </button>
-          <button
-            type="button"
-            onClick={() => setCustomizeOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg border border-[rgba(14,154,160,0.2)] px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-          >
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCustomizeOpen((v) => !v)}>
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Personalizar dashboard
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -302,9 +294,9 @@ export default function DashboardPage() {
         <div className="glass-card p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-label">Widgets exibidos</div>
-            <button onClick={() => setCustomizeOpen(false)} aria-label="Fechar" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+            <Button variant="ghost" size="icon" onClick={() => setCustomizeOpen(false)} aria-label="Fechar">
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {WIDGETS.map((w) => (
