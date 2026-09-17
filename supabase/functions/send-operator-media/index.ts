@@ -83,6 +83,38 @@ Deno.serve(async (req) => {
     }
     const channel = convRow.channel === 'instagram' ? 'instagram' : 'whatsapp';
 
+    // Mesma regra de send-operator-message: no Instagram, 24h-7dias exige a
+    // tag HUMAN_AGENT (só vale porque este endpoint só atende operador/admin
+    // autenticado — nunca a IA). Acima de 7 dias, bloqueia antes de gastar
+    // upload de mídia.
+    let humanAgentTag = false;
+    if (channel === 'instagram') {
+      const { data: lastInbound } = await admin
+        .from('messages')
+        .select('created_at')
+        .eq('conversation_id', conversationId)
+        .eq('direction', 'inbound')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const lastInboundAt = (lastInbound as { created_at?: string } | null)?.created_at;
+      const hoursSince = lastInboundAt
+        ? (Date.now() - new Date(lastInboundAt).getTime()) / (60 * 60 * 1000)
+        : Infinity;
+      if (hoursSince > 24) {
+        if (hoursSince > 24 * 7) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Mais de 7 dias desde a última mensagem do contato no Instagram — a Meta não permite mais nenhuma resposta nesta conversa.',
+            },
+            { status: 400 },
+          );
+        }
+        humanAgentTag = true;
+      }
+    }
+
     const contentType = classify(file.type || '');
     const mime = file.type || 'application/octet-stream';
     const filename = voiceNote ? 'voice-note.ogg' : (file.name || `arquivo-${contentType}`);
@@ -115,7 +147,7 @@ Deno.serve(async (req) => {
         zernioAccountId: convRow.zernio_account_id ?? null,
         provider: convRow.provider ?? null,
       },
-      { attachmentUrl: mediaUrl, voiceNote, text: caption || undefined },
+      { attachmentUrl: mediaUrl, voiceNote, text: caption || undefined, humanAgentTag },
     );
 
     // 4. Persiste a linha (media_url = url do Zernio, baixável pelo thread).

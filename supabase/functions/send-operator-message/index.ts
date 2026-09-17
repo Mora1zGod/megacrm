@@ -74,6 +74,44 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'Conversa não encontrada.' }, { status: 404 });
     }
 
+    const convRow0 = conv as { channel: 'whatsapp' | 'instagram' | null };
+    const channel = convRow0.channel === 'instagram' ? 'instagram' : 'whatsapp';
+
+    // Janela de mensagens — calculada no servidor, nunca confiando no cliente.
+    // WhatsApp: 24h, sem exceção (fora dela só template — ver
+    // send-operator-template). Instagram: 24h livre; de 24h até 7 dias, só
+    // atendimento HUMANO pode responder via texto livre com a tag HUMAN_AGENT
+    // (confirmado em docs.zernio.com/platforms/instagram) — e é exatamente o
+    // que esta function é: todo caller aqui já passou por requireOrgCaller
+    // como admin/operator, nunca a IA. Acima de 7 dias, nem isso é permitido.
+    let humanAgentTag = false;
+    if (!isPrivate && channel === 'instagram') {
+      const { data: lastInbound } = await admin
+        .from('messages')
+        .select('created_at')
+        .eq('conversation_id', conversationId)
+        .eq('direction', 'inbound')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const lastInboundAt = (lastInbound as { created_at?: string } | null)?.created_at;
+      const hoursSince = lastInboundAt
+        ? (Date.now() - new Date(lastInboundAt).getTime()) / (60 * 60 * 1000)
+        : Infinity;
+      if (hoursSince > 24) {
+        if (hoursSince > 24 * 7) {
+          return jsonResponse(
+            {
+              ok: false,
+              error: 'Mais de 7 dias desde a última mensagem do contato no Instagram — a Meta não permite mais nenhuma resposta nesta conversa. Peça pro contato mandar mensagem de novo.',
+            },
+            { status: 400 },
+          );
+        }
+        humanAgentTag = true;
+      }
+    }
+
     // Insert the message row first. UI gets it from realtime immediately.
     const { data: inserted, error: insErr } = await admin
       .from('messages')
@@ -108,8 +146,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, message_id: message.id, sent_to_zernio: false });
     }
 
-    // Envia via Zernio. Mensagem livre exige a janela de 24h aberta; fora dela
-    // o Zernio responde com erro (registrado em meta_status, sem falhar o DB).
+    // Envia via Zernio. Mensagem livre exige a janela de 24h aberta (ou, no
+    // Instagram, a extensão de 7 dias com HUMAN_AGENT calculada acima); fora
+    // dela o Zernio responde com erro (registrado em meta_status, sem falhar
+    // o DB).
     const convRow = conv as {
       contact_id: string;
       channel: 'whatsapp' | 'instagram' | null;
@@ -118,7 +158,6 @@ Deno.serve(async (req) => {
       zernio_account_id?: string | null;
       provider?: string | null;
     };
-    const channel = convRow.channel === 'instagram' ? 'instagram' : 'whatsapp';
 
     try {
       const { data: contactRow } = await admin
@@ -141,7 +180,7 @@ Deno.serve(async (req) => {
           zernioAccountId: convRow.zernio_account_id ?? null,
           provider: convRow.provider ?? null,
         },
-        { text: content },
+        { text: content, humanAgentTag },
       );
 
       await admin

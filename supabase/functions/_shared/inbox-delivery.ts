@@ -47,6 +47,9 @@ export interface InboxSendPayload {
   attachmentUrl?: string;
   attachmentType?: 'image' | 'video' | 'audio' | 'file';
   voiceNote?: boolean;
+  // Só Instagram, só chamado a partir de send-operator-message/send-operator-media
+  // (nunca da IA) — ver comentário em zernio.ts::sendInboxMessage.
+  humanAgentTag?: boolean;
 }
 
 interface Resolved {

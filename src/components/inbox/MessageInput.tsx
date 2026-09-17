@@ -12,6 +12,13 @@ interface MessageInputProps {
   disabled?: boolean;
   // false = contato fora da janela de 24h (Meta bloqueia texto livre).
   withinWindow?: boolean;
+  // Só quando true o composer trava de fato e empurra pro fluxo de template
+  // — hoje isso nunca é o caso do Instagram dentro de 7 dias (ver InboxPage).
+  requiresTemplateRestart?: boolean;
+  // Instagram entre 24h e 7 dias: texto livre continua liberado (atendimento
+  // humano via tag HUMAN_AGENT, aplicada no backend) — só avisa que não é
+  // mais a janela padrão.
+  instagramHumanAgentWindow?: boolean;
   // Envio OTIMISTA de texto/nota: o balão aparece na hora e a requisição roda
   // em segundo plano (dono do estado é o useMessages).
   onSendText: (text: string, isPrivate: boolean) => Promise<SendResult>;
@@ -19,7 +26,13 @@ interface MessageInputProps {
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
-export function MessageInput({ conversationId, disabled, withinWindow = true, onSendText }: MessageInputProps) {
+export function MessageInput({
+  conversationId,
+  disabled,
+  requiresTemplateRestart = false,
+  instagramHumanAgentWindow = false,
+  onSendText,
+}: MessageInputProps) {
   const [content, setContent] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [showTemplate, setShowTemplate] = useState(false);
@@ -256,7 +269,7 @@ export function MessageInput({ conversationId, disabled, withinWindow = true, on
         )}
       </div>
 
-      {!withinWindow && !isPrivate ? (
+      {requiresTemplateRestart && !isPrivate ? (
         <div className="flex flex-col gap-2 rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.05)] p-3">
           <div className="flex items-center gap-2 text-sm text-[#FBBF24]">
             <Clock className="h-4 w-4" />
@@ -277,9 +290,15 @@ export function MessageInput({ conversationId, disabled, withinWindow = true, on
             </span>
           </div>
         </div>
+      ) : instagramHumanAgentWindow && !isPrivate ? (
+        <div className="flex items-center gap-2 rounded-lg border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-[11px] text-[#FBBF24]">
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          Fora da janela padrão de 24h do Instagram — sua resposta ainda é entregue
+          como atendimento humano, válida por até 7 dias desde a última mensagem do contato.
+        </div>
       ) : null}
 
-      {(withinWindow || isPrivate) && file && (
+      {(!requiresTemplateRestart || isPrivate) && file && (
         <div className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-xs">
           <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
           <span className="truncate text-[var(--color-text-primary)]">{file.name}</span>
@@ -300,7 +319,7 @@ export function MessageInput({ conversationId, disabled, withinWindow = true, on
         </div>
       )}
 
-      <div className={`flex items-end gap-2 ${!withinWindow && !isPrivate ? 'hidden' : ''}`}>
+      <div className={`flex items-end gap-2 ${requiresTemplateRestart && !isPrivate ? 'hidden' : ''}`}>
         <input
           ref={fileInputRef}
           type="file"

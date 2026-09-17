@@ -167,7 +167,13 @@ export interface InboxSendResult {
 
 // POST /inbox/conversations/{id}/messages — envia texto/midia numa conversa
 // existente (dentro da janela de 24h, sem template). Corpo real:
-// { accountId, message, attachmentUrl?, attachmentType?, voiceNote? }.
+// { accountId, message, attachmentUrl?, attachmentType?, voiceNote?, messageTag?, messagingType? }.
+//
+// humanAgentTag: aplica messageTag: "HUMAN_AGENT" + messagingType: "MESSAGE_TAG"
+// — confirmado na doc oficial do Zernio (docs.zernio.com/platforms/instagram):
+// permite responder no Instagram por até 7 dias após a última mensagem do
+// contato (contra as 24h padrão), mas SÓ é válido para atendimento humano —
+// nunca deve ser usado em envio automático/IA (violaria a política da Meta).
 export async function sendInboxMessage(input: {
   apiKey: string;
   accountId: string;
@@ -176,6 +182,7 @@ export async function sendInboxMessage(input: {
   attachmentUrl?: string;
   attachmentType?: 'image' | 'video' | 'audio' | 'file';
   voiceNote?: boolean;
+  humanAgentTag?: boolean;
 }): Promise<InboxSendResult> {
   const body: Record<string, unknown> = { accountId: input.accountId };
   if (input.attachmentUrl) {
@@ -185,6 +192,10 @@ export async function sendInboxMessage(input: {
     if (input.text) body.message = input.text;
   } else {
     body.message = input.text ?? '';
+  }
+  if (input.humanAgentTag) {
+    body.messageTag = 'HUMAN_AGENT';
+    body.messagingType = 'MESSAGE_TAG';
   }
   const res = await zfetch(
     input.apiKey,

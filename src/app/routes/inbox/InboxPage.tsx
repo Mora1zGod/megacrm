@@ -155,20 +155,34 @@ export default function InboxPage() {
   }, [selected, isLocked]);
 
   // Janela de 24h: aberta se a última mensagem do CONTATO foi há menos de 24h.
-  // Fora dela, a Meta só permite reiniciar com template.
-  const withinWindow = useMemo(() => {
+  // Fora dela, a Meta só permite reiniciar com template (WhatsApp) — Instagram
+  // não tem template, mas permite responder por atendimento humano até 7 dias
+  // (tag HUMAN_AGENT, aplicada automaticamente no backend só pra sends de
+  // operador — nunca da IA). Ver send-operator-message/index.ts.
+  const hoursSinceLastInbound = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].direction === 'inbound') {
-        return Date.now() - new Date(messages[i].created_at).getTime() < 24 * 60 * 60 * 1000;
+        return (Date.now() - new Date(messages[i].created_at).getTime()) / (60 * 60 * 1000);
       }
     }
-    return false;
+    return Infinity;
   }, [messages]);
+  const withinWindow = hoursSinceLastInbound < 24;
 
   // UAZAPI (não oficial) não tem janela de 24h — envio liberado sempre. A
   // trava só vale para a API oficial da Meta (WhatsApp Meta e Instagram).
   const selectedProvider = selected ? providerOf(selected) : 'meta';
   const effectiveWithinWindow = selectedProvider === 'uazapi' ? true : withinWindow;
+
+  // Instagram: 24h-7dias ainda permite texto livre (atendimento humano) —
+  // só bloqueia de verdade acima de 7 dias, ou no WhatsApp fora de 24h (só
+  // template ali). Sem isso, o composer escondia o campo de texto no
+  // Instagram e empurrava pro fluxo de template, que não existe lá.
+  const selectedChannel = selected?.channel === 'instagram' ? 'instagram' : 'whatsapp';
+  const instagramHumanAgentWindow =
+    selectedChannel === 'instagram' && hoursSinceLastInbound >= 24 && hoursSinceLastInbound <= 24 * 7;
+  const requiresTemplateRestart =
+    selectedProvider !== 'uazapi' && !effectiveWithinWindow && !instagramHumanAgentWindow;
 
   // Deep-link vindo do drawer do card do funil: ?contact=<uuid> seleciona a
   // conversa daquele contato assim que a lista carrega.
@@ -372,6 +386,8 @@ export default function InboxPage() {
                 <MessageInput
                   conversationId={selected.id}
                   withinWindow={effectiveWithinWindow}
+                  requiresTemplateRestart={requiresTemplateRestart}
+                  instagramHumanAgentWindow={instagramHumanAgentWindow}
                   onSendText={sendText}
                 />
               )}
