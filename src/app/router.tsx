@@ -4,6 +4,7 @@ import { AppLayout } from './layout/AppLayout';
 import { useSupabaseConfig } from '@/hooks/useSupabase';
 import { useAuth } from './providers/AuthProvider';
 import { useAppUser } from './providers/AppUserProvider';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Lazy loading the page chunks keeps the initial bundle lean.
 const SetupPage = lazy(() => import('./routes/setup/SetupPage'));
@@ -29,8 +30,18 @@ const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
 
 function PageFallback() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="text-label opacity-60">Carregando...</div>
+    <div className="max-w-7xl mx-auto space-y-6 p-6" aria-busy="true" aria-label="Carregando página">
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+      </div>
+      <Skeleton className="h-64" />
     </div>
   );
 }

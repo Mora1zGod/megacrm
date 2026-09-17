@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { BookOpen, Globe, Loader2, Plus, FileText, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,10 @@ export default function KnowledgePage() {
         {/* Mobile (<md): lista de cartões em vez da tabela larga. */}
         <div className="md:hidden space-y-2">
           {loading ? (
-            <div className="p-6 text-center text-[var(--color-text-secondary)] opacity-60">Carregando...</div>
+            <div className="space-y-2">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
           ) : items.length === 0 ? (
             <div className="p-6 text-center text-[var(--color-text-secondary)] opacity-60">
               Nenhuma entrada ainda. Adicione texto ou URL pra o agente IA consultar.
@@ -115,11 +119,15 @@ export default function KnowledgePage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-[var(--color-text-secondary)] opacity-60">
-                    Carregando...
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-t border-[var(--color-border-soft)]">
+                    <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-16" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-14" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                    <td className="p-3" />
+                  </tr>
+                ))
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-[var(--color-text-secondary)] opacity-60">

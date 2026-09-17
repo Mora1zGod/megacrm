@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { CalendarClock, Check, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -121,7 +122,10 @@ export function ProximaAcao({ dealId, contactId, deals }: ProximaAcaoProps) {
 
       {/* Lista de pendentes — a mais próxima em destaque */}
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)] opacity-60">Carregando…</p>
+        <div className="space-y-1.5">
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
+        </div>
       ) : pending.length === 0 ? (
         <p className="text-sm text-[var(--color-text-secondary)] opacity-70">Nenhuma ação agendada.</p>
       ) : (
