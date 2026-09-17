@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { requireAdmin } from '../src/lib/admin-auth.js';
+import { requireAdmin, isAuthFailure } from '../src/lib/admin-auth.js';
 import { decrypt, getCredential, setCredential } from '../src/lib/credentials.js';
 import {
   ZernioError,
@@ -344,7 +344,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
     const auth = await requireAdmin(authHeaderOf(req));
-    if (!auth.ok) {
+    if (isAuthFailure(auth)) {
       return res.status(auth.status).json({ success: false, message: auth.message });
     }
 

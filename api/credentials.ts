@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { credentialExists, setCredential } from '../src/lib/credentials.js';
-import { requireAdmin } from '../src/lib/admin-auth.js';
+import { requireAdmin, isAuthFailure } from '../src/lib/admin-auth.js';
 import { setupConfig } from '../setup.config.js';
 
 type ApiRequest = {
@@ -55,7 +55,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
     const auth = await requireAdmin(req.headers?.authorization ?? req.headers?.Authorization);
-    if (!auth.ok) {
+    if (isAuthFailure(auth)) {
       return res.status(auth.status).json({ success: false, message: auth.message });
     }
 

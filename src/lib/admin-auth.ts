@@ -13,6 +13,17 @@ export type SuperAdminAuthResult =
   | { ok: true; userId: string; orgId: string | null; homeOrgId: string | null }
   | { ok: false; status: number; message: string };
 
+// Type guard explícito — em vez de contar com `!auth.ok` sozinho pra estreitar
+// a union (a build de function da Vercel, isolada por arquivo, às vezes não
+// preserva o narrowing corretamente entre arquivos). Com este helper, o
+// TypeScript estreita de forma garantida mesmo checando cada api/*.ts sem o
+// contexto completo do projeto.
+export function isAuthFailure(
+  auth: AdminAuthResult | SuperAdminAuthResult,
+): auth is { ok: false; status: number; message: string } {
+  return auth.ok === false;
+}
+
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
