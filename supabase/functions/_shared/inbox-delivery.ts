@@ -20,6 +20,7 @@ import {
   isConversationNotFoundError,
   resolveInboxConversation,
   sendInboxMessage,
+  sendTypingIndicator,
 } from './zernio.ts';
 import { uazapiSendMedia, uazapiSendText } from './uazapi.ts';
 import { getSendContextForConversation } from './channels.ts';
@@ -160,6 +161,16 @@ export async function sendInboxWithResolve(
     });
     return sent.messageId;
   };
+
+  // "Digitando..." antes de mandar de verdade — cobre IA e operador humano,
+  // já que os dois chamam esta mesma função. Best-effort (nunca lança, ver
+  // sendTypingIndicator); não dispara na tentativa de retry pra não repetir
+  // o sinal sem necessidade.
+  await sendTypingIndicator({
+    apiKey: ctx.apiKey,
+    accountId: resolved.accountId,
+    conversationId: resolved.conversationId,
+  });
 
   try {
     return await trySend(resolved);

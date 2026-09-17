@@ -128,6 +128,35 @@ function pickString(body: unknown, keys: string[]): string | null {
   return null;
 }
 
+// POST /inbox/conversations/{id}/typing — mostra "digitando..." pro contato.
+// Confirmado na doc oficial do Zernio (docs.zernio.com/messages/send-typing-indicator):
+// corpo real { accountId }. WhatsApp mostra "digitando..." por até 25s; exige
+// uma mensagem inbound recente na conversa (referência da Meta) e, de brinde,
+// já marca essa mensagem como lida. Outras plataformas: 200 no-op.
+//
+// Best-effort DE VERDADE — a própria API do Zernio sempre devolve 200, mas
+// engolimos qualquer erro de rede/auth aqui dentro também: isso nunca deve
+// atrasar ou derrubar o envio real da mensagem (IA ou operador).
+export async function sendTypingIndicator(input: {
+  apiKey: string;
+  accountId: string;
+  conversationId: string;
+}): Promise<void> {
+  try {
+    await zfetch(
+      input.apiKey,
+      `/inbox/conversations/${encodeURIComponent(input.conversationId)}/typing`,
+      { method: 'POST', body: JSON.stringify({ accountId: input.accountId }) },
+    );
+  } catch (err) {
+    console.warn(JSON.stringify({
+      event: 'typing_indicator_failed',
+      conversationId: input.conversationId,
+      message: err instanceof Error ? err.message : String(err),
+    }));
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Inbox (mensagens 1:1 — IA e operador)
 // ---------------------------------------------------------------------------
