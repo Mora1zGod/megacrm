@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Plus, Trash2, Zap } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
@@ -124,7 +125,10 @@ export function FunnelAutomationsTab() {
       )}
 
       {loading ? (
-        <div className="text-label opacity-60">Carregando…</div>
+        <div className="space-y-2">
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+        </div>
       ) : pipelineAutomations.length === 0 ? (
         <div className="glass-card p-6 text-sm text-[var(--color-text-secondary)]">
           Nenhuma automação neste funil. Crie a primeira: quando o lead entrar numa etapa,

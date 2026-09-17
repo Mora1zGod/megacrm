@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Copy, FileEdit, Plus, Archive } from 'lucide-react';
 import { useAutomationFlows, type AutomationFlow } from '@/hooks/useAutomationFlows';
@@ -57,7 +58,11 @@ export function FlowsTab() {
       {error && <p className="text-sm text-[var(--color-error)]">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
       ) : flows.length === 0 ? (
         <div className="glass-card p-8 text-center">
           <p className="text-sm text-[var(--color-text-secondary)] mb-3">

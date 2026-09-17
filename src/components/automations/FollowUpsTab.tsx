@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { AlertTriangle, Plus, Timer, Trash2 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
@@ -97,7 +98,11 @@ export function FollowUpsTab() {
       )}
 
       {loading ? (
-        <div className="text-label opacity-60">Carregando…</div>
+        <div className="space-y-2">
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
+        </div>
       ) : rules.length === 0 ? (
         <div className="glass-card p-6 text-sm text-[var(--color-text-secondary)]">
           Nenhuma regra de follow-up. Crie regras por tempo de inatividade, tempo sem compra
