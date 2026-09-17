@@ -7,6 +7,8 @@ import { useSalesDashboard } from '@/hooks/useSalesDashboard';
 import { periodRange } from '@/lib/dashboard';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DealDrawer } from '@/components/funil/DealDrawer';
 import { FunilManager } from '@/components/funil/FunilManager';
 import { applyFunilFilters, EMPTY_FILTERS, FunilFilters, sortFunilDeals, type FunilFilterState, type FunilSort } from '@/components/funil/FunilFilters';
@@ -113,14 +115,9 @@ export default function FunilPage() {
 
         {/* Atualizar + seletor de funil + arquivados + gestão */}
         <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-          <button
-            onClick={() => void reload()}
-            disabled={loading}
-            title="Atualizar funil"
-            className="inline-flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.25)] px-3 py-2 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-          </button>
+          <Button variant="outline" size="sm" onClick={() => void reload()} loading={loading} title="Atualizar funil">
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
           <button
             onClick={() => setArchivedOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.25)] px-3 py-2 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
@@ -216,7 +213,20 @@ export default function FunilPage() {
       {error && <LoadErrorBanner message={error} onRetry={() => void reload()} />}
 
       {loading ? (
-        <div className="text-label opacity-60">Carregando funil...</div>
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {Array.from({ length: 4 }).map((_, col) => (
+            <div key={col} className="w-72 shrink-0 space-y-3">
+              <Skeleton className="h-5 w-24" />
+              {Array.from({ length: 3 }).map((_, card) => (
+                <div key={card} className="glass-card p-3 space-y-2">
+                  <Skeleton className="h-3.5 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       ) : !pipeline ? (
         <div className="glass-card p-6 text-sm text-[var(--color-text-secondary)]">
           Nenhum funil comercial configurado.

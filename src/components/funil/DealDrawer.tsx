@@ -6,6 +6,7 @@ import { getSupabase } from '@/lib/supabase';
 import { useDealDetail } from '@/hooks/useDealDetail';
 import { useOperators } from '@/hooks/useOperators';
 import { ProximaAcao } from '@/components/crm/ProximaAcao';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   CONTACT_SOURCE_LABEL,
   CUSTOM_FIELD_TYPE_LABEL,
@@ -159,7 +160,18 @@ export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageC
         )}
 
         {loading && !contact ? (
-          <div className="p-6 text-label opacity-60">Carregando ficha...</div>
+          <div className="space-y-6 p-5">
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
+            <Skeleton className="h-24" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
+            </div>
+          </div>
         ) : (
           <div className="space-y-6 p-5">
             {/* Valor + temperatura + tipo */}
