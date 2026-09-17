@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useIntegrationsStatus } from '@/hooks/useIntegrationsStatus';
 
@@ -19,7 +20,12 @@ export default function IntegrationsPage() {
 
       <div className="flex-1 overflow-y-auto space-y-2">
         {loading ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+          <div className="space-y-2">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
         ) : (
           statuses.map((s) => (
             <div

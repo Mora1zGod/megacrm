@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Building2, Loader2, Plus, LogIn, Pencil, Ban, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -153,8 +154,10 @@ export default function AdminPage() {
 
       <Card>
         {loading ? (
-          <div className="text-sm text-[var(--color-text-secondary)] opacity-60 py-6 text-center">
-            Carregando...
+          <div className="space-y-2 p-2">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
           </div>
         ) : orgs.length === 0 ? (
           <div className="text-sm text-[var(--color-text-secondary)] opacity-60 py-6 text-center">

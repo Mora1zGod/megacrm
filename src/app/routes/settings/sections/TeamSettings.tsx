@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Circle, Loader2, Mail, Plus, Settings2, Trash2, UserPlus, Users } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { extractFunctionErrorMessage } from '@/lib/functionError';
+import { Skeleton } from '@/components/ui/skeleton';
 import { logAudit } from '@/hooks/useAuditLog';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { Button } from '@/components/ui/button';
@@ -181,8 +182,10 @@ export function TeamSettings() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-        <Loader2 className="h-4 w-4 animate-spin" /> Carregando equipe...
+      <div className="space-y-2">
+        <Skeleton className="h-14" />
+        <Skeleton className="h-14" />
+        <Skeleton className="h-14" />
       </div>
     );
   }

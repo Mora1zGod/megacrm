@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Loader2, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -190,7 +191,10 @@ export function AgentMediaSettings() {
         <div className="space-y-2">
           <div className="text-label">Mídias cadastradas</div>
           {loading ? (
-            <div className="text-sm text-[var(--color-text-secondary)] opacity-60">Carregando...</div>
+            <div className="space-y-2">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
           ) : items.length === 0 ? (
             <div className="text-sm text-[var(--color-text-secondary)] opacity-60">Nenhuma mídia ainda.</div>
           ) : (

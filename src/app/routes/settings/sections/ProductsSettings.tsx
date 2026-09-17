@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Loader2, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -247,7 +248,11 @@ export function ProductsSettings() {
           <div className="text-label">Catálogo</div>
           {error && <LoadErrorBanner message={error} onRetry={() => void reload()} />}
           {loading ? (
-            <div className="py-8 text-center text-label opacity-60">Carregando...</div>
+            <div className="space-y-2 py-2">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
+            </div>
           ) : products.length === 0 ? (
             <div className="py-8 text-center text-sm text-[var(--color-text-secondary)] opacity-60">
               <Package className="mx-auto mb-2 h-6 w-6 opacity-50" />

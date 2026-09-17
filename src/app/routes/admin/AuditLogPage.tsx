@@ -1,4 +1,5 @@
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ACTION_LABELS: Record<string, string> = {
   team_invite: 'Convidou membro da equipe',
@@ -22,7 +23,12 @@ export default function AuditLogPage() {
 
       <div className="flex-1 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]">
         {loading ? (
-          <p className="p-4 text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+          <div className="p-4 space-y-2">
+            <Skeleton className="h-8" />
+            <Skeleton className="h-8" />
+            <Skeleton className="h-8" />
+            <Skeleton className="h-8" />
+          </div>
         ) : rows.length === 0 ? (
           <div className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
             Nenhum evento registrado ainda.

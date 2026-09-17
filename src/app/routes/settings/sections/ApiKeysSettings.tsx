@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Check, Copy, Key, Plus, Trash2 } from 'lucide-react';
 import { useApiKeys } from '@/hooks/useApiKeys';
@@ -44,7 +45,10 @@ export function ApiKeysSettings() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+        <div className="space-y-2">
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
+        </div>
       ) : keys.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[rgba(148,163,184,0.25)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
           Nenhuma chave gerada ainda.
