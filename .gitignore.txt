@@ -1,0 +1,27 @@
+# Dependências (reinstala com npm install, nunca versiona)
+node_modules/
+
+# Build
+dist/
+build/
+
+# Variáveis de ambiente e segredos — NUNCA subir isso pro GitHub
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
