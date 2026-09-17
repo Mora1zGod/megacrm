@@ -8,6 +8,7 @@ import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { Dialog } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type VisitsView = 'agenda' | 'lista';
 
@@ -249,7 +250,12 @@ export default function VisitsPage() {
                   {WEEKDAYS[i]} {day.getDate()}
                 </div>
                 <div className="space-y-1.5">
-                  {loading && dayVisits.length === 0 ? null : dayVisits.map((v) => {
+                  {loading && dayVisits.length === 0 ? (
+                    <>
+                      <Skeleton className="h-8" />
+                      <Skeleton className="h-8" />
+                    </>
+                  ) : dayVisits.map((v) => {
                     // Muito contato do WhatsApp vem com nome vazio ou só emoji
                     // (o próprio perfil do cliente). Nesses casos o telefone é
                     // o único identificador útil pro operador.
@@ -552,8 +558,8 @@ function ReagendarDialog({ visit, onClose, onSaved }: { visit: Visit; onClose: (
         </p>
       </div>
       <div className="flex justify-end gap-2 pt-4">
-        <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)]">Cancelar</button>
-        <Button onClick={() => void salvar()} disabled={saving}>{saving ? 'Salvando...' : 'Reagendar'}</Button>
+        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button onClick={() => void salvar()} loading={saving}>Reagendar</Button>
       </div>
     </Dialog>
   );
@@ -565,7 +571,12 @@ function ReagendarDialog({ visit, onClose, onSaved }: { visit: Visit; onClose: (
 function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit) => void }) {
   const sorted = [...visits].sort((a, b) => (a.visit_date + a.visit_time).localeCompare(b.visit_date + b.visit_time));
   if (sorted.length === 0) {
-    return <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">Nenhuma visita nesta semana.</div>;
+    return (
+      <div className="glass-card p-6 text-center">
+        <p className="text-sm text-[var(--color-text-secondary)]">Nenhuma visita nesta semana.</p>
+        <p className="text-xs text-[var(--color-text-muted)] mt-1">Troque a semana no calendário acima ou agende uma nova visita.</p>
+      </div>
+    );
   }
   return (
     <div className="glass-card overflow-hidden p-0">
