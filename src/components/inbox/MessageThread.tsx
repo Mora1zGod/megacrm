@@ -368,7 +368,12 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                 'max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm transition-opacity',
                 isInbound
                   ? 'bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] rounded-bl-md'
-                  : 'bg-[var(--accent-primary)] text-white rounded-br-md',
+                  : m.sender_type === 'ai'
+                    // AMAIA: contorno na cor de marca, fundo transparente —
+                    // identidade própria sem virar mais uma caixa teal sólida
+                    // igual ao operador humano (era a mesma cor pros dois).
+                    ? 'border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] rounded-br-md'
+                    : 'bg-[var(--accent-primary)] text-white rounded-br-md',
                 m._state === 'pending' && 'opacity-70',
                 (m._state === 'failed' || m.meta_status === 'failed') &&
                   'ring-1 ring-[var(--color-error)]',
