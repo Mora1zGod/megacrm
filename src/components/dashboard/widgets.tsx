@@ -417,12 +417,27 @@ export function OriginBarsWidget({
 // comparação com período anterior.
 // ---------------------------------------------------------------------------
 
+// Cada tom usa a MESMA fórmula (bg 12% opacidade + texto na cor cheia) —
+// não é arco-íris decorativo, é uma paleta fixa e pequena (5 tons) reusada
+// em qualquer lugar do sistema que precise diferenciar categorias/métricas.
+const KPI_TONES = {
+  accent: { bg: 'var(--color-accent-subtle)', fg: 'var(--accent-primary)' },
+  blue: { bg: 'rgba(59,130,246,0.12)', fg: 'var(--color-info)' },
+  purple: { bg: 'rgba(168,85,247,0.12)', fg: '#A855F7' },
+  amber: { bg: 'rgba(245,158,11,0.12)', fg: 'var(--color-warning)' },
+  green: { bg: 'rgba(34,197,94,0.12)', fg: 'var(--color-success)' },
+} as const;
+
 export function KpiCompact({
-  icon, label, value, hint, loading = false,
-}: { icon: React.ReactNode; label: string; value: string; hint?: string; loading?: boolean }) {
+  icon, label, value, hint, loading = false, tone = 'accent',
+}: { icon: React.ReactNode; label: string; value: string; hint?: string; loading?: boolean; tone?: keyof typeof KPI_TONES }) {
+  const t = KPI_TONES[tone];
   return (
     <div className="glass-card p-4 flex items-center gap-3">
-      <div className="h-10 w-10 rounded-[var(--radius-control)] bg-[var(--color-accent-subtle)] flex items-center justify-center shrink-0 text-[var(--accent-primary)]">
+      <div
+        className="h-10 w-10 rounded-[var(--radius-control)] flex items-center justify-center shrink-0"
+        style={{ backgroundColor: t.bg, color: t.fg }}
+      >
         {icon}
       </div>
       <div className="min-w-0 flex-1">

@@ -162,36 +162,42 @@ export default function DashboardPage() {
           icon={<MessageSquare className="h-5 w-5" />}
           label="Conversas abertas"
           value={String(dashMetrics.conversationStatus.ai_active + dashMetrics.conversationStatus.human_active)}
+          tone="accent"
         />
         <KpiCompact
           icon={<CalendarClock className="h-5 w-5" />}
           label="Visitas hoje"
           value={String(todayVisits.length)}
           loading={visitsLoading}
+          tone="blue"
         />
         <KpiCompact
           icon={<Briefcase className="h-5 w-5" />}
           label="Negócios ativos"
           value={String(metrics.forecast.openCount)}
           hint={metrics.forecast.value > 0 ? `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(metrics.forecast.value)} em pipeline` : undefined}
+          tone="purple"
         />
         <KpiCompact
           icon={<Percent className="h-5 w-5" />}
           label="Taxa de conversão"
           value={conversionRate === null ? '—' : `${conversionRate.toFixed(1)}%`}
           hint="No período selecionado"
+          tone="amber"
         />
         <KpiCompact
           icon={<Clock3 className="h-5 w-5" />}
           label="Tempo de resposta"
           value={formatDuration(metrics.firstResponse.avgMs)}
           hint="Média da equipe"
+          tone="blue"
         />
         <KpiCompact
           icon={<Bot className="h-5 w-5" />}
           label="AMAIA (IA)"
           value={String(metrics.ai.messagesCount)}
           hint={`${metrics.ai.conversationsCount} conversas atendidas`}
+          tone="green"
         />
       </div>
 

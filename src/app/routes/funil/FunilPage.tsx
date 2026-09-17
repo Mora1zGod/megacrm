@@ -657,10 +657,67 @@ function FunilListView({ deals, stages, onOpen }: { deals: Deal[]; stages: Stage
 }
 
 // ---------------------------------------------------------------------------
-// Forecast — valor ponderado pela probabilidade REAL de cada etapa
-// (stages.probability, já existente e usada no forecast do Dashboard). Sem
-// probabilidade configurada (0), mostra o valor cheio da etapa com aviso.
-// ---------------------------------------------------------------------------
+// Funil visual — cada faixa é um trapézio cuja largura é proporcional à
+// CONTAGEM real de negócios na etapa (relativa à primeira etapa, que é
+// sempre 100%). Cor: a cor real configurada em cada etapa (stages.color);
+// sem cor configurada, cai no accent padrão — nunca inventa paleta nova.
+const FUNNEL_H = 44;
+const FUNNEL_GAP = 3;
+const FUNNEL_W = 600;
+const FUNNEL_MIN_WIDTH_PCT = 0.16; // faixa nunca fica fina a ponto de desaparecer
+
+function FunnelChart({ rows }: { rows: { stage: Stage; count: number }[] }) {
+  const max = rows[0]?.count || 1;
+  const n = rows.length;
+  const totalH = n * FUNNEL_H + (n - 1) * FUNNEL_GAP;
+
+  const widthPctAt = (i: number) => Math.max(rows[i].count / max, FUNNEL_MIN_WIDTH_PCT);
+
+  return (
+    <div className="glass-card p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <svg
+          viewBox={`0 0 ${FUNNEL_W} ${totalH}`}
+          className="w-full sm:w-[320px] shrink-0"
+          role="img"
+          aria-label="Funil de negócios por etapa"
+        >
+          {rows.map((r, i) => {
+            const wTop = widthPctAt(i) * FUNNEL_W;
+            const wBottom = widthPctAt(Math.min(i + 1, n - 1)) * FUNNEL_W;
+            const y = i * (FUNNEL_H + FUNNEL_GAP);
+            const xTop = (FUNNEL_W - wTop) / 2;
+            const xBottom = (FUNNEL_W - wBottom) / 2;
+            const color = r.stage.color || 'var(--accent-primary)';
+            return (
+              <polygon
+                key={r.stage.id}
+                points={`${xTop},${y} ${xTop + wTop},${y} ${xBottom + wBottom},${y + FUNNEL_H} ${xBottom},${y + FUNNEL_H}`}
+                fill={color}
+                opacity={0.85 - i * (0.35 / Math.max(n - 1, 1))}
+              />
+            );
+          })}
+        </svg>
+
+        <div className="flex-1 min-w-0 space-y-1.5">
+          {rows.map((r) => (
+            <div key={r.stage.id} className="flex items-center gap-2 text-sm">
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: r.stage.color || 'var(--accent-primary)' }} />
+              <span className="text-[var(--color-text-primary)] font-medium truncate">{r.count}</span>
+              <span className="text-[var(--color-text-secondary)] truncate flex-1">{r.stage.name}</span>
+              <span className="text-[var(--color-text-secondary)] text-xs shrink-0">
+                {max > 0 ? Math.round((r.count / max) * 100) : 0}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function FunilForecastView({ deals, stages }: { deals: Deal[]; stages: Stage[] }) {
   const rows = stages
     .filter((s) => !s.is_won && !s.is_lost)
@@ -685,6 +742,9 @@ function FunilForecastView({ deals, stages }: { deals: Deal[]; stages: Stage[] }
         <div className="text-label mb-1">Forecast ponderado (total)</div>
         <div className="text-2xl font-bold text-[var(--color-text-primary)]">{brl(totalWeighted)}</div>
       </div>
+
+      {rows.length > 0 && rows[0].count > 0 && <FunnelChart rows={rows} />}
+
       <div className="glass-card overflow-hidden p-0">
         <table className="w-full text-sm">
           <thead>
