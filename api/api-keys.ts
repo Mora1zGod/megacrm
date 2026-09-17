@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { requireAdmin } from '../src/lib/admin-auth.js';
+import { requireAdmin, isAuthFailure } from '../src/lib/admin-auth.js';
 
 // ============================================================================
 // api/api-keys
@@ -114,7 +114,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return res.status(405).end();
     }
     const auth = await requireAdmin(authHeaderOf(req));
-    if (!auth.ok) {
+    if (isAuthFailure(auth)) {
       return res.status(auth.status).json({ success: false, message: auth.message });
     }
     if (req.method === 'GET') return await handleGet(auth.orgId, res);

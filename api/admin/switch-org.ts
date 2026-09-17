@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { requireSuperAdmin } from '../../src/lib/admin-auth.js';
+import { requireSuperAdmin, isAuthFailure } from '../../src/lib/admin-auth.js';
 
 // ============================================================================
 // api/admin/switch-org
@@ -51,7 +51,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const auth = await requireSuperAdmin(
       req.headers?.authorization ?? req.headers?.Authorization,
     );
-    if (!auth.ok) {
+    if (isAuthFailure(auth)) {
       return res.status(auth.status).json({ success: false, message: auth.message });
     }
 
