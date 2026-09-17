@@ -5,3 +5,4 @@ dist/
 .env.check
 .env
 .env.*
+supabase/.temp/
