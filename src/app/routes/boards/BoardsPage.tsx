@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { KanbanSquare, Plus, Users } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
@@ -190,7 +191,7 @@ export default function BoardsPage() {
             </button>
           );
         })}
-        {loadingBoards && <span className="text-xs text-[var(--color-text-secondary)] px-2 py-1.5">Carregando...</span>}
+        {loadingBoards && <Skeleton className="h-7 w-24 shrink-0" />}
         {boardId && (
           <button
             type="button"

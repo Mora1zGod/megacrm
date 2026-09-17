@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { CheckSquare, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,7 +60,11 @@ export default function TasksPage() {
 
       <div className="flex-1 overflow-y-auto space-y-1.5">
         {loading ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+          <div className="space-y-2">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+          </div>
         ) : visiveis.length === 0 ? (
           <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--color-border-card)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
             {filter === 'pending' ? 'Nenhuma tarefa pendente.' : 'Nada aqui ainda.'}
