@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, Tag as TagIcon, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Dialog } from '@/components/ui/dialog';
 import { useTags } from '@/hooks/useTags';
@@ -130,7 +131,11 @@ export function TagManagerDialog({ open, onClose }: TagManagerDialogProps) {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-label opacity-60 py-6 text-center">Carregando...</div>
+          <div className="space-y-2 py-2">
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+          </div>
         ) : tags.length === 0 ? (
           <div className="text-sm text-[var(--color-text-secondary)] opacity-60 py-6 text-center">
             Nenhuma tag criada ainda.

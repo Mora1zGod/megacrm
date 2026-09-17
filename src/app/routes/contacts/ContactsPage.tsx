@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   useContacts,
   type ContactExportRow,
@@ -323,7 +324,14 @@ export default function ContactsPage() {
         {/* Mobile (<md): lista de cartões em vez da tabela larga. */}
         <div className="md:hidden space-y-2">
           {loading ? (
-            <div className="p-6 text-center text-[var(--color-text-secondary)] opacity-60">Carregando...</div>
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="rounded-lg border border-[rgba(14,154,160,0.1)] bg-white/[0.02] p-3 space-y-2">
+                  <Skeleton className="h-4 w-2/5" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              ))}
+            </>
           ) : contacts.length === 0 ? (
             <div className="p-6 text-center text-[var(--color-text-secondary)] opacity-60">
               {search || tagFilter || sourceFilter || leadTypeFilter
@@ -409,11 +417,18 @@ export default function ContactsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-[var(--color-text-secondary)] opacity-60">
-                    Carregando...
-                  </td>
-                </tr>
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="border-t border-[var(--color-border-soft)]">
+                    <td className="p-3"><Skeleton className="h-4 w-4" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-32" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-24" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-16" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-16" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                    <td className="p-3"><Skeleton className="h-4 w-20" /></td>
+                    <td className="p-3" />
+                  </tr>
+                ))
               ) : contacts.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-[var(--color-text-secondary)] opacity-60">

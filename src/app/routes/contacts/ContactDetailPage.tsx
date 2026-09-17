@@ -13,6 +13,7 @@ import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { AddToPipelineModal } from '@/components/funil/AddToPipelineModal';
 import { ProximaAcao } from '@/components/crm/ProximaAcao';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type Deal } from '@/types/crm';
 
 type ProfileTab = 'geral' | 'conversas' | 'negocios' | 'visitas' | 'tarefas' | 'campanhas' | 'arquivos' | 'atividades';
@@ -72,7 +73,24 @@ export default function ContactDetailPage() {
   const authorName = (uid: string | null | undefined) =>
     uid ? operators.find((o) => o.user_id === uid)?.email ?? 'Operador' : 'Sistema';
 
-  if (loading && !contact) return <div className="text-label opacity-60">Carregando ficha...</div>;
+  if (loading && !contact) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-6 p-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-14 w-14 rounded-full" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+        <Skeleton className="h-40" />
+      </div>
+    );
+  }
   if (error && !contact)
     return (
       <div className="max-w-3xl">
@@ -528,7 +546,15 @@ function ConversasTab({ contactId }: { contactId: string }) {
     return () => { alive = false; };
   }, [contactId]);
 
-  if (rows === null) return <div className="text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+  if (rows === null) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+      </div>
+    );
+  }
   if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">Nenhuma conversa ainda.</div>;
 
   return (
@@ -606,7 +632,15 @@ function VisitasTab({ contactId }: { contactId: string }) {
     return () => { alive = false; };
   }, [contactId]);
 
-  if (rows === null) return <div className="text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+  if (rows === null) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+      </div>
+    );
+  }
   if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">Nenhuma visita ainda.</div>;
 
   return (
@@ -703,7 +737,15 @@ function CampanhasTab({ contactId }: { contactId: string }) {
     return () => { alive = false; };
   }, [contactId]);
 
-  if (rows === null) return <div className="text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+  if (rows === null) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+      </div>
+    );
+  }
   if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">Nenhuma campanha recebida.</div>;
 
   return (
