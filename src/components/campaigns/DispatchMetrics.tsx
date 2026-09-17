@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   BarChart,
   Bar,
@@ -359,7 +360,12 @@ function MetricCard({
 function ChartSkeleton() {
   return (
     <div className="h-full w-full flex items-center justify-center">
-      <div className="text-label opacity-60">Carregando...</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Plus, Tag as TagIcon, Trash2, Users } from 'lucide-react';
 import { useSegments } from '@/hooks/useSegments';
@@ -25,7 +26,10 @@ export function SegmentsList() {
       {error && <p className="text-sm text-[var(--color-error)]">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+        <div className="space-y-2">
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
+        </div>
       ) : segments.length === 0 ? (
         <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">
           Nenhum segmento criado ainda.

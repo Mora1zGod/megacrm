@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -90,7 +91,11 @@ export function CampaignsList() {
 
       <div className="grid grid-cols-1 gap-3">
         {loading ? (
-          <div className="glass-card p-8 text-center text-label opacity-60">Carregando...</div>
+          <div className="space-y-2">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
         ) : campaigns.length === 0 ? (
           <div className="glass-card p-8 text-center">
             <div className="text-label mb-2">Em breve</div>

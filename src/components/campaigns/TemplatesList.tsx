@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Info, Pencil, Plus, RefreshCw, Send, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -136,7 +137,7 @@ export function TemplatesList() {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-[var(--color-text-secondary)] opacity-60">
-                    Carregando...
+                    <span className="inline-flex items-center gap-2"><Skeleton className="h-3.5 w-24" /></span>
                   </td>
                 </tr>
               ) : templates.length === 0 ? (

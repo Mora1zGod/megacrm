@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Copy, Link2, Loader2, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -189,7 +190,10 @@ export function UtmBuilder() {
         {error && <LoadErrorBanner message={error} onRetry={() => void reload()} />}
         <div className="glass-card p-4">
           {loading ? (
-            <div className="py-8 text-center text-label opacity-60">Carregando...</div>
+            <div className="space-y-2 py-2">
+              <Skeleton className="h-9" />
+              <Skeleton className="h-9" />
+            </div>
           ) : links.length === 0 ? (
             <div className="py-8 text-center text-sm text-[var(--color-text-secondary)] opacity-60">
               Nenhuma URL gerada ainda.
