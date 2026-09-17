@@ -1,4 +1,5 @@
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, CheckCircle2, CalendarX2, type LucideIcon } from 'lucide-react';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import {
   Area,
   AreaChart,
@@ -24,10 +25,11 @@ import type {
 import { brl, formatDuration } from '@/lib/dashboard';
 
 const TOOLTIP_STYLE = {
-  background: 'rgba(15,18,35,0.95)',
-  border: '1px solid rgba(14,154,160,0.25)',
+  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--color-border-card)',
   borderRadius: 10,
   fontSize: 12,
+  color: 'var(--color-text-primary)',
 } as const;
 
 const PALETTE = ['#0E9AA0', '#8FE3DC', '#10B981', '#FBBF24', '#A78BFA', '#F87171', '#94A3B8'];
@@ -70,10 +72,15 @@ export function WidgetCard({
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+// Empty state — seção 16 do reboot: não é só uma frase solta, mas também
+// não vira banner gigante. Ícone pequeno + texto principal + (opcional)
+// uma segunda linha explicando o porquê ou o que fazer.
+function EmptyState({ text, hint, icon: Icon }: { text: string; hint?: string; icon?: LucideIcon }) {
   return (
-    <div className="flex h-40 items-center justify-center text-xs text-[var(--color-text-secondary)] opacity-60">
-      {text}
+    <div className="flex h-40 flex-col items-center justify-center gap-1.5 text-center">
+      {Icon && <Icon className="h-5 w-5 text-[var(--color-text-muted)]" />}
+      <div className="text-sm text-[var(--color-text-secondary)]">{text}</div>
+      {hint && <div className="text-xs text-[var(--color-text-muted)] max-w-[220px]">{hint}</div>}
     </div>
   );
 }
@@ -411,17 +418,26 @@ export function OriginBarsWidget({
 // ---------------------------------------------------------------------------
 
 export function KpiCompact({
-  icon, label, value, hint,
-}: { icon: React.ReactNode; label: string; value: string; hint?: string }) {
+  icon, label, value, hint, loading = false,
+}: { icon: React.ReactNode; label: string; value: string; hint?: string; loading?: boolean }) {
   return (
     <div className="glass-card p-4 flex items-center gap-3">
       <div className="h-10 w-10 rounded-[var(--radius-control)] bg-[var(--color-accent-subtle)] flex items-center justify-center shrink-0 text-[var(--accent-primary)]">
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="text-lg font-bold text-[var(--color-text-primary)] leading-tight">{value}</div>
-        <div className="text-xs text-[var(--color-text-secondary)] truncate">{label}</div>
-        {hint && <div className="text-[10px] text-[var(--color-text-secondary)] opacity-70 truncate">{hint}</div>}
+      <div className="min-w-0 flex-1">
+        {loading ? (
+          <>
+            <Skeleton className="h-5 w-12 mb-1.5" />
+            <Skeleton className="h-3 w-20" />
+          </>
+        ) : (
+          <>
+            <div className="text-lg font-bold text-[var(--color-text-primary)] leading-tight">{value}</div>
+            <div className="text-xs text-[var(--color-text-secondary)] truncate">{label}</div>
+            {hint && <div className="text-[10px] text-[var(--color-text-secondary)] opacity-70 truncate">{hint}</div>}
+          </>
+        )}
       </div>
     </div>
   );
@@ -466,9 +482,17 @@ export function AttentionListWidget({
   return (
     <WidgetCard title="Precisam de atenção" titleBadge={total > 0 ? <CountPill n={total} /> : undefined}>
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+        <div className="space-y-1">
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </div>
       ) : total === 0 ? (
-        <EmptyState text="Tudo em dia — nenhum alerta agora." />
+        <EmptyState
+          icon={CheckCircle2}
+          text="Tudo em dia."
+          hint="Nenhuma conversa parada, sem responsável ou fora do prazo agora."
+        />
       ) : (
         <div className="space-y-1">
           {items.filter((i) => i.count > 0).map((item) => (
@@ -514,9 +538,16 @@ export function TodayAgendaWidget({ visits, loading }: { visits: TodayVisitData[
   return (
     <WidgetCard title="Hoje na agenda" subtitle="Visitas marcadas para hoje">
       {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+        <div className="space-y-1.5">
+          <SkeletonRow />
+          <SkeletonRow />
+        </div>
       ) : visits.length === 0 ? (
-        <EmptyState text="Nenhuma visita hoje." />
+        <EmptyState
+          icon={CalendarX2}
+          text="Nenhuma visita marcada pra hoje."
+          hint="Novas visitas agendadas na tela de Visitas aparecem aqui automaticamente."
+        />
       ) : (
         <div className="space-y-1.5 max-h-56 overflow-y-auto">
           {visits.map((v) => (

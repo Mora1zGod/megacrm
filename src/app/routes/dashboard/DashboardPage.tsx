@@ -165,7 +165,8 @@ export default function DashboardPage() {
         <KpiCompact
           icon={<CalendarClock className="h-5 w-5" />}
           label="Visitas hoje"
-          value={visitsLoading ? '…' : String(todayVisits.length)}
+          value={String(todayVisits.length)}
+          loading={visitsLoading}
         />
         <KpiCompact
           icon={<Briefcase className="h-5 w-5" />}
