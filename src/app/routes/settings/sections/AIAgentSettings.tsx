@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { ChevronDown, Instagram, Loader2, MessageCircle, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -235,7 +236,11 @@ export function AIAgentSettings() {
   if (loading) {
     return (
       <Card>
-        <div className="text-label opacity-60 py-8 text-center">Carregando...</div>
+        <div className="space-y-2 py-2">
+          <Skeleton className="h-9" />
+          <Skeleton className="h-9" />
+          <Skeleton className="h-9" />
+        </div>
       </Card>
     );
   }

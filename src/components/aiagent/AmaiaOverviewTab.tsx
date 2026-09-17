@@ -1,10 +1,20 @@
 import { Bot, DollarSign, MessageSquare, UserCheck } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAmaiaOverview } from '@/hooks/useAmaiaOverview';
 
 export function AmaiaOverviewTab() {
   const { data, loading } = useAmaiaOverview();
 
-  if (loading || !data) return <div className="text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+  if (loading || !data) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

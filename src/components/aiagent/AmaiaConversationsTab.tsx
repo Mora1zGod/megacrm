@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import { getSupabase } from '@/lib/supabase';
 
@@ -29,7 +30,15 @@ export function AmaiaConversationsTab() {
       .then(({ data }) => setRows((data ?? []) as unknown as ConvRow[]));
   }, []);
 
-  if (rows === null) return <div className="text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+  if (rows === null) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-10" />
+        <Skeleton className="h-10" />
+      </div>
+    );
+  }
   if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">Nenhuma conversa ainda.</div>;
 
   return (

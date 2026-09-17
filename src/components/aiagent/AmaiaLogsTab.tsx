@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getSupabase } from '@/lib/supabase';
 
 interface LogRow {
@@ -32,7 +33,16 @@ export function AmaiaLogsTab() {
       .then(({ data }) => setRows((data ?? []) as LogRow[]));
   }, []);
 
-  if (rows === null) return <div className="text-sm text-[var(--color-text-secondary)]">Carregando...</div>;
+  if (rows === null) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+      </div>
+    );
+  }
   if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-[var(--color-text-secondary)]">Nenhum log ainda.</div>;
 
   return (

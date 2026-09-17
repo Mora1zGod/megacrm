@@ -4,6 +4,7 @@ import {
   AlertTriangle, CheckCircle2, Copy, FileText, History, Loader2, Play, Plus, Send, Trash2, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog } from '@/components/ui/dialog';
@@ -135,12 +136,13 @@ export function AIAgentProfiles() {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-          <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
+        <div className="space-y-2">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
         </div>
       ) : profiles.length === 0 ? (
-        <div className="glass-card rounded-xl p-6 text-sm text-[var(--color-text-secondary)]">
-          Nenhum modelo cadastrado ainda.
+        <div className="glass-card rounded-xl p-6 text-center">
+          <p className="text-sm text-[var(--color-text-secondary)] mb-3">Nenhum modelo cadastrado ainda.</p>
         </div>
       ) : (
         <div className="space-y-3">
