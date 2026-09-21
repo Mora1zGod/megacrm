@@ -25,7 +25,7 @@ import {
   getSoleUazapiChannel,
   type ChannelRow,
 } from '../_shared/channels.ts';
-import { uazapiContextFromChannel, uazapiGetChatDetails } from '../_shared/uazapi.ts';
+import { uazapiContextFromChannel, uazapiGetChatDetails, uazapiDownloadMessageFile } from '../_shared/uazapi.ts';
 import { maybeAddLeadToFunnel } from '../_shared/funnel.ts';
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -62,24 +62,37 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 
 // messageType da UAZAPI (estilo whatsmeow: Conversation, ImageMessage,
 // AudioMessage, PTT, VideoMessage, DocumentMessage, StickerMessage...).
+//
+// O payload do webhook às vezes chega com messageType de mídia mas SEM
+// fileURL (mídia ainda não processada no instante do evento) — `needsDownload`
+// sinaliza esse caso pro handleMessage tentar o fallback via
+// POST /message/download (uazapiDownloadMessageFile), documentado pela UAZAPI
+// como a forma confiável de resolver o arquivo pelo id da mensagem.
 function decodeContent(message: Record<string, unknown>): {
   contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
   content: string | null;
   mediaUrl: string | null;
+  needsDownload: boolean;
 } {
   const text = str(message, ['text', 'caption', 'body']);
   const mediaUrl = str(message, ['fileURL', 'fileUrl', 'file_url', 'mediaUrl']);
   const type = (str(message, ['messageType', 'type']) ?? '').toLowerCase();
+  const isMediaType = /image|sticker|audio|ptt|video|document/.test(type);
 
-  if (!mediaUrl) return { contentType: 'text', content: text ?? '', mediaUrl: null };
+  if (!mediaUrl) {
+    if (isMediaType) {
+      return { contentType: 'document', content: text, mediaUrl: null, needsDownload: true };
+    }
+    return { contentType: 'text', content: text ?? '', mediaUrl: null, needsDownload: false };
+  }
   if (type.includes('image') || type.includes('sticker')) {
-    return { contentType: 'image', content: text, mediaUrl };
+    return { contentType: 'image', content: text, mediaUrl, needsDownload: false };
   }
   if (type.includes('audio') || type.includes('ptt')) {
-    return { contentType: 'audio', content: null, mediaUrl };
+    return { contentType: 'audio', content: null, mediaUrl, needsDownload: false };
   }
-  if (type.includes('video')) return { contentType: 'video', content: text, mediaUrl };
-  return { contentType: 'document', content: text, mediaUrl };
+  if (type.includes('video')) return { contentType: 'video', content: text, mediaUrl, needsDownload: false };
+  return { contentType: 'document', content: text, mediaUrl, needsDownload: false };
 }
 
 interface ContactRow {
@@ -288,7 +301,29 @@ async function handleMessage(
     if (dup) return;
   }
 
-  const { contentType, content, mediaUrl } = decodeContent(message);
+  const decoded = decodeContent(message);
+  const content = decoded.content;
+  let contentType = decoded.contentType;
+  let mediaUrl = decoded.mediaUrl;
+  if (decoded.needsDownload && uazapiMessageId) {
+    try {
+      const ctx = await uazapiContextFromChannel(channel);
+      const dl = await uazapiDownloadMessageFile(ctx, { messageId: uazapiMessageId });
+      if (dl.fileUrl) {
+        mediaUrl = dl.fileUrl;
+        const mime = (dl.mimetype ?? '').toLowerCase();
+        if (mime.startsWith('image/')) contentType = 'image';
+        else if (mime.startsWith('audio/')) contentType = 'audio';
+        else if (mime.startsWith('video/')) contentType = 'video';
+        else contentType = 'document';
+      } else {
+        errors.push(`uazapi download sem fileURL (msg ${uazapiMessageId})`);
+      }
+    } catch (e) {
+      errors.push(`uazapi download falhou (msg ${uazapiMessageId}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   const { error: insErr } = await admin.from('messages').insert({
     org_id: orgId,
     conversation_id: conversationId,

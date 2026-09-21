@@ -112,6 +112,21 @@ export async function uazapiSendMedia(
   return { messageId: messageIdOf(root) };
 }
 
+// POST /message/download {id} → resolve a fileURL pública (CDN, válida por
+// 2 dias) de uma mensagem de mídia. O webhook de mensagens às vezes chega SEM
+// fileURL populado no payload (mídia ainda não processada no momento do
+// evento) — quando isso acontece, este endpoint é o fallback documentado
+// pra buscar o arquivo pelo id da mensagem.
+export async function uazapiDownloadMessageFile(
+  ctx: UazapiContext,
+  input: { messageId: string },
+): Promise<{ fileUrl: string | null; mimetype: string | null }> {
+  const root = await ufetch(ctx, '/message/download', { id: input.messageId });
+  const fileUrl = typeof root.fileURL === 'string' && root.fileURL.trim() ? root.fileURL : null;
+  const mimetype = typeof root.mimetype === 'string' ? root.mimetype : null;
+  return { fileUrl, mimetype };
+}
+
 // POST /chat/details {number, preview} → detalhes completos do chat/contato,
 // incluindo a URL da foto de perfil: `imagePreview` (menor, preview=true) ou
 // `image` (resolução original, preview=false). Usada para exibir o avatar do
