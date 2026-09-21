@@ -32,6 +32,9 @@ export interface Conversation {
   // Provedor: 'zernio' (WhatsApp Meta oficial / Instagram) × 'uazapi'
   // (integração direta, sem janela de 24h). Último inbound decide.
   provider: 'zernio' | 'uazapi';
+  // Canal (número) que recebeu a conversa (whatsapp_hub.channels). Usado pra
+  // exibir qual número/instância é, quando há mais de um canal conectado.
+  channel_id: string | null;
   closed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -82,4 +85,9 @@ export interface ConversationWithContact extends Conversation {
   lastInboundAt: string | null;
   // Contato tem algum deal como Cliente (filtro Lead/Cliente do inbox).
   isCliente: boolean;
+  // Número/label do canal que recebeu a conversa (null = sem canal
+  // registrado, ex. conversas antigas pré-multi-canal). Usado na etiqueta da
+  // lista pra diferenciar entre múltiplos números UAZAPI/WhatsApp conectados.
+  channelPhone: string | null;
+  channelLabel: string | null;
 }

@@ -16,6 +16,15 @@ interface UseConversationsResult {
   setArchived: (id: string, archived: boolean) => Promise<void>;
   setFavorite: (id: string, favorite: boolean) => Promise<void>;
   markRead: (id: string) => Promise<void>;
+  // Move a conversa pra outra fila (ou tira da fila com null) — "devolver pra
+  // fila" depois de atendida, ou rotear manualmente pro setor certo.
+  setQueue: (id: string, queueId: string | null) => Promise<void>;
+}
+
+interface ChannelRow {
+  id: string;
+  phone: string | null;
+  label: string | null;
 }
 
 interface ContactRow {
@@ -80,10 +89,14 @@ export function useConversations(): UseConversationsResult {
     const rows = (convs ?? []) as Conversation[];
     const contactIds = Array.from(new Set(rows.map((c) => c.contact_id)));
     const conversationIds = rows.map((c) => c.id);
+    const channelIds = Array.from(
+      new Set(rows.map((c) => c.channel_id).filter((id): id is string => Boolean(id))),
+    );
 
-    // Batch: contacts + tags do contato + latest messages + clientes (deals).
+    // Batch: contacts + tags do contato + latest messages + clientes (deals)
+    // + canais (número/label pra etiqueta da lista quando há vários UAZAPI).
     // Cada lista de ids vai fatiada (fetchInChunks) para a URL não estourar.
-    const [contactsQ, tagsQ, lastMsgsQ, clientesQ] = await Promise.all([
+    const [contactsQ, tagsQ, lastMsgsQ, clientesQ, channelsQ] = await Promise.all([
       fetchInChunks<ContactRow>(contactIds, (chunk) =>
         supabase
           .from('contacts')
@@ -109,6 +122,12 @@ export function useConversations(): UseConversationsResult {
           .select('contact_id')
           .eq('lead_type', 'Cliente')
           .in('contact_id', chunk),
+      ),
+      fetchInChunks<ChannelRow>(channelIds, (chunk) =>
+        supabase
+          .from('channels')
+          .select('id, phone, label')
+          .in('id', chunk),
       ),
     ]);
 
@@ -155,15 +174,23 @@ export function useConversations(): UseConversationsResult {
       ((clientesQ.data ?? []) as Array<{ contact_id: string }>).map((d) => d.contact_id),
     );
 
-    const merged: ConversationWithContact[] = rows.map((c) => ({
-      ...c,
-      contact: contactsById.get(c.contact_id) ?? null,
-      lastMessagePreview: latestByConv.get(c.id) ?? null,
-      lastMessageDirection: lastDirByConv.get(c.id) ?? null,
-      tagIds: tagsByContact.get(c.contact_id) ?? [],
-      lastInboundAt: lastInboundByConv.get(c.id) ?? null,
-      isCliente: clienteSet.has(c.contact_id),
-    }));
+    const channelsById = new Map<string, ChannelRow>();
+    for (const ch of (channelsQ.data ?? []) as ChannelRow[]) channelsById.set(ch.id, ch);
+
+    const merged: ConversationWithContact[] = rows.map((c) => {
+      const ch = c.channel_id ? channelsById.get(c.channel_id) : undefined;
+      return {
+        ...c,
+        contact: contactsById.get(c.contact_id) ?? null,
+        lastMessagePreview: latestByConv.get(c.id) ?? null,
+        lastMessageDirection: lastDirByConv.get(c.id) ?? null,
+        tagIds: tagsByContact.get(c.contact_id) ?? [],
+        lastInboundAt: lastInboundByConv.get(c.id) ?? null,
+        isCliente: clienteSet.has(c.contact_id),
+        channelPhone: ch?.phone ?? null,
+        channelLabel: ch?.label ?? null,
+      };
+    });
 
     setConversations(merged);
     setLoading(false);
@@ -299,7 +326,17 @@ export function useConversations(): UseConversationsResult {
     if (error) throw new Error(translateDbError(error.message));
   };
 
-  return { conversations, loading, error, reload, setStatus, setAiPaused, setAssigned, setActiveDeal, setPinnedNote, setArchived, setFavorite, markRead };
+  const setQueue: UseConversationsResult['setQueue'] = async (id, queueId) => {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .schema('whatsapp_hub')
+      .from('conversations')
+      .update({ queue_id: queueId })
+      .eq('id', id);
+    if (error) throw new Error(translateDbError(error.message));
+  };
+
+  return { conversations, loading, error, reload, setStatus, setAiPaused, setAssigned, setActiveDeal, setPinnedNote, setArchived, setFavorite, markRead, setQueue };
 }
 
 // Maps the most common Postgres/PostgREST errors to actionable pt-BR messages.

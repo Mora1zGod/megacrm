@@ -128,6 +128,7 @@ export default function InboxPage() {
     setArchived,
     setFavorite,
     markRead,
+    setQueue,
   } = useConversations();
 
   // Base = filtros avançados aplicados. Os contadores dos chips saem daqui,
@@ -443,6 +444,7 @@ export default function InboxPage() {
                   withinWindow={effectiveWithinWindow}
                   provider={selectedProvider}
                   operators={operators}
+                  queues={queues}
                   aiEnabled={aiEnabledForChannel(selected.channel ?? null)}
                   assignedName={operatorName(selected.assigned_to)}
                   onPauseAI={() => setAiPaused(selected.id, true)}
@@ -450,6 +452,7 @@ export default function InboxPage() {
                   onClose={() => setStatus(selected.id, 'closed')}
                   onReopen={() => setStatus(selected.id, 'human_active')}
                   onAssign={(uid) => setAssigned(selected.id, uid)}
+                  onSetQueue={(qid) => setQueue(selected.id, qid)}
                   onSetActiveDeal={(dealId) => setActiveDeal(selected.id, dealId)}
                   onPinNote={(note) => setPinnedNote(selected.id, note)}
                   onArchive={(a) => setArchived(selected.id, a)}
@@ -499,6 +502,7 @@ export default function InboxPage() {
               withinWindow={effectiveWithinWindow}
               provider={selectedProvider}
               operators={operators}
+              queues={queues}
               aiEnabled={aiEnabledForChannel(selected.channel ?? null)}
               assignedName={operatorName(selected.assigned_to)}
               onPauseAI={() => setAiPaused(selected.id, true)}
@@ -506,6 +510,7 @@ export default function InboxPage() {
               onClose={() => setStatus(selected.id, 'closed')}
               onReopen={() => setStatus(selected.id, 'human_active')}
               onAssign={(uid) => setAssigned(selected.id, uid)}
+              onSetQueue={(qid) => setQueue(selected.id, qid)}
               onSetActiveDeal={(dealId) => setActiveDeal(selected.id, dealId)}
               onPinNote={(note) => setPinnedNote(selected.id, note)}
               onArchive={(a) => setArchived(selected.id, a)}

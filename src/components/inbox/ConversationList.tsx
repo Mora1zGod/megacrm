@@ -6,15 +6,31 @@ import type { WhatsappProvider } from '@/hooks/useWhatsappProvider';
 import type { ConversationChannel, ConversationWithContact } from '@/types/inbox';
 
 // Badge de canal/provedor: WhatsApp Meta (oficial), UAZAPI (não oficial, sem
-// janela de 24h) ou Instagram.
-function channelBadge(channel: ConversationChannel | undefined, provider: WhatsappProvider) {
+// janela de 24h) ou Instagram. Quando o número do canal é conhecido, mostra o
+// telefone em vez do nome genérico do provedor — útil pra diferenciar quando
+// há mais de um número conectado (ex.: vários canais UAZAPI).
+function channelBadge(
+  channel: ConversationChannel | undefined,
+  provider: WhatsappProvider,
+  channelPhone: string | null,
+  channelLabel: string | null,
+) {
   if (channel === 'instagram') {
     return { Icon: Instagram, label: 'Instagram', chip: 'bg-[rgba(225,48,108,0.14)] text-[#E1306C]' };
   }
+  const phoneLabel = channelPhone || channelLabel;
   if (provider === 'uazapi') {
-    return { Icon: MessageCircle, label: 'UAZAPI', chip: 'bg-[rgba(45,212,191,0.14)] text-[#2DD4BF]' };
+    return {
+      Icon: MessageCircle,
+      label: phoneLabel || 'UAZAPI',
+      chip: 'bg-[rgba(45,212,191,0.14)] text-[#2DD4BF]',
+    };
   }
-  return { Icon: MessageCircle, label: 'WhatsApp', chip: 'bg-[rgba(37,211,102,0.14)] text-[#25D366]' };
+  return {
+    Icon: MessageCircle,
+    label: phoneLabel || 'WhatsApp',
+    chip: 'bg-[rgba(37,211,102,0.14)] text-[#25D366]',
+  };
 }
 
 interface ConversationListProps {
@@ -96,7 +112,12 @@ export function ConversationList({
         const aiEnabled = aiEnabledForChannel?.(c.channel ?? null) ?? true;
         const status = statusChip(c, aiEnabled, assignedName);
         const StatusIcon = status.Icon;
-        const chan = channelBadge(c.channel, providerOf?.(c) ?? (c.channel === 'instagram' ? 'instagram' : 'meta'));
+        const chan = channelBadge(
+          c.channel,
+          providerOf?.(c) ?? (c.channel === 'instagram' ? 'instagram' : 'meta'),
+          c.channelPhone,
+          c.channelLabel,
+        );
         const isActive = c.id === selectedId;
         const contact = c.contact;
         const displayName = contact?.name?.trim() || contact?.phone || '—';

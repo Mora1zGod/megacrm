@@ -95,11 +95,21 @@ async function findOrCreateContact(
 ): Promise<ContactRow | null> {
   const { data: existing } = await admin
     .from('contacts')
-    .select('id, profile_pic_updated_at')
+    .select('id, name, profile_pic_updated_at')
     .eq('org_id', orgId)
     .eq('phone', phone)
     .maybeSingle();
-  if (existing) return existing as ContactRow;
+  if (existing) {
+    const row = existing as ContactRow & { name: string | null };
+    // Contato já existe mas ainda sem nome (ex.: 1ª mensagem chegou sem
+    // senderName/pushName no payload) — se uma mensagem posterior trouxer o
+    // nome, backfill aqui. Nunca sobrescreve um nome já preenchido (pode ter
+    // sido editado manualmente no CRM).
+    if (name && !row.name?.trim()) {
+      await admin.from('contacts').update({ name }).eq('id', row.id);
+    }
+    return row;
+  }
   const { data: created, error } = await admin
     .from('contacts')
     .insert({ org_id: orgId, phone, name, source: 'whatsapp' })

@@ -9,6 +9,7 @@ import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import type { ConversationWithContact } from '@/types/inbox';
 import { operatorLabel, type Operator } from '@/hooks/useOperators';
+import type { Queue } from '@/hooks/useQueues';
 import { useTasks } from '@/hooks/useTasks';
 import { ContactTagsEditor } from './ContactTagsEditor';
 import { CustomFieldsEditor } from './CustomFieldsEditor';
@@ -31,6 +32,9 @@ interface ContactPanelProps {
   conversation: ConversationWithContact;
   withinWindow: boolean;
   operators: Operator[];
+  // Filas disponíveis (Configurações → Equipe → Filas). Opcional pra não
+  // quebrar quem ainda não passa essa prop — sem ela, o seletor não aparece.
+  queues?: Queue[];
   // IA habilitada para o canal desta conversa (configurações). false → "Humano".
   aiEnabled?: boolean;
   // Nome do operador atribuído — substitui o rótulo genérico.
@@ -42,6 +46,9 @@ interface ContactPanelProps {
   onClose: () => Promise<void>;
   onReopen: () => Promise<void>;
   onAssign: (userId: string | null) => Promise<void>;
+  // Move a conversa pra outra fila, ou de volta pra "sem fila" (null) —
+  // devolver ao setor depois de atendida, ou rotear manualmente.
+  onSetQueue?: (queueId: string | null) => Promise<void>;
   onSetActiveDeal: (dealId: string | null) => Promise<void>;
   onPinNote: (note: string | null) => Promise<void>;
   onArchive: (archived: boolean) => Promise<void>;
@@ -49,8 +56,8 @@ interface ContactPanelProps {
 }
 
 export function ContactPanel({
-  conversation, withinWindow, operators, aiEnabled = true, assignedName = null, provider = 'meta',
-  onPauseAI, onResumeAI, onClose, onReopen, onAssign, onSetActiveDeal, onPinNote, onArchive, onContactRefresh,
+  conversation, withinWindow, operators, queues = [], aiEnabled = true, assignedName = null, provider = 'meta',
+  onPauseAI, onResumeAI, onClose, onReopen, onAssign, onSetQueue, onSetActiveDeal, onPinNote, onArchive, onContactRefresh,
 }: ContactPanelProps) {
   const { userId } = useAppUser();
   const { createTask } = useTasks();
@@ -397,6 +404,30 @@ export function ContactPanel({
           ))}
         </select>
       </div>
+
+      {/* Fila/setor — devolver pra fila ou rotear manualmente. */}
+      {onSetQueue && (
+        <div className="space-y-2">
+          <div className="text-label">Fila</div>
+          <select
+            value={conversation.queue_id ?? ''}
+            onChange={async (e) => {
+              try {
+                await onSetQueue(e.target.value || null);
+                toast.success('Fila atualizada.');
+              } catch (err) {
+                toast.error('Falha', { description: err instanceof Error ? err.message : String(err) });
+              }
+            }}
+            className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 text-sm text-[var(--color-text-primary)]"
+          >
+            <option value="">Sem fila</option>
+            {queues.map((q) => (
+              <option key={q.id} value={q.id}>{q.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Negócio ativo da conversa (independente do responsável) */}
       <div className="space-y-2">
