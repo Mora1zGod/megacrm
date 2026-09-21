@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin, isAuthFailure } from '../src/lib/admin-auth.js';
 import { decrypt, encrypt, getCredential } from '../src/lib/credentials.js';
-import { UazapiError, configureWebhook, instanceStatus } from '../src/lib/uazapi.js';
+import { UazapiError, configureWebhook, instanceStatus, connectInstance } from '../src/lib/uazapi.js';
 
 // ============================================================================
 // api/uazapi-connect
@@ -231,11 +231,29 @@ async function handlePost(orgId: string, req: ApiRequest, res: ApiResponse) {
     console.error('uazapi-connect webhook warning', whErr);
   }
 
+  // Se ainda não conectou (número novo ou sessão nunca pareada), já busca o
+  // QR Code de cara — evita o operador precisar de um segundo clique só pra
+  // ver o QR depois de salvar. Falha aqui também é não-fatal: o canal já está
+  // salvo e o front pode pedir o QR de novo via /api/uazapi-qrcode.
+  let qrcode: string | null = null;
+  let paircode: string | null = null;
+  if (!st.connected) {
+    try {
+      const conn = await connectInstance(serverUrl, token, phone ?? undefined);
+      qrcode = conn.qrcode;
+      paircode = conn.paircode;
+    } catch (qrErr) {
+      console.error('uazapi-connect qrcode warning', qrErr);
+    }
+  }
+
   return res.status(200).json({
     success: true,
     channelId: channel.id,
     connected: st.connected,
     status: st.status,
+    qrcode,
+    paircode,
     webhookId,
     webhookWarning,
   });

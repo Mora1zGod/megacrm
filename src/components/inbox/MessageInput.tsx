@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
-import { Clock, FileText, Loader2, Mic, Paperclip, Send, Sparkles, Square, StickyNote, Undo2, X } from 'lucide-react';
+import { Clock, FileText, Loader2, Mic, Paperclip, Send, Sparkles, Square, StickyNote, Undo2, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSupabase } from '@/lib/supabase';
 import { extractFunctionErrorMessage } from '@/lib/functionError';
 import type { SendResult } from '@/hooks/useMessages';
+import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { TemplateRestartDialog } from './TemplateRestartDialog';
 
 interface MessageInputProps {
@@ -44,6 +45,20 @@ export function MessageInput({
   const [improving, setImproving] = useState(false);
   const [preImprove, setPreImprove] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Respostas rápidas: digitar "/algo" no início da caixa abre a lista de
+  // atalhos (Configurações → Respostas rápidas). Enter/Tab aplica o
+  // selecionado; setas navegam; Esc limpa. Igual ao padrão Slack/Discord.
+  const { quickReplies } = useQuickReplies();
+  const [qrIndex, setQrIndex] = useState(0);
+  const qrQuery = content.startsWith('/') ? content.slice(1).toLowerCase() : null;
+  const qrMatches = useMemo(() => {
+    if (qrQuery === null) return [];
+    return quickReplies.filter((q) => q.shortcut.toLowerCase().startsWith(qrQuery)).slice(0, 6);
+  }, [qrQuery, quickReplies]);
+  const qrOpen = qrQuery !== null && qrMatches.length > 0;
+  useEffect(() => { setQrIndex(0); }, [qrQuery]);
+  const applyQuickReply = (reply: { content: string }) => { setContent(reply.content); };
 
   // Gravação de áudio (voice note) via MediaRecorder.
   const [recording, setRecording] = useState(false);
@@ -225,6 +240,16 @@ export function MessageInput({
   };
 
   const handleKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (qrOpen) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setQrIndex((i) => (i + 1) % qrMatches.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setQrIndex((i) => (i - 1 + qrMatches.length) % qrMatches.length); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applyQuickReply(qrMatches[qrIndex]);
+        return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setContent(''); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void submit();
@@ -372,25 +397,49 @@ export function MessageInput({
           </div>
         )}
         {!recording && (
-        <textarea
-          value={content}
-          onChange={(e) => { setContent(e.target.value); if (preImprove !== null) setPreImprove(null); }}
-          onKeyDown={handleKey}
-          rows={2}
-          disabled={disabled || sending}
-          placeholder={
-            file
-              ? 'Legenda (opcional)…'
-              : isPrivate
-                ? 'Escreva uma nota interna…'
-                : 'Digite uma mensagem…'
-          }
-          className={
-            isPrivate
-              ? 'flex-1 rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[#FBBF24] resize-none'
-              : 'flex-1 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
-          }
-        />
+        <div className="relative flex-1">
+          {qrOpen && (
+            <div className="absolute bottom-[calc(100%+6px)] left-0 z-20 w-full max-w-sm rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-surface-raised)] p-1 shadow-lg">
+              {qrMatches.map((q, i) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); applyQuickReply(q); }}
+                  className={
+                    i === qrIndex
+                      ? 'flex w-full items-start gap-2 rounded-md bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-left'
+                      : 'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-white/5'
+                  }
+                >
+                  <Zap className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--accent-primary)]" />
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold text-[var(--color-text-primary)]">/{q.shortcut}</span>
+                    <span className="block truncate text-[11px] text-[var(--color-text-secondary)]">{q.content}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <textarea
+            value={content}
+            onChange={(e) => { setContent(e.target.value); if (preImprove !== null) setPreImprove(null); }}
+            onKeyDown={handleKey}
+            rows={2}
+            disabled={disabled || sending}
+            placeholder={
+              file
+                ? 'Legenda (opcional)…'
+                : isPrivate
+                  ? 'Escreva uma nota interna…'
+                  : 'Digite uma mensagem… ("/" para respostas rápidas)'
+            }
+            className={
+              isPrivate
+                ? 'w-full rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[#FBBF24] resize-none'
+                : 'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
+            }
+          />
+        </div>
         )}
         {/* "Melhorar": só aparece quando há texto digitado. Reescreve com o tom
             da marca sem enviar — o operador revisa antes. */}

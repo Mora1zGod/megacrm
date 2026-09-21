@@ -56,29 +56,34 @@ function mergeHours(stored: unknown): BusinessHours {
 }
 
 export function BusinessHoursSettings() {
-  const { userId } = useAppUser();
+  const { userId, orgId } = useAppUser();
   const [hours, setHours] = useState<BusinessHours>(DEFAULT_HOURS);
   const [offHoursMsg, setOffHoursMsg] = useState(
     'Olá! Nosso atendimento humano está fora do horário. Responderemos assim que possível.',
   );
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !orgId) return;
     const supabase = getSupabase();
+    setLoading(true);
     supabase
+      .schema('whatsapp_hub')
       .from('app_settings')
       .select('business_hours, out_of_hours_message')
-      .eq('id', 1)
+      .eq('org_id', orgId)
       .maybeSingle()
       .then(({ data }) => {
-        if (!data) return;
-        setHours(mergeHours(data.business_hours));
-        if (data.out_of_hours_message) {
-          setOffHoursMsg(data.out_of_hours_message);
+        if (data) {
+          setHours(mergeHours(data.business_hours));
+          if (data.out_of_hours_message) {
+            setOffHoursMsg(data.out_of_hours_message);
+          }
         }
+        setLoading(false);
       });
-  }, [userId]);
+  }, [userId, orgId]);
 
   const updateDay = (key: DayKey, patch: Partial<DaySlot>) => {
     setHours((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
@@ -86,16 +91,23 @@ export function BusinessHoursSettings() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
+    if (!userId || !orgId) return;
     setSaving(true);
     const supabase = getSupabase();
+    // upsert: a linha da org em app_settings já existe desde o cadastro
+    // (criada por ensure_org_settings na migração multi-tenant), mas o
+    // upsert cobre o caso raro de faltar.
     const { error } = await supabase
+      .schema('whatsapp_hub')
       .from('app_settings')
-      .update({
-        business_hours: hours,
-        out_of_hours_message: offHoursMsg || null,
-      })
-      .eq('id', 1);
+      .upsert(
+        {
+          org_id: orgId,
+          business_hours: hours,
+          out_of_hours_message: offHoursMsg || null,
+        },
+        { onConflict: 'org_id' },
+      );
     setSaving(false);
     if (error) {
       toast.error('Falha ao salvar', { description: error.message });
@@ -103,6 +115,16 @@ export function BusinessHoursSettings() {
     }
     toast.success('Horários salvos.');
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <div className="flex items-center gap-3 py-10 justify-center text-sm text-[var(--color-text-secondary)]">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando horários...
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card>

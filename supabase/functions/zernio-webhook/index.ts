@@ -211,6 +211,8 @@ async function findOrCreateConversation(
       insert.assigned_to = channelRow.assigned_member;
       insert.assigned_at = new Date().toISOString();
     }
+    // Fila/setor herdada do canal (Configurações → Equipe → Filas).
+    if (channelRow.queue_id) insert.queue_id = channelRow.queue_id;
   }
   const { data: created, error } = await admin
     .from('conversations')

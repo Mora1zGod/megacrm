@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
+  CheckCircle2,
   Filter,
   Instagram,
   KeyRound,
@@ -9,8 +10,10 @@ import {
   Pencil,
   Phone,
   Plus,
+  QrCode,
   Trash2,
   UserRound,
+  X,
   Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -110,6 +113,20 @@ export function ChannelsSettings() {
   const [showUazapiForm, setShowUazapiForm] = useState(false);
   const [uazForm, setUazForm] = useState({ label: '', serverUrl: '', token: '' });
   const [savingUaz, setSavingUaz] = useState(false);
+  // Modal do QR Code UAZAPI — abre logo após "Conectar" (se ainda não
+  // conectado) ou pelo botão "QR Code" de um canal já cadastrado. Faz
+  // polling porque o QR expira em ~20-60s e porque é assim que detectamos
+  // que o celular escaneou (a UAZAPI não avisa a gente, o front que pergunta).
+  const [qrModal, setQrModal] = useState<{ channelId: string; label: string } | null>(null);
+  const [qrData, setQrData] = useState<{
+    qrcode: string | null;
+    paircode: string | null;
+    connected: boolean;
+    status: string | null;
+    loading: boolean;
+    error: string | null;
+  }>({ qrcode: null, paircode: null, connected: false, status: null, loading: true, error: null });
+  const qrPollRef = useRef<number | null>(null);
   const [zernioChoices, setZernioChoices] = useState<
     { credentialId: string; accounts: { id: string; name: string }[] } | null
   >(null);
@@ -488,6 +505,27 @@ export function ChannelsSettings() {
       }
       setShowUazapiForm(false);
       setUazForm({ label: '', serverUrl: '', token: '' });
+
+      // Ainda não conectou (número novo) — já abre o QR Code pra escanear,
+      // usando o que o POST já trouxe (evita uma chamada extra na hora).
+      const uazBody = body as {
+        channelId?: string;
+        connected?: boolean;
+        status?: string | null;
+        qrcode?: string | null;
+        paircode?: string | null;
+      };
+      if (uazBody.channelId && !uazBody.connected) {
+        setQrModal({ channelId: uazBody.channelId, label: uazForm.label.trim() || 'Instância UAZAPI' });
+        setQrData({
+          qrcode: uazBody.qrcode ?? null,
+          paircode: uazBody.paircode ?? null,
+          connected: false,
+          status: uazBody.status ?? null,
+          loading: false,
+          error: null,
+        });
+      }
     } catch (err) {
       toast.error('Falha ao conectar a UAZAPI', {
         description: err instanceof Error ? err.message : 'Erro interno',
@@ -499,6 +537,87 @@ export function ChannelsSettings() {
       setSavingUaz(false);
     }
   };
+
+  // Busca/renova o QR Code de uma instância UAZAPI (GET — não mexe no banco).
+  // Chamado ao abrir o modal e a cada poll enquanto ele estiver aberto.
+  const fetchQrCode = useCallback(
+    async (channelId: string) => {
+      if (!session) return;
+      try {
+        const res = await fetch(`/api/uazapi-qrcode?channelId=${encodeURIComponent(channelId)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const body = (await res.json()) as {
+          success?: boolean;
+          message?: string;
+          connected?: boolean;
+          status?: string | null;
+          qrcode?: string | null;
+          paircode?: string | null;
+        };
+        if (!res.ok || !body.success) {
+          setQrData((d) => ({ ...d, loading: false, error: body.message ?? 'Falha ao buscar o QR Code.' }));
+          return;
+        }
+        setQrData({
+          qrcode: body.qrcode ?? null,
+          paircode: body.paircode ?? null,
+          connected: Boolean(body.connected),
+          status: body.status ?? null,
+          loading: false,
+          error: null,
+        });
+        if (body.connected) {
+          void loadChannels();
+        }
+      } catch (err) {
+        setQrData((d) => ({
+          ...d,
+          loading: false,
+          error: err instanceof Error ? err.message : 'Erro de conexão.',
+        }));
+      }
+    },
+    [session, loadChannels],
+  );
+
+  const openQrModal = (channel: ChannelRow) => {
+    setQrModal({ channelId: channel.id, label: channel.label });
+    setQrData({ qrcode: null, paircode: null, connected: false, status: null, loading: true, error: null });
+  };
+
+  const closeQrModal = () => {
+    setQrModal(null);
+    if (qrPollRef.current) {
+      window.clearInterval(qrPollRef.current);
+      qrPollRef.current = null;
+    }
+  };
+
+  // Enquanto o modal estiver aberto e não tiver conectado, renova o QR a cada
+  // 8s (ele expira sozinho na UAZAPI) e checa se o celular já escaneou.
+  useEffect(() => {
+    if (!qrModal) return;
+    void fetchQrCode(qrModal.channelId);
+    qrPollRef.current = window.setInterval(() => {
+      void fetchQrCode(qrModal.channelId);
+    }, 8000);
+    return () => {
+      if (qrPollRef.current) {
+        window.clearInterval(qrPollRef.current);
+        qrPollRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrModal?.channelId]);
+
+  // Assim que detecta conexão, para o polling — não precisa mais renovar QR.
+  useEffect(() => {
+    if (qrData.connected && qrPollRef.current) {
+      window.clearInterval(qrPollRef.current);
+      qrPollRef.current = null;
+    }
+  }, [qrData.connected]);
 
   // Abre o form de edição já preenchido com o nome atual (a chave nunca volta
   // do backend — o campo de chave começa vazio, só troca se você preencher).
@@ -586,6 +705,17 @@ export function ChannelsSettings() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {channel.provider === 'uazapi' ? (
+              <button
+                onClick={() => openQrModal(channel)}
+                disabled={busy === channel.id}
+                title="Ver/renovar QR Code"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
+                style={{ borderColor: 'rgba(45,212,191,0.35)', background: 'rgba(45,212,191,0.08)', color: UAZAPI_COLOR }}
+              >
+                <QrCode className="h-3.5 w-3.5" /> QR Code
+              </button>
+            ) : null}
             <button
               onClick={() => void toggleActive(channel)}
               disabled={busy === channel.id}
@@ -1143,6 +1273,100 @@ export function ChannelsSettings() {
         </div>
       </section>
 
+      {qrModal ? <QrCodeModal modalLabel={qrModal.label} data={qrData} onClose={closeQrModal} /> : null}
+
+    </div>
+  );
+}
+
+// Modal de escaneio do QR Code UAZAPI. Componente à parte só pra não inchar
+// o corpo do ChannelsSettings — recebe tudo por props, sem estado próprio de
+// polling (isso fica no componente pai, que também decide quando reabrir).
+function QrCodeModal({
+  modalLabel,
+  data,
+  onClose,
+}: {
+  modalLabel: string;
+  data: {
+    qrcode: string | null;
+    paircode: string | null;
+    connected: boolean;
+    status: string | null;
+    loading: boolean;
+    error: string | null;
+  };
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="glass-card w-full max-w-sm space-y-4 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-label">UAZAPI</div>
+            <h3 className="text-lg font-bold text-display text-[var(--color-text-primary)]">{modalLabel}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition hover:bg-white/[0.05] hover:text-[var(--color-text-primary)]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {data.connected ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <CheckCircle2 className="h-12 w-12" style={{ color: '#10B981' }} />
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              WhatsApp conectado com sucesso!
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              A instância já está pronta pra receber e enviar mensagens.
+            </p>
+          </div>
+        ) : data.loading ? (
+          <div className="flex flex-col items-center gap-3 py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--color-text-secondary)]" />
+            <p className="text-xs text-[var(--color-text-secondary)]">Gerando QR Code...</p>
+          </div>
+        ) : data.error ? (
+          <div className="space-y-2 py-6 text-center">
+            <p className="text-sm font-medium text-[#F87171]">{data.error}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Confira se o Server URL e o Instance Token da instância ainda são válidos.
+            </p>
+          </div>
+        ) : data.qrcode ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="rounded-xl border border-[rgba(14,154,160,0.2)] bg-white p-3">
+              <img src={data.qrcode} alt="QR Code para conectar o WhatsApp" className="h-56 w-56" />
+            </div>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              No celular: WhatsApp → Aparelhos conectados → Conectar aparelho, e escaneie.
+            </p>
+            <p className="text-[11px] text-[var(--color-text-secondary)] opacity-70">
+              O código se renova sozinho a cada 8s enquanto esta janela estiver aberta.
+            </p>
+          </div>
+        ) : data.paircode ? (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Código de pareamento — digite no celular em WhatsApp → Aparelhos conectados → Conectar
+              com número de telefone:
+            </p>
+            <span className="rounded-lg bg-white/[0.05] px-4 py-2 font-mono text-2xl font-bold tracking-widest text-[var(--color-text-primary)]">
+              {data.paircode}
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-2 py-6 text-center">
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              Nenhum QR Code disponível agora{data.status ? ` (status: ${data.status})` : ''}.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

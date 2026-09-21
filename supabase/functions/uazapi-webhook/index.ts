@@ -147,6 +147,8 @@ async function findOrCreateConversation(
     insert.assigned_to = channel.assigned_member;
     insert.assigned_at = nowIso;
   }
+  // Fila/setor herdada do canal (Configurações → Equipe → Filas).
+  if (channel.queue_id) insert.queue_id = channel.queue_id;
   const { data: created, error } = await admin
     .from('conversations')
     .insert(insert)

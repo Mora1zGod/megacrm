@@ -68,6 +68,42 @@ export async function instanceStatus(
   return { connected, status, raw: root };
 }
 
+// POST /instance/connect → inicia a sessão e devolve o QR Code (base64) pra
+// escanear no celular, ou o pairing code se `phone` for informado. Enquanto a
+// instância não escaneia, chamadas repetidas aqui renovam o QR (ele expira em
+// ~20-60s na UAZAPI). Depois de escaneado, `instanceStatus` passa a reportar
+// `connected: true` e o QR não é mais necessário.
+export async function connectInstance(
+  serverUrl: string,
+  token: string,
+  phone?: string,
+): Promise<{ qrcode: string | null; paircode: string | null; connected: boolean; status: string | null }> {
+  const root = await ufetch(serverUrl, token, '/instance/connect', {
+    method: 'POST',
+    body: phone ? { phone } : {},
+  });
+  const inst = (root.instance && typeof root.instance === 'object'
+    ? (root.instance as Record<string, unknown>)
+    : root);
+  const status =
+    (typeof inst.status === 'string' && inst.status) ||
+    (typeof root.status === 'string' && root.status) ||
+    null;
+  const connected =
+    root.connected === true ||
+    inst.connected === true ||
+    (status ?? '').toLowerCase() === 'connected';
+  const qrcode =
+    (typeof inst.qrcode === 'string' && inst.qrcode) ||
+    (typeof root.qrcode === 'string' && root.qrcode) ||
+    null;
+  const paircode =
+    (typeof inst.paircode === 'string' && inst.paircode) ||
+    (typeof root.paircode === 'string' && root.paircode) ||
+    null;
+  return { qrcode, paircode, connected, status };
+}
+
 // POST /webhook — cria/atualiza o webhook da instância. Config espelhando o
 // padrão usado manualmente: POST, events connection+messages, excluindo
 // wasSentByApi (anti-loop) e isGroupYes (sem grupos).

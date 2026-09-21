@@ -27,6 +27,7 @@ const TasksPage = lazy(() => import('./routes/tasks/TasksPage'));
 const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
 const IntegrationsPage = lazy(() => import('./routes/integrations/IntegrationsPage'));
 const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
+const FilesPage = lazy(() => import('./routes/files/FilesPage'));
 
 function PageFallback() {
   return (
@@ -174,6 +175,7 @@ export function AppRouter() {
           <Route path="/templates" element={<Navigate to="/campaigns?tab=templates" replace />} />
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/contacts/:id" element={<ContactDetailPage />} />
+          <Route path="/arquivos" element={<FilesPage />} />
           <Route path="/funil" element={<AdminOnly><FunilPage /></AdminOnly>} />
           <Route path="/visitas" element={<VisitsPage />} />
           <Route path="/quadros" element={<BoardsPage />} />

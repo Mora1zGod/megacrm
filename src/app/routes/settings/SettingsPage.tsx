@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   UserCircle2,
   Users,
+  Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,12 +19,14 @@ import { ChannelsSettings } from './sections/ChannelsSettings';
 import { ProductsSettings } from './sections/ProductsSettings';
 import { ApiKeysSettings } from './sections/ApiKeysSettings';
 import { BrandingSettings } from './sections/BrandingSettings';
+import { QuickRepliesSettings } from './sections/QuickRepliesSettings';
 
 type TabId =
   | 'account'
   | 'team'
   | 'channels'
   | 'products'
+  | 'quick_replies'
   | 'api'
   | 'branding';
 
@@ -77,6 +80,13 @@ export default function SettingsPage() {
             icon: Package,
             adminOnly: true,
             render: () => <ProductsSettings />,
+          },
+          {
+            id: 'quick_replies',
+            label: 'Respostas rápidas',
+            hint: 'Atalhos pro Inbox',
+            icon: Zap,
+            render: () => <QuickRepliesSettings />,
           },
           {
             id: 'branding',

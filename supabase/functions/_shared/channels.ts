@@ -42,12 +42,15 @@ export interface ChannelRow {
   funnel_auto_add: boolean;
   funnel_pipeline_id: string | null;
   funnel_stage_id: string | null;
+  // Fila/setor pra onde conversas novas deste número são roteadas (Configurações
+  // → Equipe → Filas). null = sem fila.
+  queue_id: string | null;
 }
 
 const CHANNEL_COLUMNS =
   'id, org_id, provider, label, phone, zernio_account_id, uazapi_server_url, '
   + 'uazapi_token_encrypted, webhook_secret, assigned_member, is_active, ai_enabled, '
-  + 'funnel_auto_add, funnel_pipeline_id, funnel_stage_id';
+  + 'funnel_auto_add, funnel_pipeline_id, funnel_stage_id, queue_id';
 
 export async function getChannelById(
   admin: Admin,
