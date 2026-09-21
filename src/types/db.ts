@@ -23,6 +23,13 @@ export interface Contact {
   profile_pic_url?: string | null;
   // Data do primeiro registro do contato (Módulo 5) — coluna da lista.
   first_seen_at?: string | null;
+  // Config. Aniversário: data de nascimento (opcional) + ano do último envio
+  // automático (idempotência — nunca reenvia no mesmo ano). month/day são
+  // colunas geradas no banco, só leitura.
+  birthday_date?: string | null;
+  birthday_month?: number | null;
+  birthday_day?: number | null;
+  last_birthday_sent_year?: number | null;
   custom_fields: Record<string, unknown>;
   created_at: string;
   updated_at: string;

@@ -42,6 +42,7 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [birthdayDate, setBirthdayDate] = useState('');
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [customFields, setCustomFields] = useState<CustomFieldEntry[]>([]);
   const [saving, setSaving] = useState(false);
@@ -53,6 +54,7 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
     setName(contact?.name ?? '');
     setPhone(contact?.phone ?? '');
     setEmail(contact?.email ?? '');
+    setBirthdayDate(contact?.birthday_date ?? '');
     setSelectedTags(new Set((contact?.tags ?? []).map((t) => t.id)));
     setCustomFields(
       contact?.custom_fields
@@ -83,6 +85,7 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
         phone: phonePreview.e164,
         name: name.trim() || null,
         email: email.trim() || null,
+        birthday_date: birthdayDate.trim() || null,
         custom_fields: customFieldsFromEntries(customFields),
         tag_ids: Array.from(selectedTags),
       };
@@ -157,6 +160,20 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
               onChange={(e) => setEmail(e.target.value)}
               disabled={saving}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contact_birthday">Aniversário</Label>
+            <Input
+              id="contact_birthday"
+              type="date"
+              value={birthdayDate}
+              onChange={(e) => setBirthdayDate(e.target.value)}
+              disabled={saving}
+            />
+            <p className="text-[11px] text-[var(--color-text-secondary)] opacity-70">
+              Usado pelo disparo automático de aniversário (Config. Aniversário).
+            </p>
           </div>
         </div>
 

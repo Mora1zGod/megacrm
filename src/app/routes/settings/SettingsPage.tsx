@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import {
+  Cake,
   KeyRound,
   MessagesSquare,
   Package,
@@ -20,6 +21,7 @@ import { ProductsSettings } from './sections/ProductsSettings';
 import { ApiKeysSettings } from './sections/ApiKeysSettings';
 import { BrandingSettings } from './sections/BrandingSettings';
 import { QuickRepliesSettings } from './sections/QuickRepliesSettings';
+import { BirthdaySettings } from './sections/BirthdaySettings';
 
 type TabId =
   | 'account'
@@ -27,6 +29,7 @@ type TabId =
   | 'channels'
   | 'products'
   | 'quick_replies'
+  | 'birthday'
   | 'api'
   | 'branding';
 
@@ -87,6 +90,14 @@ export default function SettingsPage() {
             hint: 'Atalhos pro Inbox',
             icon: Zap,
             render: () => <QuickRepliesSettings />,
+          },
+          {
+            id: 'birthday',
+            label: 'Config. Aniversário',
+            hint: 'Disparo automático',
+            icon: Cake,
+            adminOnly: true,
+            render: () => <BirthdaySettings />,
           },
           {
             id: 'branding',
