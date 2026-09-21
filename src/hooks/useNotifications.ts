@@ -10,6 +10,10 @@ export interface NotificationRow {
   type: NotificationType;
   conversation_id: string | null;
   message_id: string | null;
+  // Menção no Chat Interno: aponta para a sala/mensagem lá, não para o Inbox
+  // (conversation_id/message_id são FK das tabelas do WhatsApp).
+  chat_id: string | null;
+  chat_message_id: string | null;
   title: string;
   body: string | null;
   is_read: boolean;

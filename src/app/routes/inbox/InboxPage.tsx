@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Inbox as InboxIcon, Info, MessageSquarePlus, PanelRightClose, PanelRightOpen, Pin, Star, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, Inbox as InboxIcon, Info, MessageSquarePlus, PanelRightClose, PanelRightOpen, Pin, Share2, Star, UserCheck, X } from 'lucide-react';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
@@ -30,6 +30,7 @@ import {
   type InboxSort,
 } from '@/components/inbox/inbox-filters';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
+import { ForwardToChatDialog } from '@/components/chat/ForwardToChatDialog';
 
 export default function InboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -46,6 +47,8 @@ export default function InboxPage() {
   // No mobile (<lg) mostramos uma coluna por vez: lista quando nada está
   // selecionado, senão a thread. O painel de contato vira um overlay.
   const [showPanelMobile, setShowPanelMobile] = useState(false);
+  // "Compartilhar com a equipe": joga a conversa no Chat Interno.
+  const [showForward, setShowForward] = useState(false);
   // Painel de contato (coluna direita, xl+) recolhível; preferência persiste.
   const [panelCollapsed, setPanelCollapsed] = useState(
     () => localStorage.getItem('inbox_panel_collapsed') === '1',
@@ -359,6 +362,14 @@ export default function InboxPage() {
                   </button>
                 )}
                 <button
+                  onClick={() => setShowForward(true)}
+                  aria-label="Compartilhar com a equipe"
+                  title="Compartilhar esta conversa no Chat Interno"
+                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+                <button
                   onClick={() => setShowPanelMobile(true)}
                   aria-label="Detalhes da conversa"
                   className="xl:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -502,6 +513,15 @@ export default function InboxPage() {
             />
           </div>
         </div>
+      )}
+
+      {selected && (
+        <ForwardToChatDialog
+          open={showForward}
+          onClose={() => setShowForward(false)}
+          conversationId={selected.id}
+          contactLabel={selected.contact?.name?.trim() || selected.contact?.phone || 'contato'}
+        />
       )}
     </div>
   );

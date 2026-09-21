@@ -15,6 +15,7 @@ import {
   Plug,
   ScrollText,
   Paperclip,
+  MessagesSquare,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/visitas', label: 'Visitas', icon: CalendarDays, group: 'Operação' },
   { to: '/contacts', label: 'Contatos', icon: Users, group: 'Operação' },
   { to: '/arquivos', label: 'Arquivos', icon: Paperclip, group: 'Operação' },
+  { to: '/chat', label: 'Chat Interno', icon: MessagesSquare, group: 'Operação' },
   { to: '/campaigns', label: 'Campanhas', icon: Megaphone, group: 'Engajamento' },
   { to: '/automations', label: 'Automações', icon: Zap, group: 'Engajamento', adminOnly: true },
   { to: '/ai-agent', label: 'Agente de IA', icon: Bot, group: 'Engajamento', adminOnly: true },

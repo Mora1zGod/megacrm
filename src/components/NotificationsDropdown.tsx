@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Inbox, MessageSquare, UserRoundCog } from 'lucide-react';
+import { AtSign, Bell, CheckCheck, Inbox, MessageSquare, UserRoundCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNotifications, type NotificationRow } from '@/hooks/useNotifications';
@@ -20,6 +20,7 @@ function relativeTime(iso: string): string {
 function iconFor(type: NotificationRow['type']) {
   if (type === 'new_message') return MessageSquare;
   if (type === 'handoff') return UserRoundCog;
+  if (type === 'mention') return AtSign;
   return Inbox;
 }
 
@@ -44,7 +45,9 @@ export function NotificationsDropdown() {
   const handleItemClick = async (n: NotificationRow) => {
     if (!n.is_read) await markRead(n.id);
     setOpen(false);
-    if (n.conversation_id) {
+    if (n.chat_id) {
+      navigate(`/chat?chat=${n.chat_id}`);
+    } else if (n.conversation_id) {
       navigate(`/inbox?conversation=${n.conversation_id}`);
     }
   };

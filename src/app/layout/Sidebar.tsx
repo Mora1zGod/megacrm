@@ -5,12 +5,14 @@ import { cn } from '@/lib/utils';
 import { NAV_ITEMS, type NavItem } from './nav-config';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { useTasks } from '@/hooks/useTasks';
+import { useInternalChat } from '@/hooks/useInternalChat';
 
 const GROUP_ORDER: NavItem['group'][] = ['Operação', 'Engajamento', 'Gestão', 'Administração'];
 
 export function Sidebar() {
   const { role, isSuperAdmin } = useAppUser();
   const { pendingCount } = useTasks();
+  const { unreadTotal } = useInternalChat();
   // Preferência de recolhimento persiste entre navegações/sessões.
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('sidebar_collapsed') === '1',
@@ -30,6 +32,14 @@ export function Sidebar() {
     group,
     items: visibleItems.filter((item) => item.group === group),
   })).filter((g) => g.items.length > 0);
+
+  // Contadores no item de menu: tarefas pendentes e mensagens internas não
+  // lidas. Zero = sem badge.
+  const badgeFor = (to: string): number => {
+    if (to === '/tasks') return pendingCount;
+    if (to === '/chat') return unreadTotal;
+    return 0;
+  };
 
   return (
     <aside
@@ -65,7 +75,7 @@ export function Sidebar() {
             <div className="space-y-0.5">
               {items.map((item) => {
                 const Icon = item.icon;
-                const isTasksWithBadge = item.to === '/tasks' && pendingCount > 0;
+                const badgeCount = badgeFor(item.to);
                 return (
                   <NavLink
                     key={item.to}
@@ -94,9 +104,9 @@ export function Sidebar() {
                         />
                         <Icon className="h-4 w-4 shrink-0" />
                         {!collapsed && <span className="truncate flex-1">{item.label}</span>}
-                        {!collapsed && isTasksWithBadge && (
+                        {!collapsed && badgeCount > 0 && (
                           <span className="shrink-0 rounded-full bg-[var(--accent-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-bg-primary)]">
-                            {pendingCount}
+                            {badgeCount > 99 ? '99+' : badgeCount}
                           </span>
                         )}
 
@@ -109,8 +119,8 @@ export function Sidebar() {
                             className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-[var(--z-tooltip)] -translate-y-1/2 whitespace-nowrap rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] opacity-0 shadow-[var(--shadow-md)] transition-opacity duration-[var(--motion-fast)] group-hover:opacity-100"
                           >
                             {item.label}
-                            {isTasksWithBadge && (
-                              <span className="ml-1.5 text-[var(--accent-primary)]">({pendingCount})</span>
+                            {badgeCount > 0 && (
+                              <span className="ml-1.5 text-[var(--accent-primary)]">({badgeCount})</span>
                             )}
                           </span>
                         )}

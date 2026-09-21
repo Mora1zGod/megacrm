@@ -28,6 +28,7 @@ const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
 const IntegrationsPage = lazy(() => import('./routes/integrations/IntegrationsPage'));
 const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
 const FilesPage = lazy(() => import('./routes/files/FilesPage'));
+const ChatPage = lazy(() => import('./routes/chat/ChatPage'));
 
 function PageFallback() {
   return (
@@ -176,6 +177,8 @@ export function AppRouter() {
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/contacts/:id" element={<ContactDetailPage />} />
           <Route path="/arquivos" element={<FilesPage />} />
+          {/* Chat Interno: aberto a toda a equipe (sem AdminOnly). */}
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/funil" element={<AdminOnly><FunilPage /></AdminOnly>} />
           <Route path="/visitas" element={<VisitsPage />} />
           <Route path="/quadros" element={<BoardsPage />} />
