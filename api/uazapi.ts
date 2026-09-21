@@ -4,26 +4,40 @@ import { decrypt, encrypt, getCredential } from '../src/lib/credentials.js';
 import { UazapiError, configureWebhook, instanceStatus, connectInstance } from '../src/lib/uazapi.js';
 
 // ============================================================================
-// api/uazapi-connect
+// api/uazapi  (?action=connect | ?action=qrcode)
 // ----------------------------------------------------------------------------
 // Integração DIRETA com a UAZAPI (não passa pelo Zernio). Multi-número: cada
 // instância UAZAPI é um CANAL da org (whatsapp_hub.channels, provider='uazapi')
 // com server_url + token cifrado na linha e um webhook_secret próprio — o
 // webhook é roteado por ?secret=<webhook_secret do canal>.
 //
-//  GET  → lista os canais UAZAPI da org com status de conexão.
-//  POST → cria/atualiza um canal:
-//         { channelId? , serverUrl?, token?, label?, phone? }
-//         · channelId ausente + serverUrl/token → cria canal novo
-//         · channelId presente → revalida/atualiza o canal (token opcional)
-//         · nada → fallback legado: usa as credenciais uazapi_server_url /
-//           uazapi_instance_token migradas do cofre da org (seed pós-migração)
-//         Sempre valida a instância e cadastra/atualiza o webhook na UAZAPI.
+// Junta os antigos api/uazapi-connect.ts e api/uazapi-qrcode.ts num único
+// arquivo (a Vercel Hobby limita a 12 Serverless Functions por deployment;
+// dois endpoints minúsculos e correlatos viraram um só pra caber no limite —
+// nenhum comportamento mudou, só a URL: /api/uazapi-connect e
+// /api/uazapi-qrcode viraram /api/uazapi?action=connect e ?action=qrcode).
+//
+// action=connect:
+//   GET  → lista os canais UAZAPI da org com status de conexão.
+//   POST → cria/atualiza um canal:
+//          { channelId? , serverUrl?, token?, label?, phone? }
+//          · channelId ausente + serverUrl/token → cria canal novo
+//          · channelId presente → revalida/atualiza o canal (token opcional)
+//          · nada → fallback legado: usa as credenciais uazapi_server_url /
+//            uazapi_instance_token migradas do cofre da org (seed pós-migração)
+//          Sempre valida a instância e cadastra/atualiza o webhook na UAZAPI.
+//
+// action=qrcode (GET ?channelId=<uuid>):
+//   QR Code (base64) pra escanear e conectar a instância UAZAPI daquele
+//   canal. Pensado pra polling pelo frontend (o QR expira em ~20-60s na
+//   UAZAPI, então cada chamada aqui pede um novo) sem repetir a
+//   validação/cadastro do webhook.
 // ============================================================================
 
 type ApiRequest = {
   method?: string;
   body?: unknown;
+  query?: Record<string, string | string[] | undefined>;
   headers?: Record<string, string | string[] | undefined>;
 };
 type ApiResponse = {
@@ -70,7 +84,11 @@ function decryptToken(payload: string): string {
   return decrypt(payload);
 }
 
-async function handleGet(orgId: string, res: ApiResponse) {
+// ---------------------------------------------------------------------------
+// action=connect
+// ---------------------------------------------------------------------------
+
+async function handleConnectGet(orgId: string, res: ApiResponse) {
   const { data, error } = await channelsTable()
     .select('id, label, phone, uazapi_server_url, uazapi_token_encrypted, assigned_member, is_active')
     .eq('org_id', orgId)
@@ -116,7 +134,7 @@ async function handleGet(orgId: string, res: ApiResponse) {
   });
 }
 
-async function handlePost(orgId: string, req: ApiRequest, res: ApiResponse) {
+async function handleConnectPost(orgId: string, req: ApiRequest, res: ApiResponse) {
   const body = (req.body ?? {}) as {
     channelId?: unknown;
     serverUrl?: unknown;
@@ -228,13 +246,13 @@ async function handlePost(orgId: string, req: ApiRequest, res: ApiResponse) {
     webhookId = wh.id;
   } catch (whErr) {
     webhookWarning = whErr instanceof Error ? whErr.message : 'Falha ao cadastrar o webhook na UAZAPI.';
-    console.error('uazapi-connect webhook warning', whErr);
+    console.error('uazapi connect webhook warning', whErr);
   }
 
   // Se ainda não conectou (número novo ou sessão nunca pareada), já busca o
   // QR Code de cara — evita o operador precisar de um segundo clique só pra
   // ver o QR depois de salvar. Falha aqui também é não-fatal: o canal já está
-  // salvo e o front pode pedir o QR de novo via /api/uazapi-qrcode.
+  // salvo e o front pode pedir o QR de novo via /api/uazapi?action=qrcode.
   let qrcode: string | null = null;
   let paircode: string | null = null;
   if (!st.connected) {
@@ -243,7 +261,7 @@ async function handlePost(orgId: string, req: ApiRequest, res: ApiResponse) {
       qrcode = conn.qrcode;
       paircode = conn.paircode;
     } catch (qrErr) {
-      console.error('uazapi-connect qrcode warning', qrErr);
+      console.error('uazapi connect qrcode warning', qrErr);
     }
   }
 
@@ -259,23 +277,77 @@ async function handlePost(orgId: string, req: ApiRequest, res: ApiResponse) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// action=qrcode
+// ---------------------------------------------------------------------------
+
+async function handleQrcode(orgId: string, req: ApiRequest, res: ApiResponse) {
+  if (req.method !== 'GET') return res.status(405).end();
+
+  const channelIdRaw = req.query?.channelId;
+  const channelId = Array.isArray(channelIdRaw) ? channelIdRaw[0] : channelIdRaw;
+  if (!channelId) {
+    return res.status(400).json({ success: false, message: 'Informe o channelId.' });
+  }
+
+  const { data, error } = await channelsTable()
+    .select('id, uazapi_server_url, uazapi_token_encrypted, phone')
+    .eq('id', channelId)
+    .eq('org_id', orgId)
+    .eq('provider', 'uazapi')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || !data.uazapi_server_url || !data.uazapi_token_encrypted) {
+    return res.status(404).json({ success: false, message: 'Instância UAZAPI não encontrada.' });
+  }
+
+  const serverUrl = data.uazapi_server_url as string;
+  const token = decrypt(data.uazapi_token_encrypted as string);
+
+  // Já conectado — nem precisa gastar um QR novo.
+  const st = await instanceStatus(serverUrl, token);
+  if (st.connected) {
+    return res.status(200).json({ success: true, connected: true, status: st.status });
+  }
+
+  const conn = await connectInstance(serverUrl, token, (data.phone as string | null) ?? undefined);
+  return res.status(200).json({
+    success: true,
+    connected: conn.connected,
+    status: conn.status,
+    qrcode: conn.qrcode,
+    paircode: conn.paircode,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// dispatch
+// ---------------------------------------------------------------------------
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
-    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
+    const actionRaw = req.query?.action;
+    const action = Array.isArray(actionRaw) ? actionRaw[0] : actionRaw;
 
     const auth = await requireAdmin(authHeaderOf(req));
     if (isAuthFailure(auth)) {
       return res.status(auth.status).json({ success: false, message: auth.message });
     }
 
+    if (action === 'qrcode') {
+      return await handleQrcode(auth.orgId, req, res);
+    }
+
+    // action=connect (ou ausente — mantém o comportamento antigo como default).
+    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
     return await (req.method === 'GET'
-      ? handleGet(auth.orgId, res)
-      : handlePost(auth.orgId, req, res));
+      ? handleConnectGet(auth.orgId, res)
+      : handleConnectPost(auth.orgId, req, res));
   } catch (err) {
     if (err instanceof UazapiError) {
       return res.status(err.status === 401 ? 401 : 502).json({ success: false, message: err.message });
     }
-    console.error('uazapi-connect error', err);
+    console.error('uazapi api error', err);
     return res.status(500).json({
       success: false,
       message: err instanceof Error ? err.message : 'Erro interno',

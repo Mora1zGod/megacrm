@@ -46,7 +46,7 @@ export function FollowUpsTab() {
   // UAZAPI disponível? (habilita o canal não oficial no form)
   useEffect(() => {
     if (!session) return;
-    void fetch('/api/uazapi-connect', { headers: { Authorization: `Bearer ${session.access_token}` } })
+    void fetch('/api/uazapi?action=connect', { headers: { Authorization: `Bearer ${session.access_token}` } })
       .then(async (res) => {
         const body = (await res.json()) as { configured?: boolean };
         setUazapiOk(Boolean(body.configured));

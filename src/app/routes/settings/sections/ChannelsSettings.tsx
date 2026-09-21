@@ -476,7 +476,7 @@ export function ChannelsSettings() {
     if (!session) return;
     setSavingUaz(true);
     try {
-      const res = await fetch('/api/uazapi-connect', {
+      const res = await fetch('/api/uazapi?action=connect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -544,7 +544,7 @@ export function ChannelsSettings() {
     async (channelId: string) => {
       if (!session) return;
       try {
-        const res = await fetch(`/api/uazapi-qrcode?channelId=${encodeURIComponent(channelId)}`, {
+        const res = await fetch(`/api/uazapi?action=qrcode&channelId=${encodeURIComponent(channelId)}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const body = (await res.json()) as {
