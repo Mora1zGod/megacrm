@@ -77,9 +77,10 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [orgStatus, setOrgStatus] = useState<OrgStatus | null>(null);
-  // 'dark' é o padrão até a org carregar — mesmo valor que já está fixado
-  // em globals.css antes do JS rodar, então não há flash de tema errado.
-  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  // 'light' é o padrão até a org carregar (identidade nova, ver
+  // globals.css) — mesmo valor que o <html> já tem antes do JS rodar
+  // (index.html), então não há flash de tema errado.
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
 
   const userId = user?.id ?? null;
 
@@ -125,7 +126,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setOrgName((data?.name as string | null) ?? null);
       setOrgStatus((data?.status as OrgStatus | null) ?? null);
-      setThemeMode((data?.theme_mode as ThemeMode | null) ?? 'dark');
+      setThemeMode((data?.theme_mode as ThemeMode | null) ?? 'light');
     })();
     return () => {
       cancelled = true;

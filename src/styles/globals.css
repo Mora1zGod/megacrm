@@ -104,22 +104,40 @@
 }
 
 /* -----------------------------------------------------------------------------
-   Tema claro — mesma marca, fundo/texto invertidos.
+   Tema claro — identidade nova (referência: ZapChatPro), agora o DEFAULT do
+   CRM (ver AppUserProvider.tsx e a migration 20260922120000_org_branding —
+   organizations.theme_mode default 'light'). Fundo neutro claro, sidebar/
+   cards brancos, accent teal — mesmo teal usado na faixa superior
+   (--color-topbar, definida abaixo, fora do bloco de tema porque é uma cor
+   de marca fixa, não invertida entre dark/light).
    ----------------------------------------------------------------------------- */
 :root[data-theme='light'] {
   color-scheme: light;
-  --color-bg-primary: #F7F7F5;
+  --color-bg-primary: #F2F5F6;
   --color-surface: #FFFFFF;
   --color-surface-raised: #FFFFFF;
-  --color-surface-hover: #F1F1EE;
+  --color-surface-hover: #EEF3F3;
   --color-bg-card: #FFFFFF;
-  --color-border-card: #E3E3E0;
-  --color-border-soft: #ECECE9;
-  --color-border-divider: #EFEFEC;
-  --color-text-primary: #14181C;
-  --color-text-secondary: #5B6067;
-  --color-text-label: #4B5158;
-  --color-text-muted: #8A8F96;
+  --color-border-card: #E2E8EA;
+  --color-border-soft: #EAEEEF;
+  --color-border-divider: #EDF1F2;
+  --color-text-primary: #16211F;
+  --color-text-secondary: #5C6B69;
+  --color-text-label: #45514F;
+  --color-text-muted: #8B9795;
+  --color-accent-primary: #0F9C95;
+  --color-accent-secondary: #14B8AE;
+  --color-accent-subtle: rgba(15, 156, 149, 0.1);
+  --accent-primary: #0F9C95;
+  --accent-secondary: #14B8AE;
+}
+
+/* Faixa/topbar teal — cor de marca fixa (não inverte com o tema), igual à
+   referência do ZapChatPro. Usada no Header.tsx. */
+:root {
+  --color-topbar: #0E7D78;
+  --color-topbar-hover: #0B6864;
+  --color-on-topbar: #FFFFFF;
 }
 
 :root[data-theme='light'] select option {
