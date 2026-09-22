@@ -16,20 +16,20 @@ function channelBadge(
   channelLabel: string | null,
 ) {
   if (channel === 'instagram') {
-    return { Icon: Instagram, label: 'Instagram', chip: 'bg-[rgba(225,48,108,0.14)] text-[#E1306C]' };
+    return { Icon: Instagram, label: 'Instagram', chip: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
   }
   const phoneLabel = channelPhone || channelLabel;
   if (provider === 'uazapi') {
     return {
       Icon: MessageCircle,
       label: phoneLabel || 'UAZAPI',
-      chip: 'bg-[rgba(45,212,191,0.14)] text-[#2DD4BF]',
+      chip: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]',
     };
   }
   return {
     Icon: MessageCircle,
     label: phoneLabel || 'WhatsApp',
-    chip: 'bg-[rgba(37,211,102,0.14)] text-[#25D366]',
+    chip: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]',
   };
 }
 
@@ -49,7 +49,7 @@ function statusChip(c: ConversationWithContact, aiEnabled: boolean, assignedName
     return { Icon: Inbox, label: 'Fechada', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
   }
   if (assignedName) {
-    return { Icon: User, label: assignedName, className: 'bg-[rgba(34,197,94,0.14)] text-[#22C55E]' };
+    return { Icon: User, label: assignedName, className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
   }
   if (c.status === 'ai_active' && aiEnabled) {
     return { Icon: Bot, label: 'AMAIA', className: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' };
@@ -125,11 +125,11 @@ export function ConversationList({
         return (
           <button
             key={c.id}
-            type="button"
+            type="button" aria-pressed={isActive} disabled={locked}
             onClick={() => { if (!locked) onSelect(c.id); }}
             title={locked ? `Conversa atribuída a ${assignedName ?? 'outro operador'}` : undefined}
             className={cn(
-              'w-full text-left rounded-[var(--radius-card)] px-3 py-2.5 transition-colors duration-150 border',
+              'inbox-conversation-row w-full text-left rounded-[var(--radius-card)] px-3 py-2.5 transition-colors duration-150 border',
               locked
                 ? 'opacity-50 cursor-not-allowed border-transparent'
                 : isActive
@@ -154,7 +154,7 @@ export function ConversationList({
                     {formatTimestamp(c.last_message_at)}
                   </span>
                 </div>
-                <p className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">
+                <p className="text-sm text-[var(--color-text-secondary)] truncate mt-1">
                   {locked ? <span className="italic opacity-70">Conversa em atendimento</span> : (c.lastMessagePreview ?? '—')}
                 </p>
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
@@ -165,7 +165,7 @@ export function ConversationList({
                     <StatusIcon className="h-2.5 w-2.5" /> {status.label}
                   </span>
                   {c.ai_paused && aiEnabled && (
-                    <span className="inline-flex items-center rounded-full bg-[rgba(245,158,11,0.14)] px-2 py-0.5 text-[10px] font-semibold text-[#FBBF24]">
+                    <span className="inline-flex items-center rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
                       AMAIA pausada
                     </span>
                   )}

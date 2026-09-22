@@ -314,7 +314,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-3">
+    <div className="inbox-message-history flex-1 min-h-0 overflow-y-auto p-6 space-y-3">
       {messages.map((m, i) => {
         const showDate = i === 0 || dayKey(m.created_at) !== dayKey(messages[i - 1].created_at);
         const separator = showDate ? <DateSeparator iso={m.created_at} /> : null;
@@ -365,7 +365,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
           >
             <div
               className={cn(
-                'max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm transition-opacity',
+                'inbox-message-bubble max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm transition-opacity',
                 isInbound
                   ? 'bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] rounded-bl-md'
                   : m.sender_type === 'ai'

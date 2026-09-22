@@ -92,7 +92,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
         <input
           value={busca}
           onChange={(e) => onBuscaChange(e.target.value)}
-          placeholder="Buscar por nome, telefone ou mensagem"
+          aria-label="Buscar por nome, telefone ou mensagem" placeholder="Buscar conversa..."
           className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] py-1.5 pl-8 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
         />
         {busca && (
@@ -107,7 +107,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="inbox-quick-filters">
         {chips.map((c) => {
           const ativo = chip === c.id;
           // Chip sem nada para mostrar (fora "Tudo") fica oculto — não faz
@@ -117,7 +117,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
             <button
               key={c.id}
               type="button"
-              onClick={() => onChipChange(ativo && c.id !== 'todas' ? 'todas' : c.id)}
+              aria-pressed={ativo} onClick={() => onChipChange(ativo && c.id !== 'todas' ? 'todas' : c.id)}
               className={cn(
                 'rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold transition-colors',
                 ativo

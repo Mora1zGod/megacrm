@@ -259,7 +259,7 @@ export function MessageInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-[rgba(14,154,160,0.08)] p-4 space-y-3 glass-surface"
+      className="inbox-composer border-t border-[var(--color-border-card)] p-4 space-y-3 glass-surface"
     >
       <div className="flex items-center gap-1 border-b border-[rgba(14,154,160,0.1)] pb-1.5">
         <button

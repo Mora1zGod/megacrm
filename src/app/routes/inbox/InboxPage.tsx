@@ -1,3 +1,5 @@
+import { Avatar } from '@/components/ui/Avatar';
+import './inbox.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -221,16 +223,16 @@ export default function InboxPage() {
   }, [selectedId, selected?.unread_count]);
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="inbox-workspace h-full flex flex-col min-h-0">
       {/* Cabeçalho compacto: no Inbox cada pixel vertical é conversa visível.
           O ícone grande + rótulo "Seção" das outras telas custava ~40px de
           lista sem acrescentar informação. */}
-      <div className="flex items-center justify-between mb-3 shrink-0">
+      <div className="inbox-page-heading flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-lg glass-card flex items-center justify-center">
             <InboxIcon className="h-4 w-4 text-[var(--accent-primary)]" />
           </div>
-          <h1 className="text-lg font-bold text-display">Inbox</h1>
+          <div><h1 className="text-xl font-bold text-display">Atendimento</h1><p className="text-xs text-[var(--color-text-secondary)]">Suas conversas, em um só lugar</p></div>
         </div>
         <Button variant="outline" onClick={() => setShowStartChat(true)}>
           <MessageSquarePlus className="h-4 w-4" />
@@ -258,17 +260,17 @@ export default function InboxPage() {
       )}
 
       <div
-        className={`flex-1 lg:grid gap-3 min-h-0 ${
-          panelCollapsed ? 'lg:grid-cols-[300px_1fr_44px]' : 'lg:grid-cols-[300px_1fr_320px]'
+        className={`inbox-panels flex-1 min-h-0 ${
+          panelCollapsed ? 'inbox-details-collapsed' : ''
         }`}
       >
         {/* Left: conversation list — no mobile some quando há conversa aberta */}
         <div
-          className={`glass-card p-0 flex-col overflow-hidden h-full ${
+          className={`inbox-column p-0 flex-col overflow-hidden h-full min-w-0 ${
             selectedId ? 'hidden lg:flex' : 'flex'
           }`}
         >
-          <div className="p-3 border-b border-[rgba(14,154,160,0.08)] space-y-2">
+          <div className="inbox-list-tools space-y-3">
             {/* Busca sempre visível + chips rápidos. Os filtros avançados
                 continuam no popover abaixo, para casos específicos. */}
             <InboxQuickBar
@@ -310,13 +312,13 @@ export default function InboxPage() {
 
         {/* Center: thread — no mobile ocupa a tela quando há conversa aberta */}
         <div
-          className={`glass-card p-0 flex-col overflow-hidden h-full ${
+          className={`inbox-column p-0 flex-col overflow-hidden h-full min-w-0 ${
             selectedId ? 'flex' : 'hidden lg:flex'
           }`}
         >
           {selected ? (
             <>
-              <div className="p-3 border-b border-[rgba(14,154,160,0.08)] flex items-center gap-2">
+              <div className="inbox-conversation-heading flex items-center gap-3">
                 <button
                   onClick={() => setSelectedId(null)}
                   aria-label="Voltar à lista"
@@ -324,11 +326,11 @@ export default function InboxPage() {
                 >
                   <ArrowLeft className="h-4.5 w-4.5" />
                 </button>
-                <div className="min-w-0 flex-1">
+                <Avatar src={selected.contact?.profile_pic_url} name={selected.contact?.name || selected.contact?.phone} size="md" /><div className="min-w-0 flex-1">
                   <div className="font-semibold text-[var(--color-text-primary)] text-sm truncate">
                     {selected.contact?.name?.trim() || selected.contact?.phone || '—'}
                   </div>
-                  <div className="text-[10px] font-mono text-[var(--color-text-secondary)] truncate">
+                  <div className="text-xs text-[var(--color-text-secondary)] truncate mt-1">
                     {selected.contact?.phone}
                   </div>
                 </div>
@@ -407,7 +409,7 @@ export default function InboxPage() {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-label opacity-60">
-                Selecione uma conversa para ver a thread
+                Selecione uma conversa para começar
               </div>
             </div>
           )}
@@ -415,7 +417,7 @@ export default function InboxPage() {
 
         {/* Right: contact panel — coluna fixa só em xl; abaixo disso é overlay.
             Recolhível: vira uma régua estreita com botão de expandir. */}
-        <div className="hidden xl:flex glass-card p-0 overflow-hidden h-full flex-col">
+        <div className="inbox-details hidden xl:flex p-0 overflow-hidden h-full flex-col">
           {panelCollapsed ? (
             <button
               onClick={togglePanel}
