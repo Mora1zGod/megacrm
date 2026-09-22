@@ -530,12 +530,79 @@ supabase/functions/
 
 ---
 
-## Design System — Dark Mode Glassmorphism (OBRIGATÓRIO)
+## Design System — Tema claro/teal (padrão atual, ref. ZapChatPro)
 
-A plataforma é **dark mode only**. Não implementar light mode. Não criar
-toggle de tema.
+**Histórico:** até set/2026 a plataforma era dark-mode-only (seção abaixo
+mantida só como registro do visual antigo/legado — nenhum componente novo
+deve usar esses valores). A partir daí:
 
-### Tokens de cor
+1. Já existia em produção — criado fora do histórico de migrations, mesma
+   situação do `automation_flows` — um sistema de tema **por organização**:
+   `organizations.theme_mode` (`'dark' | 'light'`) + `organizations.logo_url`
+   + bucket `org-branding`, lido/escrito por `useOrgBranding.ts` e
+   `Settings → Identidade Visual` (`BrandingSettings.tsx`). Aplicado via
+   `document.documentElement.setAttribute('data-theme', mode)`. Documentado
+   e trazido pro histórico de migrations em
+   `20260922120000_org_branding.sql`.
+2. Pedido do Gabriel (referência: telas do ZapChatPro, `demo.zapchatpro.com.br`):
+   o tema **claro** vira o DEFAULT da plataforma (era dark), com **paleta
+   copiada do ZapChatPro** (não a paleta AMAI antiga) — fundo neutro
+   claro, sidebar/cards brancos, accent teal, faixa superior (topbar) em
+   teal sólido.
+
+**Portanto:** a regra antiga "não implementar light mode / não criar toggle
+de tema" está **revogada**. O toggle já existe (`BrandingSettings.tsx`); o
+que mudou é o default e a paleta.
+
+### Tokens de cor — tema claro (default, `src/styles/globals.css`)
+
+| Token                     | Valor                        | Uso                                    |
+|----------------------------|------------------------------|-----------------------------------------|
+| `--color-bg-primary`       | `#F2F5F6`                    | fundo da página                         |
+| `--color-surface` / `-raised` / `-card` | `#FFFFFF`        | sidebar, cards, superfícies             |
+| `--color-surface-hover`    | `#EEF3F3`                    | hover de item de lista/menu             |
+| `--color-border-card`      | `#E2E8EA`                    | borda padrão                            |
+| `--color-text-primary`     | `#16211F`                    | texto principal                         |
+| `--color-text-secondary`   | `#5C6B69`                    | texto secundário                        |
+| `--color-accent-primary` / `--accent-primary` | `#0F9C95`  | acento/CTA/active state                 |
+| `--color-accent-secondary` | `#14B8AE`                    | acento secundário                       |
+| `--color-topbar`           | `#0E7D78`                    | faixa superior (Header) — cor de marca fixa, **não** inverte com o tema |
+| `--color-topbar-hover`     | `#0B6864`                    | hover sobre a faixa                     |
+| `--color-on-topbar`        | `#FFFFFF`                    | texto/ícone sobre a faixa teal          |
+
+Tema escuro continua disponível por org (`:root[data-theme='dark']`, valores
+antigos preservados em `globals.css` — não removidos, só deixaram de ser o
+default).
+
+### Padrão de superfície
+
+`.glass-card` / `.surface-card` (`globals.css`) já são **token-based** (sem
+cor fixa, sem blur pesado) — herdam o tema automaticamente:
+
+```css
+.surface-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-card);
+  border-radius: var(--radius-card);
+}
+```
+
+Componentes devem sempre usar `var(--color-*)` / `var(--accent-primary)` —
+nunca hardcodear hex. Isso é o que faz o app inteiro re-tingir sozinho
+quando o tema muda (ver Header.tsx / Sidebar.tsx como referência: Sidebar
+não precisou de nenhuma mudança estrutural pro novo tema, só herdou os
+tokens).
+
+### Tipografia
+
+Sem mudança — escala em `globals.css` (`.text-display`, `.text-page-title`,
+`.text-section-title`, `.text-body`, `.text-label`, etc.), fonte
+`Plus Jakarta Sans`.
+
+---
+
+<details>
+<summary>Legado — paleta dark-mode-only anterior a set/2026 (não usar em código novo)</summary>
 
 | Token                  | Valor                                        |
 |------------------------|----------------------------------------------|
@@ -544,78 +611,14 @@ toggle de tema.
 | `--border-card`        | `rgba(59, 130, 246, 0.15)`                   |
 | `--accent-primary`     | `#3B82F6`                                    |
 | `--accent-secondary`   | `#60A5FA`                                    |
-| `--gradient-primary`   | `linear-gradient(135deg, #1E3A8A, #3B82F6)`  |
 | `--text-primary`       | `#F8FAFC`                                    |
 | `--text-secondary`     | `#94A3B8`                                    |
-| `--text-label`         | `#CBD5E1`                                    |
-| `--color-success`      | `#10B981`                                    |
-| `--color-error`        | `#EF4444`                                    |
 
-### Background glow (no `body`)
+Glassmorphism com `backdrop-filter: blur(40px)` e bordas azuis translúcidas.
+Substituído pelos tokens `--color-*` de `globals.css`, hoje a fonte de
+verdade real (esta tabela nunca refletiu 1:1 o CSS do repo).
 
-```css
-body {
-  background-color: #0A0A0F;
-  background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(59, 130, 246, 0.06), transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(37, 99, 235, 0.04), transparent 50%);
-  min-height: 100vh;
-}
-```
-
-### Glass card padrão
-
-```css
-.glass-card {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.02));
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: 16px;
-  box-shadow:
-    0 0 20px rgba(59, 130, 246, 0.06),
-    inset 0 1px 0 rgba(59, 130, 246, 0.1);
-}
-
-.glass-card:hover {
-  border-color: rgba(59, 130, 246, 0.45);
-  box-shadow:
-    0 0 30px rgba(59, 130, 246, 0.12),
-    0 0 60px rgba(59, 130, 246, 0.04),
-    inset 0 1px 0 rgba(59, 130, 246, 0.2);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-```
-
-### Tipografia
-
-```css
-* { font-family: 'Inter', sans-serif; }
-
-.text-display { font-weight: 700; }
-.text-stat    { font-size: 2.5rem; font-weight: 800; }
-
-.text-label {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-}
-
-.text-body { font-weight: 400; font-size: 0.875rem; }
-```
-
-### Bordas e separadores
-
-- Borders padrão: `rgba(59, 130, 246, 0.12)`.
-- Dividers: `rgba(59, 130, 246, 0.08)`.
-- Sidebar `border-right`: `1px solid rgba(59, 130, 246, 0.1)`.
-- Header `border-bottom`: `1px solid rgba(59, 130, 246, 0.08)`.
-
-Componentes devem usar `var(--accent-primary)` / `var(--accent-secondary)` em
-vez de hardcodear `#3B82F6` / `#60A5FA`. Os hex listados acima são apenas o
-fallback default.
+</details>
 
 ---
 
