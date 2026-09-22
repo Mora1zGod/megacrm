@@ -140,6 +140,21 @@
   --color-on-topbar: #FFFFFF;
 }
 
+/* Preenchimento sutil — inputs, badges "neutros", toggle desligado, hover de
+   item sobre fundo transparente. Era hardcoded como bg-white/[0.02..0.06] em
+   ~70 arquivos (herdado do tema dark-only antigo): sobre fundo branco isso
+   fica quase invisível (input sem contorno, hover que não aparece) — é a
+   causa principal de telas parecerem "não mudou nada" no tema claro. Trocado
+   globalmente por var(--color-fill-subtle) / var(--color-surface-hover).
+   Ver ImageLightbox.tsx e Header.tsx: ficaram de fora de propósito (overlay
+   fullscreen sempre escuro / faixa teal sempre colorida — não são tema). */
+:root[data-theme='light'] {
+  --color-fill-subtle: #EEF3F3;
+}
+:root {
+  --color-fill-subtle: rgba(255, 255, 255, 0.04);
+}
+
 :root[data-theme='light'] select option {
   background-color: #FFFFFF;
   color: #14181C;

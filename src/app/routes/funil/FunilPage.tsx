@@ -124,7 +124,7 @@ export default function FunilPage() {
           >
             <Archive className="h-4 w-4" /> Arquivados
             {archivedDeals.length > 0 && (
-              <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
+              <span className="rounded-full bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
                 {archivedDeals.length}
               </span>
             )}
@@ -132,7 +132,7 @@ export default function FunilPage() {
           <div className="relative">
             <button
               onClick={() => setPickerOpen((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
+              className="inline-flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
             >
               {pipeline?.name ?? 'Funil'}
               <ChevronDown className="h-4 w-4 opacity-70" />
@@ -145,7 +145,7 @@ export default function FunilPage() {
                     <button
                       key={p.id}
                       onClick={() => { select(p.id); setPickerOpen(false); }}
-                      className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-white/5 ${
+                      className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-[var(--color-surface-hover)] ${
                         p.id === selectedId ? 'text-[var(--accent-secondary)]' : 'text-[var(--color-text-primary)]'
                       }`}
                     >
@@ -190,7 +190,7 @@ export default function FunilPage() {
       </div>
 
       {/* Abas de visualização */}
-      <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-white/[0.02] w-fit">
+      <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-[var(--color-fill-subtle)] w-fit">
         {([
           ['kanban', 'Kanban', KanbanSquare],
           ['lista', 'Lista', List],
@@ -251,7 +251,7 @@ export default function FunilPage() {
                   if (dragId) void moveDeal(dragId, stage.id);
                   setDragId(null);
                 }}
-                className="flex w-72 shrink-0 flex-col rounded-xl border border-[rgba(14,154,160,0.12)] bg-white/[0.02]"
+                className="flex w-72 shrink-0 flex-col rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)]"
               >
                 <div className="flex items-center justify-between border-b border-[rgba(14,154,160,0.1)] px-3 py-2.5">
                   <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
@@ -365,7 +365,7 @@ function ArchivedPanel({
           <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
             <Archive className="h-4 w-4 text-[var(--accent-primary)]" /> Negócios arquivados ({deals.length})
           </span>
-          <button onClick={onClose} className="rounded-md p-1 text-[var(--color-text-secondary)] transition hover:bg-white/5">
+          <button onClick={onClose} className="rounded-md p-1 text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-hover)]">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -520,7 +520,7 @@ function DealCard({
       <button
         onClick={(e) => { e.stopPropagation(); onArchive(); }}
         title="Arquivar negócio"
-        className="absolute bottom-2 right-2 rounded-md border border-[rgba(14,154,160,0.25)] p-1 text-[var(--color-text-secondary)] opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-[var(--color-text-primary)]"
+        className="absolute bottom-2 right-2 rounded-md border border-[rgba(14,154,160,0.25)] p-1 text-[var(--color-text-secondary)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
         style={{ background: 'rgba(11,59,46,0.9)' }}
       >
         <Archive className="h-3.5 w-3.5" />
@@ -581,7 +581,7 @@ function AddDealForm({
   const [busy, setBusy] = useState(false);
 
   const inputCls =
-    'w-full rounded-md border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+    'w-full rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 
   return (
     <form
@@ -592,7 +592,7 @@ function AddDealForm({
         await onSubmit({ title: title.trim(), contact_id: contactId, value: Number(value) || 0 });
         setBusy(false);
       }}
-      className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] p-2"
+      className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] p-2"
     >
       <select value={contactId} onChange={(e) => setContactId(e.target.value)} className={inputCls}>
         <option value="">Contato (lead)…</option>
@@ -642,7 +642,7 @@ function FunilListView({ deals, stages, onOpen }: { deals: Deal[]; stages: Stage
             <tr
               key={d.id}
               onClick={() => onOpen(d.id)}
-              className="cursor-pointer border-b border-[rgba(14,154,160,0.08)] last:border-0 hover:bg-white/[0.03]"
+              className="cursor-pointer border-b border-[rgba(14,154,160,0.08)] last:border-0 hover:bg-[var(--color-fill-subtle)]"
             >
               <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{d.title}</td>
               <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{stageName(d.stage_id)}</td>

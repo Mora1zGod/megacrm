@@ -238,7 +238,7 @@ export function TeamSettings() {
                       value={m.role}
                       onChange={(e) => void mudarRole(m, e.target.value as Role)}
                       disabled={m.user_id === userId}
-                      className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
+                      className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
                     >
                       <option value="admin">Administrador</option>
                       <option value="operator">Operador</option>
@@ -248,7 +248,7 @@ export function TeamSettings() {
                       onClick={() => void remover(m)}
                       disabled={m.user_id === userId}
                       aria-label="Remover membro"
-                      className="rounded-lg p-1.5 hover:bg-white/5 disabled:opacity-30"
+                      className="rounded-lg p-1.5 hover:bg-[var(--color-surface-hover)] disabled:opacity-30"
                     >
                       <Trash2 className="h-4 w-4 text-[#EF4444]" />
                     </button>
@@ -312,7 +312,7 @@ export function TeamSettings() {
                       type="button"
                       onClick={() => setEditandoFila(q)}
                       aria-label="Editar fila"
-                      className="ml-auto rounded-lg p-1 hover:bg-white/5"
+                      className="ml-auto rounded-lg p-1 hover:bg-[var(--color-surface-hover)]"
                     >
                       <Settings2 className="h-3.5 w-3.5 text-[var(--color-text-secondary)]" />
                     </button>
@@ -378,7 +378,7 @@ export function TeamSettings() {
                   value={c.queue_id ?? ''}
                   disabled={!isAdmin}
                   onChange={(e) => void mudarCanalFila(c.id, e.target.value)}
-                  className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1.5 text-xs text-[var(--color-text-primary)] disabled:opacity-60"
+                  className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)] disabled:opacity-60"
                 >
                   <option value="">Sem fila</option>
                   {queues.map((q) => (
@@ -440,7 +440,7 @@ function ConviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () =>
             id="inv-role"
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           >
             <option value="operator">Operador — vê só as filas dele</option>
             <option value="admin">Administrador — vê tudo</option>

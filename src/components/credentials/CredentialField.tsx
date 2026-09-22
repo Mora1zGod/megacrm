@@ -88,7 +88,7 @@ export function CredentialField({
 
   if (!editing && initialHasValue) {
     return (
-      <div className="rounded-xl border border-[rgba(14,154,160,0.12)] bg-white/[0.02] p-5">
+      <div className="rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="text-[13px] font-medium text-[#CBD5E1]">{field.label}</div>
@@ -100,7 +100,7 @@ export function CredentialField({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-4 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0] hover:shadow-[0_0_30px_rgba(14,154,160,0.25)]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0] hover:shadow-[0_0_30px_rgba(14,154,160,0.25)]"
           >
             <Pencil className="h-4 w-4" />
             Alterar
@@ -111,7 +111,7 @@ export function CredentialField({
   }
 
   return (
-    <div className="rounded-xl border border-[rgba(14,154,160,0.12)] bg-white/[0.02] p-5">
+    <div className="rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-5">
       <div className="mb-2 flex items-center justify-between gap-3">
         <label htmlFor={field.key} className="text-[13px] font-medium text-[#CBD5E1]">
           {field.label}
@@ -137,7 +137,7 @@ export function CredentialField({
           placeholder={field.placeholder}
           autoComplete="off"
           spellCheck={false}
-          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-4 py-3 pr-20 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
+          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-3 pr-20 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
         />
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
           {field.inputType === 'password' ? (

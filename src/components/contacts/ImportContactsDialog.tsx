@@ -225,7 +225,7 @@ export function ImportContactsDialog({
       {step === 'upload' && (
         <label
           htmlFor="contacts_file"
-          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[rgba(14,154,160,0.25)] bg-white/[0.02] p-10 cursor-pointer hover:border-[rgba(14,154,160,0.5)]"
+          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] p-10 cursor-pointer hover:border-[rgba(14,154,160,0.5)]"
         >
           <FileUp className="h-8 w-8 text-[var(--accent-primary)]" />
           <div className="text-center">
@@ -270,7 +270,7 @@ export function ImportContactsDialog({
 
           <div className="rounded-lg border border-[rgba(14,154,160,0.1)] overflow-auto max-h-[340px]">
             <table className="w-full text-xs">
-              <thead className="bg-white/[0.03] sticky top-0">
+              <thead className="bg-[var(--color-fill-subtle)] sticky top-0">
                 <tr>
                   {headers.map((h, i) => (
                     <th key={i} className="p-2 text-left border-b border-[rgba(14,154,160,0.08)] min-w-[140px]">
@@ -352,7 +352,7 @@ export function ImportContactsDialog({
           <div className="text-sm text-[var(--color-text-primary)]">
             Importando... {progress}%
           </div>
-          <div className="w-full max-w-md h-2 rounded-full bg-white/5 overflow-hidden">
+          <div className="w-full max-w-md h-2 rounded-full bg-[var(--color-fill-subtle)] overflow-hidden">
             <div
               className="h-full bg-[var(--accent-primary)] transition-all"
               style={{ width: `${progress}%` }}

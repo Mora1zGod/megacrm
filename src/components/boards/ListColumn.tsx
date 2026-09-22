@@ -74,12 +74,12 @@ export function ListColumn({
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
               if (e.key === 'Escape') { setName(list.name); setEditingName(false); }
             }}
-            className="min-w-0 flex-1 rounded-md border border-[var(--accent-primary)] bg-white/[0.03] px-1.5 py-0.5 text-xs font-bold text-[var(--color-text-primary)]"
+            className="min-w-0 flex-1 rounded-md border border-[var(--accent-primary)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs font-bold text-[var(--color-text-primary)]"
           />
         ) : (
           <span
             onClick={() => setEditingName(true)}
-            className="min-w-0 flex-1 truncate cursor-text rounded-md px-1 text-xs font-bold text-display hover:bg-white/5"
+            className="min-w-0 flex-1 truncate cursor-text rounded-md px-1 text-xs font-bold text-display hover:bg-[var(--color-surface-hover)]"
           >
             {list.name}
           </span>
@@ -90,7 +90,7 @@ export function ListColumn({
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Opções da lista"
-            className="h-6 w-6 flex items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
+            className="h-6 w-6 flex items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
@@ -99,7 +99,7 @@ export function ListColumn({
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); void arquivarLista(); }}
-                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-white/5"
+                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
               >
                 <Archive className="h-3.5 w-3.5" /> Arquivar lista
               </button>
@@ -155,7 +155,7 @@ function NovoCartao({ onCreate }: { onCreate: (title: string) => void }) {
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="mt-1.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)] shrink-0"
+        className="mt-1.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] shrink-0"
       >
         <Plus className="h-3.5 w-3.5" /> Adicionar um cartão
       </button>
@@ -175,7 +175,7 @@ function NovoCartao({ onCreate }: { onCreate: (title: string) => void }) {
         }}
         onBlur={enviar}
         placeholder="Título do cartão"
-        className="w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+        className="w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
       />
     </div>
   );

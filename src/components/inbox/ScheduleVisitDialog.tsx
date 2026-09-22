@@ -62,7 +62,7 @@ export function ScheduleVisitDialog({ contactId, contactName, onClose, onSaved }
               value={date}
               min={hoje}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
             />
           </div>
           <div>
@@ -72,7 +72,7 @@ export function ScheduleVisitDialog({ contactId, contactName, onClose, onSaved }
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
             />
           </div>
         </div>
@@ -84,7 +84,7 @@ export function ScheduleVisitDialog({ contactId, contactName, onClose, onSaved }
             min={1}
             value={partySize}
             onChange={(e) => setPartySize(Math.max(1, Number(e.target.value) || 1))}
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           />
         </div>
         <div>
@@ -94,7 +94,7 @@ export function ScheduleVisitDialog({ contactId, contactName, onClose, onSaved }
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ex.: associado, vem de Cruzeiro do Sul"
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           />
         </div>
       </div>

@@ -109,7 +109,7 @@ function StepIndicator({ step }: { step: Step }) {
 
 function SetupCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-[40px] md:p-12">
+    <div className="rounded-2xl border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-[40px] md:p-12">
       {children}
     </div>
   );
@@ -129,7 +129,7 @@ function PrepItem({
   pills: string[];
 }) {
   return (
-    <div className="relative rounded-xl border border-[rgba(14,154,160,0.12)] bg-white/[0.02] p-5">
+    <div className="relative rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-5">
       <div className="flex gap-4 pr-16">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(14,154,160,0.4)] text-sm font-medium text-[#8FE3DC]">
           {n}
@@ -421,7 +421,7 @@ export default function SetupPage() {
                             setCore((prev) => ({ ...prev, [key]: next }));
                           }}
                           autoComplete={key === 'owner_password' ? 'new-password' : 'off'}
-                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-4 py-3 pr-16 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
+                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-3 pr-16 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
                         />
                         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
                           {isSecret ? (
@@ -450,7 +450,7 @@ export default function SetupPage() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="min-h-11 w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] px-5 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0] sm:w-auto"
+                  className="min-h-11 w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-5 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0] sm:w-auto"
                 >
                   Voltar
                 </button>
@@ -469,7 +469,7 @@ export default function SetupPage() {
               </p>
               <div className="space-y-3">
                 {TIMELINE_STEPS.map((entry) => (
-                  <div key={entry.label} className="flex items-center gap-3 rounded-xl border border-[rgba(14,154,160,0.12)] bg-white/[0.02] p-4">
+                  <div key={entry.label} className="flex items-center gap-3 rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-4">
                     {timeline.includes(entry.label) ? <Check className="h-5 w-5 text-[#10B981]" /> : <Loader2 className="h-5 w-5 animate-spin text-[#8FE3DC]" />}
                     <span className="text-sm text-[#F8FAFC]">{entry.label}</span>
                   </div>
@@ -514,7 +514,7 @@ export default function SetupPage() {
                     <button
                       type="button"
                       onClick={() => void waitForAppLive()}
-                      className="min-h-11 rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] px-5 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0]"
+                      className="min-h-11 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-5 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0]"
                     >
                       Verificar de novo
                     </button>
@@ -536,7 +536,7 @@ export default function SetupPage() {
                         onChange={(event) => setCore((prev) => ({ ...prev, owner_password: event.target.value }))}
                         placeholder="senha do owner"
                         autoComplete="current-password"
-                        className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-4 py-3 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
+                        className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-3 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
                       />
                     </div>
                   ) : null}

@@ -101,7 +101,7 @@ export function NotificationsDropdown() {
                         onClick={() => handleItemClick(n)}
                         className={cn(
                           'w-full text-left p-3 flex items-start gap-3 transition-colors',
-                          'hover:bg-white/[0.03]',
+                          'hover:bg-[var(--color-fill-subtle)]',
                           !n.is_read && 'bg-[rgba(14,154,160,0.04)]',
                         )}
                       >

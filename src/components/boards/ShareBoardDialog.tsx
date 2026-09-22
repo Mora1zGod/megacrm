@@ -36,7 +36,7 @@ export function ShareBoardDialog({ boardId, boardName, operators, onClose, onCha
           {operators.map((o) => (
             <label
               key={o.user_id}
-              className="flex items-center gap-2.5 rounded-lg border border-[rgba(14,154,160,0.15)] px-3 py-2 text-sm cursor-pointer hover:bg-white/5"
+              className="flex items-center gap-2.5 rounded-lg border border-[rgba(14,154,160,0.15)] px-3 py-2 text-sm cursor-pointer hover:bg-[var(--color-surface-hover)]"
             >
               <input
                 type="checkbox"

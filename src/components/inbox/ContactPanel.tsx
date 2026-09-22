@@ -394,7 +394,7 @@ export function ContactPanel({
               toast.error('Falha', { description: err instanceof Error ? err.message : String(err) });
             }
           }}
-          className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 text-sm text-[var(--color-text-primary)]"
+          className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)]"
         >
           <option value="">Ninguém</option>
           {operators.map((op) => (
@@ -419,7 +419,7 @@ export function ContactPanel({
                 toast.error('Falha', { description: err instanceof Error ? err.message : String(err) });
               }
             }}
-            className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 text-sm text-[var(--color-text-primary)]"
+            className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)]"
           >
             <option value="">Sem fila</option>
             {queues.map((q) => (
@@ -443,7 +443,7 @@ export function ContactPanel({
                 toast.error('Falha', { description: err instanceof Error ? err.message : String(err) });
               }
             }}
-            className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 text-sm text-[var(--color-text-primary)]"
+            className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)]"
           >
             <option value="">Nenhum</option>
             {openDeals.map((d) => (
@@ -491,7 +491,7 @@ export function ContactPanel({
                 onChange={(e) => setLostReason(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void markOutcome('lost')}
                 placeholder="Motivo da perda (opcional)"
-                className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 autoFocus
               />
               <button
@@ -624,7 +624,7 @@ export function ContactPanel({
               onChange={(e) => setNovaTarefaTexto(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void criarTarefaRapida(); }}
               placeholder="O que precisa ser feito?"
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             />
             <Button size="sm" onClick={() => void criarTarefaRapida()} disabled={criandoTarefa || !novaTarefaTexto.trim()}>
               {criandoTarefa ? 'Criando...' : 'Criar'}

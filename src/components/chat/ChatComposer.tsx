@@ -134,7 +134,7 @@ export function ChatComposer({ members, disabled, onSendText, onSendFile }: Chat
       className="border-t border-[rgba(14,154,160,0.08)] p-4 space-y-3 glass-surface"
     >
       {file && (
-        <div className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
           <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
           <span className="truncate text-[var(--color-text-primary)]">{file.name}</span>
           <span className="text-[var(--color-text-secondary)]">{formatBytes(file.size)}</span>
@@ -182,7 +182,7 @@ export function ChatComposer({ members, disabled, onSendText, onSendFile }: Chat
                   className={
                     i === mentionIndex
                       ? 'flex w-full items-center gap-2 rounded-md bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-left'
-                      : 'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-white/5'
+                      : 'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-[var(--color-surface-hover)]'
                   }
                 >
                   <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" className="h-6 w-6 text-[10px]" />
@@ -205,7 +205,7 @@ export function ChatComposer({ members, disabled, onSendText, onSendFile }: Chat
             rows={2}
             disabled={disabled || sending}
             placeholder={file ? 'Legenda (opcional)…' : 'Mensagem para a equipe… ("@" menciona alguém)'}
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
           />
         </div>
 

@@ -130,7 +130,7 @@ export function ConversationDealBar({
                 if (e.key === 'Escape') setEditandoValor(false);
               }}
               placeholder="0,00"
-              className="w-24 rounded border border-[rgba(14,154,160,0.3)] bg-white/[0.05] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
+              className="w-24 rounded border border-[rgba(14,154,160,0.3)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
             />
             <button type="button" onClick={() => void salvarValor()} disabled={salvando} aria-label="Salvar valor">
               {salvando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-[#10B981]" />}
@@ -160,7 +160,7 @@ export function ConversationDealBar({
           <select
             value={deal.stage_id ?? ''}
             onChange={(e) => void mudarEtapa(e.target.value)}
-            className="rounded border border-[rgba(14,154,160,0.25)] bg-white/[0.04] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
+            className="rounded border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
           >
             {stages.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>

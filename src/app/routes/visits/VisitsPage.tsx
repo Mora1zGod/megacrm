@@ -197,7 +197,7 @@ export default function VisitsPage() {
       </div>
 
       {/* Abas de visualização */}
-      <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-white/[0.02] w-fit">
+      <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-[var(--color-fill-subtle)] w-fit">
         {([
           ['agenda', 'Agenda', CalendarDays],
           ['lista', 'Lista', List],
@@ -345,7 +345,7 @@ export default function VisitsPage() {
                   <button type="button" onClick={() => void updateStatus(detailVisit, 'completed')} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[rgba(16,185,129,0.18)] text-[#10B981]">Marcar compareceu</button>
                 )}
                 <button type="button" onClick={() => void updateStatus(detailVisit, 'no_show')} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[rgba(242,185,55,0.18)] text-[#F2B937]">Não compareceu</button>
-                <button type="button" onClick={() => { setReagendarVisit(detailVisit); setDetailVisit(null); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/5 text-[var(--color-text-primary)]">Reagendar</button>
+                <button type="button" onClick={() => { setReagendarVisit(detailVisit); setDetailVisit(null); }} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[var(--color-fill-subtle)] text-[var(--color-text-primary)]">Reagendar</button>
                 <button type="button" onClick={() => void updateStatus(detailVisit, 'cancelled')} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[rgba(239,68,68,0.18)] text-[#EF4444]">Cancelar</button>
               </>
             )}
@@ -596,7 +596,7 @@ function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit
             const nome = (v.contact?.name ?? '').trim();
             const rotulo = /\p{L}/u.test(nome) ? nome : (v.contact?.phone ?? 'Sem nome');
             return (
-              <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[rgba(14,154,160,0.08)] last:border-0 hover:bg-white/[0.03]">
+              <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[rgba(14,154,160,0.08)] last:border-0 hover:bg-[var(--color-fill-subtle)]">
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{new Date(`${v.visit_date}T00:00:00`).toLocaleDateString('pt-BR')}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{v.visit_time.slice(0, 5)}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{rotulo}</td>

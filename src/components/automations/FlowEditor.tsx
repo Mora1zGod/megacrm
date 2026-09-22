@@ -278,7 +278,7 @@ export function FlowEditor({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex gap-1 rounded-lg bg-white/5 p-1">
+              <div className="flex gap-1 rounded-lg bg-[var(--color-fill-subtle)] p-1">
                 {(['gatilhos', 'condicoes', 'acoes'] as const).map((t) => (
                   <button
                     key={t}

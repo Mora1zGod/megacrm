@@ -81,7 +81,7 @@ export function NewChatDialog({
   return (
     <Dialog open={open} onClose={close} title="Nova conversa" widthClass="max-w-md">
       <div className="space-y-4">
-        <div className="flex items-center gap-1 rounded-lg bg-white/[0.03] p-1">
+        <div className="flex items-center gap-1 rounded-lg bg-[var(--color-fill-subtle)] p-1">
           {([['dm', 'Conversa direta'], ['group', 'Grupo']] as const).map(([id, label]) => (
             <button
               key={id}
@@ -90,7 +90,7 @@ export function NewChatDialog({
               className={
                 mode === id
                   ? 'flex-1 rounded-md bg-[var(--color-accent-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-primary)]'
-                  : 'flex-1 rounded-md px-3 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-white/5'
+                  : 'flex-1 rounded-md px-3 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }
             >
               {label}
@@ -106,7 +106,7 @@ export function NewChatDialog({
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="Ex.: Vendas — plantão"
-              className="mt-1 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+              className="mt-1 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
         )}
@@ -117,7 +117,7 @@ export function NewChatDialog({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar membro..."
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] pl-9 pr-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
 
@@ -147,7 +147,7 @@ export function NewChatDialog({
                   className={
                     isSelected && mode === 'group'
                       ? 'flex w-full items-center gap-2.5 rounded-lg bg-[var(--color-accent-subtle)] px-2.5 py-2 text-left'
-                      : 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-white/5 disabled:opacity-60'
+                      : 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--color-surface-hover)] disabled:opacity-60'
                   }
                 >
                   <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" />

@@ -65,7 +65,7 @@ export function Dialog({
           type="button"
           aria-label="Fechar"
           onClick={onClose}
-          className="absolute top-4 right-4 h-8 w-8 rounded-lg flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-white/5"
+          className="absolute top-4 right-4 h-8 w-8 rounded-lg flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
         >
           <X className="h-4 w-4" />
         </button>

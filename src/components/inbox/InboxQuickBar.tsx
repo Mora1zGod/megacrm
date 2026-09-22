@@ -93,7 +93,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
           value={busca}
           onChange={(e) => onBuscaChange(e.target.value)}
           placeholder="Buscar por nome, telefone ou mensagem"
-          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] py-1.5 pl-8 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
+          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] py-1.5 pl-8 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
         />
         {busca && (
           <button

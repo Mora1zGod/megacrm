@@ -102,7 +102,7 @@ export function BirthdaySettings() {
           </p>
         </header>
 
-        <div className="flex items-start gap-3 p-3 rounded-lg border border-[rgba(14,154,160,0.1)] bg-white/[0.02]">
+        <div className="flex items-start gap-3 p-3 rounded-lg border border-[rgba(14,154,160,0.1)] bg-[var(--color-fill-subtle)]">
           <input
             id="birthday_auto_send"
             type="checkbox"

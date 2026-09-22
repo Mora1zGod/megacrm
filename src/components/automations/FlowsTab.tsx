@@ -9,10 +9,10 @@ import { Dialog } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
 const STATUS_LABEL: Record<AutomationFlow['status'], { label: string; className: string }> = {
-  draft: { label: 'Rascunho', className: 'bg-white/10 text-[var(--color-text-secondary)]' },
+  draft: { label: 'Rascunho', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' },
   active: { label: 'Ativa', className: 'bg-[rgba(34,197,94,0.15)] text-[#22C55E]' },
   paused: { label: 'Pausada', className: 'bg-[rgba(245,158,11,0.15)] text-[#F59E0B]' },
-  archived: { label: 'Arquivada', className: 'bg-white/5 text-[var(--color-text-secondary)] opacity-60' },
+  archived: { label: 'Arquivada', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)] opacity-60' },
 };
 
 export function FlowsTab() {

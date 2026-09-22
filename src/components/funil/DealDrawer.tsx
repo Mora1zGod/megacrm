@@ -40,7 +40,7 @@ interface DealDrawerProps {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 
 export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageChange, onChanged }: DealDrawerProps) {
   const detail = useDealDetail(deal);
@@ -150,7 +150,7 @@ export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageC
               onRemove={async (id) => { await detail.removeProduct(id); void onChanged(); }}
             />
           </div>
-          <button onClick={onClose} aria-label="Fechar" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition hover:bg-white/5 hover:text-[var(--color-text-primary)]">
+          <button onClick={onClose} aria-label="Fechar" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -250,7 +250,7 @@ export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageC
                   )}
                 </div>
               ) : (
-                <div className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.12)] bg-white/[0.02] p-3">
+                <div className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span
                       className={
@@ -331,7 +331,7 @@ export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageC
             <section className="space-y-2">
               <div className="text-label">Origem do lead (UTM)</div>
               {origin ? (
-                <div className="space-y-3 rounded-lg border border-[rgba(14,154,160,0.12)] bg-white/[0.02] p-3">
+                <div className="space-y-3 rounded-lg border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TRAFFIC_TYPE_STYLE[origin.traffic ?? ''] ?? ''}`}>
                       {origin.highlight}
@@ -355,7 +355,7 @@ export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageC
               )}
             </section>
 
-            <Link to={`/inbox?contact=${deal.contact_id}`} className="flex items-center justify-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] py-2.5 text-sm font-medium text-[var(--accent-secondary)] transition hover:border-[var(--accent-primary)] hover:bg-white/5">
+            <Link to={`/inbox?contact=${deal.contact_id}`} className="flex items-center justify-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] py-2.5 text-sm font-medium text-[var(--accent-secondary)] transition hover:border-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)]">
               <MessageSquare className="h-4 w-4" /> Abrir conversa no inbox
             </Link>
 
@@ -468,7 +468,7 @@ function ProductMultiSelect({
                     key={p.id}
                     type="button"
                     onClick={() => void (active ? onRemove(p.id) : onAdd(p.name))}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                   >
                     <span
                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
@@ -564,7 +564,7 @@ function InlineText({
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setLocal(value); setErr(null); setEditing(false); } }}
         placeholder={placeholder}
-        className="w-full rounded border border-[rgba(14,154,160,0.3)] bg-white/[0.05] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
+        className="w-full rounded border border-[rgba(14,154,160,0.3)] bg-[var(--color-fill-subtle)] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
       />
       {err && <div className="mt-1 text-xs text-[#EF4444]">{err}</div>}
     </div>
@@ -632,12 +632,12 @@ function ChipEditor({
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
             <div className="absolute z-20 mt-1 w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-[#062720] p-1 shadow-[0_0_30px_rgba(14,154,160,0.15)]">
               {suggestions.map((s) => (
-                <button key={s.id} onClick={() => void add(s.name)} className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-white/5">
+                <button key={s.id} onClick={() => void add(s.name)} className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
                   {s.name}
                 </button>
               ))}
               {q.trim() && !exact && (
-                <button onClick={() => void add(q.trim())} className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-[var(--accent-secondary)] hover:bg-white/5">
+                <button onClick={() => void add(q.trim())} className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-[var(--accent-secondary)] hover:bg-[var(--color-surface-hover)]">
                   <Plus className="h-3 w-3" /> Criar “{q.trim()}”
                 </button>
               )}

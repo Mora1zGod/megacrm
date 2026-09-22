@@ -40,7 +40,7 @@ interface Props {
 }
 
 const inputCls =
-  'w-full rounded-md border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 const labelCls =
   'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]';
 
@@ -148,7 +148,7 @@ function MultiSelect({
           {options.map((o) => (
             <label
               key={o.id}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-white/5"
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
             >
               <input
                 type="checkbox"
@@ -243,7 +243,7 @@ export function InboxFilters({ filters, onChange, sort, onSortChange, operators,
         <button
           onClick={() => setOpen(false)}
           aria-label="Fechar filtros"
-          className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-white/5"
+          className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
         >
           <X className="h-4.5 w-4.5" />
         </button>

@@ -91,7 +91,7 @@ export function ChatHeader({
         </Button>
 
         {isGroup ? (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-fill-subtle)]">
             <Users className="h-4 w-4 text-[var(--accent-primary)]" />
           </span>
         ) : (
@@ -109,7 +109,7 @@ export function ChatHeader({
                   if (e.key === 'Enter') { e.preventDefault(); void commitRename(); }
                   if (e.key === 'Escape') setRenaming(false);
                 }}
-                className="w-full max-w-xs rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                className="w-full max-w-xs rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
               />
               <Button type="button" size="icon" variant="ghost" onClick={() => void commitRename()} disabled={busy} aria-label="Salvar nome">
                 <Check className="h-4 w-4" />
@@ -211,7 +211,7 @@ export function ChatHeader({
                         className={
                           checked
                             ? 'flex w-full items-center gap-2.5 rounded-lg bg-[var(--color-accent-subtle)] px-2 py-1.5 text-left'
-                            : 'flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-white/5'
+                            : 'flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--color-surface-hover)]'
                         }
                       >
                         <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" />

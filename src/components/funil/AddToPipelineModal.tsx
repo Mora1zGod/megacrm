@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import type { Pipeline, Stage } from '@/types/crm';
 
 const inputCls =
-  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 
 interface AddToPipelineModalProps {
   contactId: string;

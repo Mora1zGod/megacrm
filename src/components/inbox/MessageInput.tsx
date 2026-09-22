@@ -269,7 +269,7 @@ export function MessageInput({
           className={
             !isPrivate
               ? 'rounded-md px-3 py-1 text-xs font-semibold bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
-              : 'rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-white/5'
+              : 'rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }
         >
           Mensagem
@@ -281,7 +281,7 @@ export function MessageInput({
           className={
             isPrivate
               ? 'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold bg-[rgba(245,158,11,0.12)] text-[#FBBF24]'
-              : 'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-white/5'
+              : 'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }
         >
           <StickyNote className="h-3.5 w-3.5" />
@@ -324,7 +324,7 @@ export function MessageInput({
       ) : null}
 
       {(!requiresTemplateRestart || isPrivate) && file && (
-        <div className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
           <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
           <span className="truncate text-[var(--color-text-primary)]">{file.name}</span>
           <span className="text-[var(--color-text-secondary)]">
@@ -408,7 +408,7 @@ export function MessageInput({
                   className={
                     i === qrIndex
                       ? 'flex w-full items-start gap-2 rounded-md bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-left'
-                      : 'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-white/5'
+                      : 'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-[var(--color-surface-hover)]'
                   }
                 >
                   <Zap className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--accent-primary)]" />
@@ -436,7 +436,7 @@ export function MessageInput({
             className={
               isPrivate
                 ? 'w-full rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[#FBBF24] resize-none'
-                : 'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
+                : 'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
             }
           />
         </div>

@@ -129,7 +129,7 @@ export function ForwardToChatDialog({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar conversa ou colega..."
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] pl-9 pr-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
 
@@ -146,11 +146,11 @@ export function ForwardToChatDialog({
                 onClick={() => setTarget(o.key)}
                 className={cn(
                   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left',
-                  target === o.key ? 'bg-[var(--color-accent-subtle)]' : 'hover:bg-white/5',
+                  target === o.key ? 'bg-[var(--color-accent-subtle)]' : 'hover:bg-[var(--color-surface-hover)]',
                 )}
               >
                 {o.isGroup ? (
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-fill-subtle)]">
                     <Users className="h-4 w-4 text-[var(--accent-primary)]" />
                   </span>
                 ) : (
@@ -173,7 +173,7 @@ export function ForwardToChatDialog({
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             placeholder="Ex.: dá uma olhada nessa, o cliente quer desconto"
-            className="mt-1 w-full resize-none rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+            className="mt-1 w-full resize-none rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
 

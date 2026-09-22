@@ -719,7 +719,7 @@ export function ChannelsSettings() {
             <button
               onClick={() => void toggleActive(channel)}
               disabled={busy === channel.id}
-              className="rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] disabled:opacity-50"
+              className="rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] disabled:opacity-50"
             >
               {channel.is_active ? 'Desativar' : 'Reativar'}
             </button>
@@ -973,7 +973,7 @@ export function ChannelsSettings() {
           {/* Contas Zernio — cada login Zernio só aceita 2 contas sociais
               conectadas no painel deles; pra ter mais (TikTok, outro número),
               você adiciona outra conta aqui, com outra chave. */}
-          <div className="rounded-xl border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-4 space-y-3">
+          <div className="rounded-xl border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <KeyRound className="h-4 w-4 shrink-0 text-[#8FE3DC]" />
@@ -1002,12 +1002,12 @@ export function ChannelsSettings() {
             </p>
 
             {showAddZernioAccount ? (
-              <div className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-3">
+              <div className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-3">
                 <input
                   value={newZernioAccount.label}
                   onChange={(e) => setNewZernioAccount((f) => ({ ...f, label: e.target.value }))}
                   placeholder="Nome da conta (ex: Conta TikTok)"
-                  className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+                  className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
                 />
                 <input
                   value={newZernioAccount.apiKey}
@@ -1015,7 +1015,7 @@ export function ChannelsSettings() {
                   type="password"
                   autoComplete="off"
                   placeholder="Cole a Zernio API Key dessa conta"
-                  className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+                  className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
                 />
                 <div className="flex justify-end gap-2">
                   <button
@@ -1049,7 +1049,7 @@ export function ChannelsSettings() {
                 {zernioAccountsList.map((acc) => (
                   <div
                     key={acc.id}
-                    className="rounded-lg border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-3"
+                    className="rounded-lg border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-[var(--color-text-primary)]">{acc.label}</span>
@@ -1070,7 +1070,7 @@ export function ChannelsSettings() {
                           }
                           title="Editar nome ou chave"
                           aria-label="Editar nome ou chave"
-                          className="rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] p-2 text-[var(--color-text-secondary)] transition hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
+                          className="rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] p-2 text-[var(--color-text-secondary)] transition hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -1096,7 +1096,7 @@ export function ChannelsSettings() {
                           value={editZernioAccount.label}
                           onChange={(e) => setEditZernioAccount((f) => ({ ...f, label: e.target.value }))}
                           placeholder="Nome da conta"
-                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
                         />
                         <input
                           value={editZernioAccount.apiKey}
@@ -1104,7 +1104,7 @@ export function ChannelsSettings() {
                           type="password"
                           autoComplete="off"
                           placeholder="Nova API Key (deixe em branco pra manter a atual)"
-                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
                         />
                         <div className="flex justify-end gap-2">
                           <button
@@ -1133,7 +1133,7 @@ export function ChannelsSettings() {
           {/* Seletor de conta social (uma conta Zernio pode ter 2 contas
               conectadas — WhatsApp + Instagram, por exemplo) */}
           {zernioChoices ? (
-            <div className="rounded-xl border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-4">
+            <div className="rounded-xl border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-4">
               <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
                 Escolha a conta para conectar
               </h4>
@@ -1143,7 +1143,7 @@ export function ChannelsSettings() {
                     key={acc.id}
                     onClick={() => void connectZernio(zernioChoices.credentialId, acc.id)}
                     disabled={connectingZernio === zernioChoices.credentialId}
-                    className="flex w-full items-center justify-between rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.02] p-3 text-left text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
+                    className="flex w-full items-center justify-between rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] p-3 text-left text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
                   >
                     <span className="truncate">{acc.name}</span>
                     <span className="ml-3 shrink-0 font-mono text-[11px] text-[var(--color-text-secondary)]">
@@ -1216,7 +1216,7 @@ export function ChannelsSettings() {
 
           {/* Form de nova instância UAZAPI */}
           {showUazapiForm ? (
-            <div className="space-y-3 rounded-xl border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-4">
+            <div className="space-y-3 rounded-xl border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-4">
               <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
                 Nova instância UAZAPI
               </h4>
@@ -1224,20 +1224,20 @@ export function ChannelsSettings() {
               value={uazForm.label}
               onChange={(e) => setUazForm((f) => ({ ...f, label: e.target.value }))}
               placeholder="Nome do número (ex: WhatsApp da Maria)"
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
             />
             <input
               value={uazForm.serverUrl}
               onChange={(e) => setUazForm((f) => ({ ...f, serverUrl: e.target.value }))}
               placeholder="Server URL (https://…uazapi.com)"
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
             />
             <input
               value={uazForm.token}
               onChange={(e) => setUazForm((f) => ({ ...f, token: e.target.value }))}
               placeholder="Instance Token"
               type="password"
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
+              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)] focus:outline-none"
             />
               <div className="flex justify-end gap-2">
                 <button
@@ -1309,7 +1309,7 @@ function QrCodeModal({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition hover:bg-white/[0.05] hover:text-[var(--color-text-primary)]"
+            className="rounded-lg p-1.5 text-[var(--color-text-secondary)] transition hover:bg-[var(--color-fill-subtle)] hover:text-[var(--color-text-primary)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -1355,7 +1355,7 @@ function QrCodeModal({
               Código de pareamento — digite no celular em WhatsApp → Aparelhos conectados → Conectar
               com número de telefone:
             </p>
-            <span className="rounded-lg bg-white/[0.05] px-4 py-2 font-mono text-2xl font-bold tracking-widest text-[var(--color-text-primary)]">
+            <span className="rounded-lg bg-[var(--color-fill-subtle)] px-4 py-2 font-mono text-2xl font-bold tracking-widest text-[var(--color-text-primary)]">
               {data.paircode}
             </span>
           </div>

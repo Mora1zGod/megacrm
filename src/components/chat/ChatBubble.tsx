@@ -69,7 +69,7 @@ export function ChatBubble({
   if (message.content_type === 'system') {
     return (
       <div className="flex justify-center py-1">
-        <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[11px] text-[var(--color-text-secondary)]">
+        <span className="rounded-full bg-[var(--color-fill-subtle)] px-3 py-1 text-[11px] text-[var(--color-text-secondary)]">
           {message.content}
         </span>
       </div>
@@ -116,7 +116,7 @@ export function ChatBubble({
             'mt-0.5 rounded-2xl px-3.5 py-2 text-sm',
             mine
               ? 'bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] rounded-tr-sm'
-              : 'bg-white/[0.04] text-[var(--color-text-primary)] rounded-tl-sm',
+              : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-primary)] rounded-tl-sm',
             message._state === 'pending' && 'opacity-60',
             message._state === 'failed' && 'border border-[rgba(239,68,68,0.4)]',
           )}
@@ -155,7 +155,7 @@ export function ChatBubble({
                     />
                   </a>
                 ) : (
-                  <div className="mb-1 h-32 w-48 animate-pulse rounded-lg bg-white/[0.06]" />
+                  <div className="mb-1 h-32 w-48 animate-pulse rounded-lg bg-[var(--color-fill-subtle)]" />
                 )
               )}
 

@@ -14,7 +14,7 @@ const TYPE_OPTIONS = Object.entries(PRODUCT_TYPE_LABELS);
 const CUSTOM = '__custom__';
 
 const selectCls =
-  'h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-4 text-sm text-[var(--color-text-primary)]';
+  'h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 text-sm text-[var(--color-text-primary)]';
 
 // Normaliza o tipo personalizado: minúsculo, sem acento, espaços → underscore.
 function slugifyType(raw: string): string {
@@ -237,7 +237,7 @@ export function ProductsSettings() {
               rows={2}
               placeholder="Opcional — descrição do produto (aparece no catálogo)"
               disabled={saving}
-              className="w-full resize-none rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-4 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              className="w-full resize-none rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
         </form>
@@ -264,7 +264,7 @@ export function ProductsSettings() {
                 editingId === p.id ? (
                   <div
                     key={p.id}
-                    className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.25)] bg-white/[0.03] p-3"
+                    className="space-y-2 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] p-3"
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px_120px] gap-2 items-start">
                       <Input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={editSaving} />
@@ -291,7 +291,7 @@ export function ProductsSettings() {
                       rows={2}
                       placeholder="Descrição (opcional)"
                       disabled={editSaving}
-                      className="w-full resize-none rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                      className="w-full resize-none rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
                     />
                     <div className="flex items-center gap-1 justify-end">
                       <Button size="sm" onClick={handleUpdate} disabled={editSaving || !editName.trim()}>
@@ -305,12 +305,12 @@ export function ProductsSettings() {
                 ) : (
                   <div
                     key={p.id}
-                    className="flex items-center gap-3 rounded-lg border border-[rgba(14,154,160,0.08)] bg-white/[0.02] p-3"
+                    className="flex items-center gap-3 rounded-lg border border-[rgba(14,154,160,0.08)] bg-[var(--color-fill-subtle)] p-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-[var(--color-text-primary)]">{p.name}</span>
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                        <span className="rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
                           {productTypeLabel(p.product_type)}
                         </span>
                         {p.quantity != null && (

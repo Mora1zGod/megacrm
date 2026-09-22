@@ -13,7 +13,7 @@ import { operatorLabel, type Operator } from '@/hooks/useOperators';
 import { positionBetween, type Attachment, type BoardCard, type BoardList, type Label } from '@/hooks/useBoards';
 
 const fieldCls =
-  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 const sectionLabel = 'flex items-center gap-1.5 text-label mb-1.5';
 
 const LABEL_COLORS = ['#EF4444', '#F2B937', '#10B981', '#0E9AA0', '#60A5FA', '#A78BFA', '#F472B6', '#94A3B8'];
@@ -291,7 +291,7 @@ export function CardModal({
             <button
               type="button"
               onClick={() => setListPickerOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
             >
               {currentList?.name ?? '—'}
               <ChevronDown className="h-3 w-3" />
@@ -304,7 +304,7 @@ export function CardModal({
                     type="button"
                     onClick={() => { setListPickerOpen(false); void moverPara(l.id); }}
                     className={cn(
-                      'w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-white/5',
+                      'w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-[var(--color-surface-hover)]',
                       l.id === card.list_id ? 'text-[var(--accent-primary)] font-semibold' : 'text-[var(--color-text-primary)]',
                     )}
                   >
@@ -331,7 +331,7 @@ export function CardModal({
                 type="button"
                 onClick={() => setActionsOpen((v) => !v)}
                 aria-label="Mais ações"
-                className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
+                className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </button>
@@ -340,14 +340,14 @@ export function CardModal({
                   <button
                     type="button"
                     onClick={() => { setActionsOpen(false); void alternarFeito(); }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                   >
                     <CheckSquare className="h-3.5 w-3.5" /> {card.done ? 'Reabrir cartão' : 'Marcar concluído'}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActionsOpen(false); setListPickerOpen(true); }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                   >
                     <ArrowRightLeft className="h-3.5 w-3.5" /> Mover
                   </button>
@@ -355,7 +355,7 @@ export function CardModal({
                     type="button"
                     onClick={() => { setActionsOpen(false); void copiarCartao(); }}
                     disabled={busy}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                   >
                     <Copy className="h-3.5 w-3.5" /> Copiar
                   </button>
@@ -364,14 +364,14 @@ export function CardModal({
                     type="button"
                     onClick={() => { setActionsOpen(false); void arquivar(); }}
                     disabled={busy}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                   >
                     <Archive className="h-3.5 w-3.5" /> Arquivar
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActionsOpen(false); void excluir(); }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[#EF4444] hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[#EF4444] hover:bg-[var(--color-surface-hover)]"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Excluir
                   </button>
@@ -402,12 +402,12 @@ export function CardModal({
                   if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                   if (e.key === 'Escape') { setTitle(card.title); setEditingTitle(false); }
                 }}
-                className="w-full rounded-lg border border-[var(--accent-primary)] bg-white/[0.03] px-2 py-1 text-lg font-bold text-display text-[var(--color-text-primary)]"
+                className="w-full rounded-lg border border-[var(--accent-primary)] bg-[var(--color-fill-subtle)] px-2 py-1 text-lg font-bold text-display text-[var(--color-text-primary)]"
               />
             ) : (
               <h2
                 onClick={() => setEditingTitle(true)}
-                className={cn('cursor-text rounded-lg px-2 py-1 -mx-2 text-lg font-bold text-display hover:bg-white/5', card.done && 'line-through opacity-70')}
+                className={cn('cursor-text rounded-lg px-2 py-1 -mx-2 text-lg font-bold text-display hover:bg-[var(--color-surface-hover)]', card.done && 'line-through opacity-70')}
               >
                 {card.title}
               </h2>
@@ -497,7 +497,7 @@ export function CardModal({
                       defaultValue={l.name ?? ''}
                       placeholder="nome"
                       onBlur={(e) => { if (e.target.value !== (l.name ?? '')) void renomearEtiqueta(l.id, e.target.value); }}
-                      className="w-20 rounded-md border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-1.5 py-1 text-[10px] text-[var(--color-text-primary)]"
+                      className="w-20 rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-1.5 py-1 text-[10px] text-[var(--color-text-primary)]"
                     />
                   </div>
                 ))}
@@ -521,7 +521,7 @@ export function CardModal({
             <div className={sectionLabel}><UserPlus className="h-3.5 w-3.5" /> Membros</div>
             <div className="flex flex-wrap items-center gap-1.5">
               {members.map((m) => (
-                <span key={m.user_id} className="inline-flex items-center gap-1 rounded-full bg-white/5 pl-0.5 pr-2 py-0.5 text-[11px]">
+                <span key={m.user_id} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-fill-subtle)] pl-0.5 pr-2 py-0.5 text-[11px]">
                   <Avatar src={m.avatar_url} name={m.display_name ?? m.email} className="h-5 w-5 text-[9px]" />
                   {operatorLabel(m)}
                 </span>
@@ -626,7 +626,7 @@ export function CardModal({
                 </div>
                 {total > 0 && (
                   <div className="flex items-center gap-2">
-                    <div className="h-1.5 flex-1 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-1.5 flex-1 rounded-full bg-[var(--color-fill-subtle)] overflow-hidden">
                       <div className="h-full rounded-full bg-[var(--accent-primary)] transition-all" style={{ width: `${pct}%` }} />
                     </div>
                     <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">{done}/{total}</span>
@@ -678,14 +678,14 @@ export function CardModal({
               value={novoAnexoNome}
               onChange={(e) => setNovoAnexoNome(e.target.value)}
               placeholder="Nome (opcional)"
-              className="w-36 rounded-md border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+              className="w-36 rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
             />
             <input
               value={novoAnexoUrl}
               onChange={(e) => setNovoAnexoUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void addLinkAttachment(); }}
               placeholder="https://…"
-              className="flex-1 min-w-[140px] rounded-md border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+              className="flex-1 min-w-[140px] rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
             />
             <Button size="sm" variant="outline" onClick={() => void addLinkAttachment()}>
               <LinkIcon className="h-3.5 w-3.5" /> Link
@@ -750,7 +750,7 @@ export function CardModal({
                       type="button"
                       onClick={() => void moverPara(l.id)}
                       className={cn(
-                        'w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-white/5',
+                        'w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-[var(--color-surface-hover)]',
                         l.id === card.list_id ? 'text-[var(--accent-primary)] font-semibold' : 'text-[var(--color-text-primary)]',
                       )}
                     >
@@ -787,7 +787,7 @@ function ChecklistItemInput({ onAdd }: { onAdd: (text: string) => void }) {
         if (e.key === 'Enter' && txt.trim()) { e.preventDefault(); onAdd(txt); setTxt(''); }
       }}
       placeholder="Adicionar item + Enter"
-      className="w-full rounded-md border border-[rgba(14,154,160,0.15)] bg-white/[0.02] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+      className="w-full rounded-md border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
     />
   );
 }

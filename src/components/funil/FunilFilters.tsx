@@ -22,7 +22,7 @@ export type { FunilFilterState, FunilSort, ContactConvInfo } from './funilFilter
 // ---- UI ---------------------------------------------------------------------
 
 const inputCls =
-  'w-full rounded-md border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 const labelCls = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -80,7 +80,7 @@ function MultiSelect({
             <div className="px-2 py-1.5 text-xs text-[var(--color-text-secondary)]">Nenhuma opção</div>
           )}
           {options.map((o) => (
-            <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-white/5">
+            <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
               <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggle(o.id)} className="accent-[var(--accent-primary)]" />
               <span className="truncate">{o.name}</span>
             </label>

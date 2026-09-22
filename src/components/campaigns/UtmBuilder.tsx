@@ -160,7 +160,7 @@ export function UtmBuilder() {
         <div className="space-y-2">
           <Label>URL final</Label>
           <div className="flex items-start gap-2">
-            <div className="flex-1 min-w-0 rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-xs font-mono text-[var(--color-text-primary)] break-all min-h-[40px]">
+            <div className="flex-1 min-w-0 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs font-mono text-[var(--color-text-primary)] break-all min-h-[40px]">
               {finalUrl || <span className="opacity-40">Preencha a URL base e os parâmetros obrigatórios…</span>}
             </div>
             <Button
@@ -203,7 +203,7 @@ export function UtmBuilder() {
               {links.map((l) => (
                 <div
                   key={l.id}
-                  className="flex items-start gap-3 rounded-lg border border-[rgba(14,154,160,0.08)] bg-white/[0.02] p-3"
+                  className="flex items-start gap-3 rounded-lg border border-[rgba(14,154,160,0.08)] bg-[var(--color-fill-subtle)] p-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -211,7 +211,7 @@ export function UtmBuilder() {
                         <span className="text-sm font-semibold text-[var(--color-text-primary)]">{l.label}</span>
                       )}
                       {l.utm_campaign && (
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                        <span className="rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
                           {l.utm_campaign}
                         </span>
                       )}

@@ -196,7 +196,7 @@ export default function BoardsPage() {
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
           >
             <Users className="h-3.5 w-3.5" /> Compartilhar
           </button>
@@ -307,7 +307,7 @@ function NovaListaInput({ onCreate, onCancel }: { onCreate: (nome: string) => vo
       }}
       onBlur={enviar}
       placeholder="Nome da lista"
-      className="w-full rounded-xl border border-[var(--accent-primary)] bg-white/[0.03] px-3 py-2.5 text-xs font-semibold text-[var(--color-text-primary)]"
+      className="w-full rounded-xl border border-[var(--accent-primary)] bg-[var(--color-fill-subtle)] px-3 py-2.5 text-xs font-semibold text-[var(--color-text-primary)]"
     />
   );
 }
@@ -352,7 +352,7 @@ function NovoQuadroDialog({ onClose, onCreated }: { onClose: () => void; onCreat
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void criar(); }}
           placeholder="Ex.: Obras, Marketing"
-          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
         />
       </div>
       <div className="flex justify-end gap-2 pt-4">

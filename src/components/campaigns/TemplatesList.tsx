@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<TemplateStatus, string> = {
 };
 
 const STATUS_COLORS: Record<TemplateStatus, string> = {
-  draft: 'bg-white/5 text-[var(--color-text-secondary)]',
+  draft: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]',
   pending: 'bg-[rgba(245,158,11,0.12)] text-[#FBBF24]',
   approved: 'bg-[rgba(16,185,129,0.12)] text-[var(--color-success)]',
   rejected: 'bg-[rgba(239,68,68,0.12)] text-[var(--color-error)]',
@@ -124,7 +124,7 @@ export function TemplatesList() {
         <div className="rounded-lg border border-[rgba(14,154,160,0.08)] overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-white/[0.02] text-left">
+              <tr className="bg-[var(--color-fill-subtle)] text-left">
                 <th className="p-3 text-label">Nome</th>
                 <th className="p-3 text-label">Categoria</th>
                 <th className="p-3 text-label">Idioma</th>
@@ -152,7 +152,7 @@ export function TemplatesList() {
                   return (
                     <tr
                       key={t.id}
-                      className="border-t border-[rgba(14,154,160,0.06)] hover:bg-white/[0.02]"
+                      className="border-t border-[rgba(14,154,160,0.06)] hover:bg-[var(--color-fill-subtle)]"
                     >
                       <td className="p-3 font-mono text-[var(--color-text-primary)]">
                         {t.name}

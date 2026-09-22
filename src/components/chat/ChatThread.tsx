@@ -103,7 +103,7 @@ export function ChatThread({
           <div key={message._tempId ?? message.id} className="space-y-3">
             {showDay && (
               <div className="flex justify-center">
-                <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
+                <span className="rounded-full bg-[var(--color-fill-subtle)] px-3 py-1 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
                   {day}
                 </span>
               </div>

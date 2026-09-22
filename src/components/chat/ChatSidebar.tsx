@@ -51,7 +51,7 @@ export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: C
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar..."
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] pl-9 pr-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
       </div>
@@ -80,11 +80,11 @@ export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: C
                     onClick={() => onSelect(chat.chat_id)}
                     className={cn(
                       'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
-                      active ? 'bg-[var(--color-accent-subtle)]' : 'hover:bg-white/[0.03]',
+                      active ? 'bg-[var(--color-accent-subtle)]' : 'hover:bg-[var(--color-fill-subtle)]',
                     )}
                   >
                     {chat.kind === 'group' ? (
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-fill-subtle)]">
                         <Users className="h-4 w-4 text-[var(--accent-primary)]" />
                       </span>
                     ) : (

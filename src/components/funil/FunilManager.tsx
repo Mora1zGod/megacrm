@@ -19,7 +19,7 @@ export function FunilManager({ funil, onClose }: { funil: FunilController; onClo
   const dragIdx = useRef<number | null>(null);
 
   const inputCls =
-    'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+    'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 
   const handleCreateFunil = async () => {
     if (!newFunil.trim()) return;
@@ -159,7 +159,7 @@ function StageRow({
       onDragStart={onDragStart}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
-      className="rounded-lg border border-[rgba(14,154,160,0.15)] bg-white/[0.02] px-2 py-2"
+      className="rounded-lg border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] px-2 py-2"
     >
       <div className="flex items-center gap-2">
         <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-[var(--color-text-secondary)]" />
@@ -200,7 +200,7 @@ function StageRow({
               const v = Number(e.target.value);
               if (!Number.isNaN(v) && v !== stage.probability) onProbability(v);
             }}
-            className="w-14 rounded border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
+            className="w-14 rounded border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
           />
           %
         </label>
@@ -213,7 +213,7 @@ function StageRow({
           onBlur={(e) => { if (e.target.value.trim() !== (stage.ai_criteria ?? '').trim()) onAiCriteria(e.target.value); }}
           rows={2}
           placeholder="Critério p/ a IA mover o lead p/ cá (ex.: lead pediu proposta). Vazio = a IA não move para este estágio."
-          className="w-full resize-y rounded border border-[rgba(14,154,160,0.15)] bg-white/[0.02] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
+          className="w-full resize-y rounded border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] px-2 py-1 text-[11px] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
         />
       </div>
 
@@ -221,7 +221,7 @@ function StageRow({
         <div className="mt-2 space-y-2 rounded-md border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.06)] p-2">
           <div className="text-[11px] text-[var(--color-text-secondary)]">Mover negócios deste estágio para:</div>
           <div className="flex items-center gap-2">
-            <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)} className="flex-1 rounded border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none">
+            <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)} className="flex-1 rounded border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none">
               <option value="">Selecione…</option>
               {others.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>

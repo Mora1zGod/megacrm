@@ -79,7 +79,7 @@ export function DispatchMetrics() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-white/[0.02]">
+        <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-[var(--color-fill-subtle)]">
           {PERIODS.map((p) => (
             <button
               key={p.value}
@@ -129,7 +129,7 @@ export function DispatchMetrics() {
                   .map(([label, v]) => (
                     <span
                       key={label}
-                      className="rounded-full border border-[rgba(14,154,160,0.2)] bg-white/[0.02] px-3 py-1 text-[11px] text-[var(--color-text-secondary)]"
+                      className="rounded-full border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-1 text-[11px] text-[var(--color-text-secondary)]"
                     >
                       {label}: <span className="font-mono text-[var(--color-text-primary)]">{v}</span>
                     </span>

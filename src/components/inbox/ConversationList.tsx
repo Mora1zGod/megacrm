@@ -46,7 +46,7 @@ interface ConversationListProps {
 
 function statusChip(c: ConversationWithContact, aiEnabled: boolean, assignedName: string | null) {
   if (c.status === 'closed') {
-    return { Icon: Inbox, label: 'Fechada', className: 'bg-white/[0.06] text-[var(--color-text-secondary)]' };
+    return { Icon: Inbox, label: 'Fechada', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
   }
   if (assignedName) {
     return { Icon: User, label: assignedName, className: 'bg-[rgba(34,197,94,0.14)] text-[#22C55E]' };
@@ -54,7 +54,7 @@ function statusChip(c: ConversationWithContact, aiEnabled: boolean, assignedName
   if (c.status === 'ai_active' && aiEnabled) {
     return { Icon: Bot, label: 'AMAIA', className: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' };
   }
-  return { Icon: User, label: 'Não atribuído', className: 'bg-white/[0.06] text-[var(--color-text-secondary)]' };
+  return { Icon: User, label: 'Não atribuído', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
 }
 
 function formatTimestamp(iso: string | null): string {

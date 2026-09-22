@@ -24,7 +24,7 @@ const TRIGGER_LABEL: Record<FollowUpTrigger, string> = {
 };
 
 const inputCls =
-  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 const labelCls = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]';
 
 export function FollowUpsTab() {
@@ -122,7 +122,7 @@ export function FollowUpsTab() {
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.provider === 'uazapi' ? 'bg-[rgba(45,212,191,0.14)] text-[#2DD4BF]' : 'bg-[rgba(37,211,102,0.14)] text-[#25D366]'}`}>
                       {r.provider === 'uazapi' ? 'UAZAPI (não oficial)' : 'API Oficial'}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.is_active ? 'bg-[rgba(16,185,129,0.12)] text-[#10B981]' : 'bg-white/5 text-[var(--color-text-secondary)]'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.is_active ? 'bg-[rgba(16,185,129,0.12)] text-[#10B981]' : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]'}`}>
                       {r.is_active ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
@@ -138,13 +138,13 @@ export function FollowUpsTab() {
                     onClick={() => void update(r.id, { is_active: !r.is_active }).catch((e) => toast.error(e.message))}
                     role="switch"
                     aria-checked={r.is_active}
-                    className={`relative h-6 w-11 rounded-full transition-colors ${r.is_active ? 'bg-[var(--accent-primary)]' : 'bg-white/10'}`}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${r.is_active ? 'bg-[var(--accent-primary)]' : 'bg-[var(--color-fill-subtle)]'}`}
                   >
                     <span className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${r.is_active ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </button>
                   <button
                     onClick={() => { if (confirm('Excluir esta regra?')) void remove(r.id).catch((e) => toast.error(e.message)); }}
-                    className="rounded-md p-1.5 text-[var(--color-error)] transition hover:bg-white/5"
+                    className="rounded-md p-1.5 text-[var(--color-error)] transition hover:bg-[var(--color-surface-hover)]"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

@@ -23,7 +23,7 @@ export function ApiKeysSettings() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-[rgba(14,154,160,0.15)] bg-white/[0.02] p-4 space-y-2 text-sm">
+      <div className="rounded-lg border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-4 space-y-2 text-sm">
         <div className="font-semibold text-[var(--color-text-primary)]">Como usar</div>
         <p className="text-[var(--color-text-secondary)]">
           Toda chamada precisa do header <code className="text-[var(--accent-primary)]">Authorization: Bearer sua_chave</code>.
@@ -156,7 +156,7 @@ function NovaChaveDialog({
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Ex.: Site institucional, Uniklin CRM..."
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-white/[0.03] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           />
         </div>
       </div>

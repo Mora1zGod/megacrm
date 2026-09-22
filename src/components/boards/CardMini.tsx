@@ -29,7 +29,7 @@ export function CardMini({ card, labels, operators, currentUserId, onOpen, onDra
       onDragStart={onDragStart}
       onClick={onOpen}
       className={cn(
-        'cursor-pointer overflow-hidden rounded-lg border border-[var(--color-border-soft)] bg-white/[0.03] hover:border-[var(--accent-primary)]',
+        'cursor-pointer overflow-hidden rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-fill-subtle)] hover:border-[var(--accent-primary)]',
         card.done && 'opacity-60',
       )}
     >
