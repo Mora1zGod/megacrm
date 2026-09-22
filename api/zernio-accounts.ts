@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin, isAuthFailure } from '../src/lib/admin-auth.js';
-import { encrypt } from '../src/lib/credentials.js';
+import { encrypt, getCredential } from '../src/lib/credentials.js';
 
 // ============================================================================
 // api/zernio-accounts
@@ -52,13 +52,43 @@ interface ZernioCredentialRow {
 
 async function handleGet(orgId: string, res: ApiResponse) {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .schema('whatsapp_hub')
     .from('zernio_credentials')
     .select('id, label, created_at')
     .eq('org_id', orgId)
     .order('created_at');
   if (error) throw error;
+
+  // Compatibilidade com organizações configuradas antes do suporte a várias
+  // contas Zernio. A chave antiga continua válida no cofre da org; materializa
+  // uma conta equivalente e vincula os canais órfãos sem pedir a chave de novo.
+  if ((data ?? []).length === 0) {
+    const legacyApiKey = (await getCredential(orgId, 'zernio_api_key'))?.trim();
+    if (legacyApiKey) {
+      const { data: migrated, error: insertError } = await supabase
+        .schema('whatsapp_hub')
+        .from('zernio_credentials')
+        .insert({
+          org_id: orgId,
+          label: 'Conta principal',
+          api_key_encrypted: encrypt(legacyApiKey),
+        })
+        .select('id, label, created_at')
+        .single();
+      if (insertError) throw insertError;
+
+      const { error: linkError } = await supabase
+        .schema('whatsapp_hub')
+        .from('channels')
+        .update({ zernio_credential_id: migrated.id })
+        .eq('org_id', orgId)
+        .eq('provider', 'zernio')
+        .is('zernio_credential_id', null);
+      if (linkError) throw linkError;
+      data = [migrated];
+    }
+  }
   return res.status(200).json({ success: true, accounts: (data ?? []) as ZernioCredentialRow[] });
 }
 

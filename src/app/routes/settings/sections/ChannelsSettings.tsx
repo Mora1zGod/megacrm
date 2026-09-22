@@ -103,6 +103,9 @@ export function ChannelsSettings() {
   const { operators } = useOperators();
   const [channels, setChannels] = useState<ChannelRow[] | null>(null);
   const [instagram, setInstagram] = useState<ConnState>(null);
+  const [uazapiConnection, setUazapiConnection] = useState<
+    Record<string, { connected: boolean; status: string | null }>
+  >({});
   // Plataforma (whatsapp | instagram) por conta Zernio — resolvida ao vivo pela
   // API (o GET /api/zernio-connect devolve isso), sem coluna no banco.
   const [zernioPlatform, setZernioPlatform] = useState<Record<string, string>>({});
@@ -167,9 +170,10 @@ export function ChannelsSettings() {
       });
       const body = (await res.json()) as {
         connected?: boolean;
+        instagramConnected?: boolean;
         channels?: { zernio_account_id: string | null; platform: string | null }[];
       };
-      setInstagram(Boolean(body.connected));
+      setInstagram(Boolean(body.instagramConnected));
       const map: Record<string, string> = {};
       for (const c of body.channels ?? []) {
         if (c.zernio_account_id && c.platform) map[c.zernio_account_id] = c.platform;
@@ -177,6 +181,25 @@ export function ChannelsSettings() {
       setZernioPlatform(map);
     } catch {
       setInstagram(false);
+    }
+  }, [session]);
+
+  const loadUazapiStatus = useCallback(async () => {
+    if (!session) return;
+    try {
+      const res = await fetch('/api/uazapi?action=connect', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const body = (await res.json()) as {
+        channels?: { id: string; connected: boolean; status: string | null }[];
+      };
+      const next: Record<string, { connected: boolean; status: string | null }> = {};
+      for (const channel of body.channels ?? []) {
+        next[channel.id] = { connected: channel.connected, status: channel.status };
+      }
+      setUazapiConnection(next);
+    } catch {
+      setUazapiConnection({});
     }
   }, [session]);
 
@@ -208,9 +231,10 @@ export function ChannelsSettings() {
   useEffect(() => {
     void loadChannels();
     void loadInstagramStatus();
+    void loadUazapiStatus();
     void loadZernioAccounts();
     void loadFunnels();
-  }, [loadChannels, loadInstagramStatus, loadZernioAccounts, loadFunnels]);
+  }, [loadChannels, loadInstagramStatus, loadUazapiStatus, loadZernioAccounts, loadFunnels]);
 
   const zernioChannels = useMemo(
     () => (channels ?? []).filter((c) => c.provider === 'zernio'),
@@ -689,6 +713,19 @@ export function ChannelsSettings() {
                 {channel.label}
               </span>
               <StatusBadge active={channel.is_active} />
+              {channel.provider === 'uazapi' && uazapiConnection[channel.id] ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    background: uazapiConnection[channel.id].connected
+                      ? 'rgba(34,197,94,0.12)'
+                      : 'rgba(239,68,68,0.12)',
+                    color: uazapiConnection[channel.id].connected ? '#22C55E' : '#F87171',
+                  }}
+                >
+                  {uazapiConnection[channel.id].connected ? 'Conectado' : 'Desconectado'}
+                </span>
+              ) : null}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
               {isInstagram ? (

@@ -203,6 +203,12 @@ async function handleGet(orgId: string, res: ApiResponse) {
   const platformById: Record<string, string> = {};
   if ((channels ?? []).length > 0) {
     const credentials = await listCredentials(orgId);
+    // Fallback para orgs criadas antes de zernio_credentials. Mantém o status
+    // correto durante a migração automática feita por /api/zernio-accounts.
+    if (credentials.length === 0) {
+      const legacyApiKey = (await getCredential(orgId, 'zernio_api_key'))?.trim();
+      if (legacyApiKey) credentials.push({ id: 'legacy', label: 'Conta principal', apiKey: legacyApiKey });
+    }
     for (const cred of credentials) {
       try {
         for (const acc of await listAllAccounts(cred.apiKey)) {
@@ -221,6 +227,7 @@ async function handleGet(orgId: string, res: ApiResponse) {
   return res.status(200).json({
     success: true,
     connected: Boolean(accountId) || (channels ?? []).length > 0,
+    instagramConnected: Object.values(platformById).includes('instagram'),
     accountId,
     channels: enrichedChannels,
     number: info
