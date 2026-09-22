@@ -39,13 +39,13 @@ export interface NavItem {
 // de /ai-agent. Credenciais virou aba dentro de Configurações. Templates virou
 // aba dentro de /campaigns (Módulo 1).
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Operação', adminOnly: true },
-  { to: '/inbox', label: 'Inbox', icon: Inbox, group: 'Operação' },
+  { to: '/dashboard', label: 'Visão geral', icon: LayoutDashboard, group: 'Operação', adminOnly: true },
+  { to: '/inbox', label: 'Atendimento', icon: Inbox, group: 'Operação' },
   { to: '/funil', label: 'Funil', icon: KanbanSquare, group: 'Operação', adminOnly: true },
   { to: '/visitas', label: 'Visitas', icon: CalendarDays, group: 'Operação' },
   { to: '/contacts', label: 'Contatos', icon: Users, group: 'Operação' },
   { to: '/arquivos', label: 'Arquivos', icon: Paperclip, group: 'Operação' },
-  { to: '/chat', label: 'Chat Interno', icon: MessagesSquare, group: 'Operação' },
+  { to: '/chat', label: 'Chat da equipe', icon: MessagesSquare, group: 'Operação' },
   { to: '/campaigns', label: 'Campanhas', icon: Megaphone, group: 'Engajamento' },
   { to: '/automations', label: 'Automações', icon: Zap, group: 'Engajamento', adminOnly: true },
   { to: '/ai-agent', label: 'Agente de IA', icon: Bot, group: 'Engajamento', adminOnly: true },

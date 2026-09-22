@@ -7,6 +7,8 @@ import { NotificationsDropdown } from '@/components/NotificationsDropdown';
 import { OrgSwitcher } from '@/app/layout/OrgSwitcher';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { useAppUser } from '@/app/providers/AppUserProvider';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -23,6 +25,7 @@ const CRIAR_ITEMS = [
 export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { displayName, avatarUrl } = useAppUser();
   const [searchOpen, setSearchOpen] = useState(false);
   const [criarOpen, setCriarOpen] = useState(false);
 
@@ -46,7 +49,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header
-      className="h-14 shrink-0 bg-[var(--color-topbar)] flex items-center justify-between px-4 sm:px-6 gap-4"
+      className="h-16 shrink-0 bg-[var(--color-topbar)] flex items-center justify-between px-4 sm:px-6 gap-4 border-b border-white/10"
       role="banner"
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -60,7 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <button
           onClick={() => setSearchOpen(true)}
-          className="hidden sm:flex items-center gap-2 flex-1 max-w-md rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-3 py-2 text-sm text-[var(--color-on-topbar)]/80 transition-colors duration-[var(--motion-base)] hover:border-white/30 hover:bg-white/15"
+          className="hidden sm:flex min-h-10 items-center gap-2 flex-1 max-w-md rounded-[var(--radius-control)] border border-white/20 bg-white/10 px-3 py-2 text-[13px] text-[var(--color-on-topbar)]/85 transition-colors duration-[var(--motion-base)] hover:border-white/35 hover:bg-white/15"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left truncate">Buscar contatos, negócios, visitas...</span>
@@ -74,7 +77,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="relative">
           <Button
             onClick={() => setCriarOpen((v) => !v)}
-            className="bg-white text-[var(--color-topbar)] hover:bg-white/90"
+            className="min-h-9 bg-white text-[var(--color-topbar)] hover:bg-white/90 shadow-sm"
           >
             <Plus className="h-4 w-4" /> Criar <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${criarOpen ? 'rotate-180' : ''}`} />
           </Button>
@@ -108,9 +111,13 @@ export function Header({ onMenuClick }: HeaderProps) {
           <NotificationsDropdown />
         </div>
 
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="hidden min-w-0 sm:block text-right leading-tight">
-            <div className="text-xs text-[var(--color-on-topbar)] max-w-[140px] lg:max-w-[200px] truncate">
+        <div className="flex min-w-0 items-center gap-2 border-l border-white/20 pl-2 sm:pl-3">
+          <Avatar src={avatarUrl} name={displayName || user?.email} size="sm" className="ring-2 ring-white/20 bg-white text-[var(--color-topbar)]" />
+          <div className="hidden min-w-0 lg:block leading-tight">
+            <div className="max-w-[160px] truncate text-xs font-semibold text-[var(--color-on-topbar)]">
+              {displayName?.trim() || user?.email?.split('@')[0] || 'Usuário'}
+            </div>
+            <div className="mt-0.5 max-w-[180px] truncate text-[10px] text-[var(--color-on-topbar)]/65">
               {user?.email ?? '—'}
             </div>
           </div>

@@ -1,5 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 /* =============================================================================
    AMAI UI · Design System — AMAI Park CRM
@@ -16,31 +16,31 @@
 
 @theme {
   /* ---- Superfícies -------------------------------------------------------- */
-  --color-bg-primary: #0B0D10;
-  --color-surface: #111318;
-  --color-surface-raised: #15181D;
-  --color-surface-hover: #1B1F26;
-  --color-bg-card: #15181D;
+  --color-bg-primary: #0B1220;
+  --color-surface: #111B2E;
+  --color-surface-raised: #17233A;
+  --color-surface-hover: #1D2D48;
+  --color-bg-card: #17233A;
 
   /* ---- Bordas --------------------------------------------------------------- */
-  --color-border-card: #23272E;
-  --color-border-soft: #1D2026;
-  --color-border-divider: #191C21;
+  --color-border-card: #28354A;
+  --color-border-soft: #223047;
+  --color-border-divider: #1F2B40;
 
   /* ---- Accent — AMAI teal, só onde tem função ------------------------------ */
-  --color-accent-primary: #14B8AE;
-  --color-accent-secondary: #5EEAD4;
-  --color-accent-subtle: rgba(20, 184, 174, 0.12);
+  --color-accent-primary: #3B82B4;
+  --color-accent-secondary: #65A7D2;
+  --color-accent-subtle: rgba(59, 130, 180, 0.18);
 
   /* ---- CTA / destaque institucional (uso pontual) -------------------------- */
   --color-cta: #F0503F;
   --color-highlight: #F2B937;
 
   /* ---- Texto ----------------------------------------------------------------- */
-  --color-text-primary: #F1F2F4;
-  --color-text-secondary: #94989F;
-  --color-text-label: #B4B8BF;
-  --color-text-muted: #6B7078;
+  --color-text-primary: #E6EDF8;
+  --color-text-secondary: #A9B6CC;
+  --color-text-label: #C1CAD9;
+  --color-text-muted: #75849B;
 
   /* ---- Semântico --------------------------------------------------------------- */
   --color-success: #22C55E;
@@ -49,8 +49,8 @@
   --color-info: #3B82F6;
 
   /* ---- Tipografia --------------------------------------------------------------- */
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   /* ---- Raio ----------------------------------------------------------------------- */
   --radius-card: 10px;
@@ -72,13 +72,13 @@
   --amai-text: var(--color-text-primary);
   --amai-text-muted: var(--color-text-secondary);
   --amai-brand: var(--color-accent-primary);
-  --amai-brand-hover: #12A69D;
+  --amai-brand-hover: #084269;
   --amai-success: var(--color-success);
   --amai-warning: var(--color-warning);
   --amai-danger: var(--color-error);
 
-  --accent-primary: #14B8AE;
-  --accent-secondary: #5EEAD4;
+  --accent-primary: #3B82B4;
+  --accent-secondary: #65A7D2;
   --cta: #F0503F;
   --highlight: #F2B937;
 
@@ -113,30 +113,30 @@
    ----------------------------------------------------------------------------- */
 :root[data-theme='light'] {
   color-scheme: light;
-  --color-bg-primary: #F2F5F6;
+  --color-bg-primary: #F3F6FA;
   --color-surface: #FFFFFF;
   --color-surface-raised: #FFFFFF;
-  --color-surface-hover: #EEF3F3;
+  --color-surface-hover: #F3F6FA;
   --color-bg-card: #FFFFFF;
-  --color-border-card: #E2E8EA;
-  --color-border-soft: #EAEEEF;
-  --color-border-divider: #EDF1F2;
-  --color-text-primary: #16211F;
-  --color-text-secondary: #5C6B69;
-  --color-text-label: #45514F;
-  --color-text-muted: #8B9795;
-  --color-accent-primary: #0F9C95;
-  --color-accent-secondary: #14B8AE;
-  --color-accent-subtle: rgba(15, 156, 149, 0.1);
-  --accent-primary: #0F9C95;
-  --accent-secondary: #14B8AE;
+  --color-border-card: #E5EAF1;
+  --color-border-soft: #EDF1F6;
+  --color-border-divider: #EFF3F7;
+  --color-text-primary: #1B293B;
+  --color-text-secondary: #728095;
+  --color-text-label: #4F5E72;
+  --color-text-muted: #91A0B4;
+  --color-accent-primary: #065183;
+  --color-accent-secondary: #297BAC;
+  --color-accent-subtle: #EAF3FB;
+  --accent-primary: #065183;
+  --accent-secondary: #297BAC;
 }
 
 /* Faixa/topbar teal — cor de marca fixa (não inverte com o tema), igual à
    referência do ZapChatPro. Usada no Header.tsx. */
 :root {
-  --color-topbar: #0E7D78;
-  --color-topbar-hover: #0B6864;
+  --color-topbar: #065183;
+  --color-topbar-hover: #084269;
   --color-on-topbar: #FFFFFF;
 }
 
@@ -149,7 +149,7 @@
    Ver ImageLightbox.tsx e Header.tsx: ficaram de fora de propósito (overlay
    fullscreen sempre escuro / faixa teal sempre colorida — não são tema). */
 :root[data-theme='light'] {
-  --color-fill-subtle: #EEF3F3;
+  --color-fill-subtle: #F3F6FA;
 }
 :root {
   --color-fill-subtle: rgba(255, 255, 255, 0.04);
@@ -320,9 +320,8 @@ select option {
   color: #F1F2F4;
 }
 
-:root {
-  color-scheme: dark;
-}
+:root { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
 
 /* -----------------------------------------------------------------------------
    Focus ring
