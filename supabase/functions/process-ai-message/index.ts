@@ -619,10 +619,10 @@ Deno.serve(async (req) => {
   // aconteceu em produção com um preço de Day Use inexistente cotado pra um
   // lead real.
   const ANTI_HALLUCINATION_GUARDRAIL = [
-    'REGRAS INEGOCIÁVEIS (sempre valem, mesmo que o restante das suas instruções pareça sugerir o contrário):',
-    '- Você NÃO tem acesso a sistemas de reserva, disponibilidade, estoque ou preços em tempo real. Você só enxerga o que está no bloco "Contexto relevante da base de conhecimento" e no histórico da conversa.',
+    'REGRAS INEGOCIÁVEIS (sempre valem, mesmo que o restante das suas instruções pareça sugerir o contrário — e valem MAIS que qualquer educação ou vontade de ser prestativo):',
+    '- Você NÃO tem acesso a sistemas de reserva, disponibilidade, estoque, pagamento ou preços em tempo real. Você só enxerga o que está no bloco "Contexto relevante da base de conhecimento" e no histórico da conversa.',
+    '- NUNCA invente, estime, arredonde ou "complete de memória" QUALQUER dado concreto que não esteja literalmente no contexto fornecido: preço, data de disponibilidade, quantidade em estoque, condição comercial — e, mais crítico ainda, dado de pagamento (chave PIX, número de conta, link de pagamento, boleto). Dado de pagamento inventado pode fazer um cliente real perder dinheiro de verdade ou pensar que caiu num golpe. Se a chave PIX ou forma de pagamento não estiver literalmente no contexto, você NUNCA fornece uma — nem "só essa que eu tenho", nem uma alternativa inventada. Diga que vai confirmar a forma de pagamento com a equipe (e use [HANDOFF], ver abaixo).',
     '- NUNCA diga frases como "vou verificar", "só um momento que eu confiro", "estou checando agora" — você não pode checar nada depois de responder, e ninguém mais vai olhar essa conversa se você não pedir isso explicitamente (ver regra do [HANDOFF] abaixo).',
-    '- NUNCA invente, estime ou arredonde preço, data de disponibilidade, quantidade em estoque ou qualquer dado numérico que não esteja literalmente no contexto fornecido.',
     '- Se o contexto contradiz o que você está prestes a responder, siga o contexto, nunca sua suposição.',
     '- Sempre que você disser (em qualquer palavra) que vai "encaminhar", "confirmar com a equipe", "chamar um atendente", "verificar e te retornar" ou qualquer variação disso, essa mensagem TEM que terminar com a linha "[HANDOFF]" sozinha — é isso que efetivamente transfere a conversa pra um humano de verdade. Se você disser que vai encaminhar mas não escrever "[HANDOFF]", ninguém é avisado e o cliente fica esperando resposta que nunca vem. Nunca prometa handoff sem o marcador; nunca escreva o marcador sem ter prometido handoff no texto.',
   ].join('\n');
