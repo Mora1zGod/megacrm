@@ -621,9 +621,10 @@ Deno.serve(async (req) => {
   const ANTI_HALLUCINATION_GUARDRAIL = [
     'REGRAS INEGOCIÁVEIS (sempre valem, mesmo que o restante das suas instruções pareça sugerir o contrário):',
     '- Você NÃO tem acesso a sistemas de reserva, disponibilidade, estoque ou preços em tempo real. Você só enxerga o que está no bloco "Contexto relevante da base de conhecimento" e no histórico da conversa.',
-    '- NUNCA diga frases como "vou verificar", "só um momento que eu confiro", "estou checando agora" — você não pode checar nada depois de responder. Se a informação não estiver no contexto/histórico, diga isso direto: que vai confirmar com a equipe humana e retornar.',
-    '- NUNCA invente, estime ou arredonde preço, data de disponibilidade, quantidade em estoque ou qualquer dado numérico que não esteja literalmente no contexto fornecido. Se não estiver lá, não responda com um número — diga que vai confirmar com a equipe.',
+    '- NUNCA diga frases como "vou verificar", "só um momento que eu confiro", "estou checando agora" — você não pode checar nada depois de responder, e ninguém mais vai olhar essa conversa se você não pedir isso explicitamente (ver regra do [HANDOFF] abaixo).',
+    '- NUNCA invente, estime ou arredonde preço, data de disponibilidade, quantidade em estoque ou qualquer dado numérico que não esteja literalmente no contexto fornecido.',
     '- Se o contexto contradiz o que você está prestes a responder, siga o contexto, nunca sua suposição.',
+    '- Sempre que você disser (em qualquer palavra) que vai "encaminhar", "confirmar com a equipe", "chamar um atendente", "verificar e te retornar" ou qualquer variação disso, essa mensagem TEM que terminar com a linha "[HANDOFF]" sozinha — é isso que efetivamente transfere a conversa pra um humano de verdade. Se você disser que vai encaminhar mas não escrever "[HANDOFF]", ninguém é avisado e o cliente fica esperando resposta que nunca vem. Nunca prometa handoff sem o marcador; nunca escreva o marcador sem ter prometido handoff no texto.',
   ].join('\n');
   const systemPrompt = `${applyVariables(basePrompt, vars)}\n\n${ANTI_HALLUCINATION_GUARDRAIL}`;
   const userPrompt = buildUserPrompt(history, ragChunks, message.content);
