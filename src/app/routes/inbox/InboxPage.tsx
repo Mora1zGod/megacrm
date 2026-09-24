@@ -336,6 +336,14 @@ export default function InboxPage() {
                     {selected.contact?.phone}
                     {selected.contact?.phone ? ' · ' : ''}
                     Responsável: <span className="text-[var(--color-text-secondary)]">{operatorName(selected.assigned_to) ?? 'ninguém'}</span>
+                    {selected.status !== 'closed' && (
+                      <>
+                        {' · '}
+                        <span className={selected.ai_paused ? 'font-medium text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}>
+                          {selected.ai_paused ? 'AMAIA pausada' : 'AMAIA ativa'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <button

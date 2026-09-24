@@ -677,7 +677,14 @@ export function ContactPanel({
           <div>
             <div className="text-xs font-semibold text-[var(--color-text-primary)]">AMAIA</div>
             <div className="text-[10px] text-[var(--color-text-secondary)]">
-              {isClosed ? 'Conversa fechada' : assignedName ? `Humano assumiu (${assignedName})` : conversation.ai_paused ? 'Pausada' : 'Online'}
+              {/* Antes mostrava "Humano assumiu (X)" só por haver responsável,
+                  mesmo com a IA respondendo — o responsável vem do número
+                  (channels.assigned_member) e não significa IA pausada. */}
+              {isClosed
+                ? 'Conversa fechada'
+                : conversation.ai_paused
+                  ? `Pausada — atendimento humano${assignedName ? ` (${assignedName})` : ''}`
+                  : 'Ativa — respondendo o cliente'}
             </div>
           </div>
         </div>

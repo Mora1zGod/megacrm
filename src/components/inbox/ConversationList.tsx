@@ -164,6 +164,13 @@ export function ConversationList({
                   <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', status.className)}>
                     <StatusIcon className="h-2.5 w-2.5" /> {status.label}
                   </span>
+                  {/* Com responsável o chip acima mostra o nome dele e escondia
+                      que a IA continua respondendo. */}
+                  {!c.ai_paused && aiEnabled && c.status !== 'closed' && c.assigned_to && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)]">
+                      <Bot className="h-2.5 w-2.5" /> AMAIA ativa
+                    </span>
+                  )}
                   {c.ai_paused && aiEnabled && (
                     <span className="inline-flex items-center rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
                       AMAIA pausada
