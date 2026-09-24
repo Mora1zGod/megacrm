@@ -243,11 +243,23 @@ async function handleMessage(
   const isGroup = message.isGroup === true;
   const sentByApi = message.wasSentByApi === true;
   const fromMe = message.fromMe === true;
-  // Grupos: fora de escopo. wasSentByApi: mensagens que NÓS enviamos pela API
-  // (send-operator-*) já entram na inbox no envio — ignorar (anti-loop).
+  // Grupos: fora de escopo.
+  //
+  // `wasSentByApi` já foi motivo de descarte aqui, como anti-loop: o
+  // send-operator-* grava a própria mensagem na inbox no envio, e o eco do
+  // webhook duplicaria. Só que o descarte era cego — jogava fora TODA mensagem
+  // enviada por API, inclusive a de outro sistema usando a mesma instância
+  // uazapi. O Bella Center dispara confirmação, lembrete e link de contrato por
+  // ela; nenhuma dessas o CRM grava, então o webhook era a única chance, e a
+  // recepção via a resposta da paciente sem a pergunta que a provocou.
+  //
+  // O eco continua coberto por duas guardas abaixo: o dedup por
+  // zernio_message_id e, para o caso em que o id ainda não foi carimbado, a
+  // guarda de corrida por conteúdo recente.
+  //
   // fromMe SEM wasSentByApi = o dono digitou direto no WhatsApp do celular →
   // registramos como mensagem OUTBOUND do próprio dono (sender_type 'owner').
-  if (isGroup || sentByApi) return;
+  if (isGroup) return;
 
   // chatid é sempre o OUTRO lado do 1:1 (o lead), tanto no inbound quanto no
   // fromMe. No fromMe NÃO caímos em `sender` (que seria o próprio dono).
@@ -324,11 +336,49 @@ async function handleMessage(
     }
   }
 
+  // Guarda contra corrida, para o envio que parte do PRÓPRIO CRM (operador, IA
+  // ou automação de visita): a linha já foi gravada no envio, mas o
+  // zernio_message_id só é carimbado num UPDATE logo depois. Quando o webhook
+  // chega nessa fresta, o dedup por id acima não acha nada e a mensagem
+  // apareceria duas vezes na thread. Se existe uma outbound de mesmo conteúdo
+  // na mesma conversa nos últimos 2 minutos, é a mesma mensagem: carimbamos o
+  // id nela em vez de inserir outra.
+  //
+  // Mesma guarda que o zernio-webhook já usa. O preço é o dono mandar o mesmo
+  // texto duas vezes em menos de 2 minutos e a segunda não aparecer — mais
+  // barato que mostrar mensagem duplicada para a recepção.
+  if (fromMe) {
+    const recente = new Date(Date.now() - 120_000).toISOString();
+    const { data: dupe } = await admin
+      .from('messages')
+      .select('id, zernio_message_id')
+      .eq('org_id', orgId)
+      .eq('conversation_id', conversationId)
+      .eq('direction', 'outbound')
+      .eq('content', content)
+      .gte('created_at', recente)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const existente = dupe as { id: string; zernio_message_id: string | null } | null;
+    if (existente) {
+      if (!existente.zernio_message_id) {
+        await admin
+          .from('messages')
+          .update({ zernio_message_id: uazapiMessageId, meta_status: 'sent' })
+          .eq('id', existente.id);
+      }
+      return;
+    }
+  }
+
   const { error: insErr } = await admin.from('messages').insert({
     org_id: orgId,
     conversation_id: conversationId,
     direction: fromMe ? 'outbound' : 'inbound',
-    sender_type: fromMe ? 'owner' : 'contact',
+    // Disparo de sistema (outro sistema pela mesma instância) não é o dono
+    // falando: 'system', igual ao que a automação de visita já grava.
+    sender_type: fromMe ? (sentByApi ? 'system' : 'owner') : 'contact',
     content_type: contentType,
     content,
     media_url: mediaUrl,
@@ -346,10 +396,16 @@ async function handleMessage(
   // round-robin/notify já existentes). Não incrementa não-lidas (é outbound)
   // nem cancela follow-ups (não é resposta do lead).
   if (fromMe) {
-    await admin
-      .from('conversations')
-      .update({ status: 'human_active', ai_paused: true })
-      .eq('id', conversationId);
+    // Só o dono digitando no celular significa que ele assumiu a conversa.
+    // Disparo automático que saiu por API não pode pausar a IA — senão cada
+    // confirmação do Bella Center desligaria o agente naquela conversa, em
+    // silêncio.
+    if (!sentByApi) {
+      await admin
+        .from('conversations')
+        .update({ status: 'human_active', ai_paused: true })
+        .eq('id', conversationId);
+    }
     return;
   }
 
