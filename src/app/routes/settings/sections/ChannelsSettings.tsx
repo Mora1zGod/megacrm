@@ -3,6 +3,7 @@ import {
   Bot,
   CheckCircle2,
   Filter,
+  History,
   Instagram,
   KeyRound,
   Loader2,
@@ -20,6 +21,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { getSupabase } from '@/lib/supabase';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
+import { ImportHistoryModal } from './ImportHistoryModal';
 
 // Configurações → Canais. Multi-número: cada linha de whatsapp_hub.channels é
 // um número de WhatsApp da organização —
@@ -121,6 +123,7 @@ export function ChannelsSettings() {
   // polling porque o QR expira em ~20-60s e porque é assim que detectamos
   // que o celular escaneou (a UAZAPI não avisa a gente, o front que pergunta).
   const [qrModal, setQrModal] = useState<{ channelId: string; label: string } | null>(null);
+  const [importModal, setImportModal] = useState<{ channelId: string; label: string } | null>(null);
   const [qrData, setQrData] = useState<{
     qrcode: string | null;
     paircode: string | null;
@@ -753,6 +756,16 @@ export function ChannelsSettings() {
                 <QrCode className="h-3.5 w-3.5" /> QR Code
               </button>
             ) : null}
+            {channel.provider === 'uazapi' ? (
+              <button
+                onClick={() => setImportModal({ channelId: channel.id, label: channel.label })}
+                disabled={busy === channel.id}
+                title="Trazer para o CRM as conversas que já estavam no celular"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] disabled:opacity-50"
+              >
+                <History className="h-3.5 w-3.5" /> Importar conversas antigas
+              </button>
+            ) : null}
             <button
               onClick={() => void toggleActive(channel)}
               disabled={busy === channel.id}
@@ -1311,6 +1324,13 @@ export function ChannelsSettings() {
       </section>
 
       {qrModal ? <QrCodeModal modalLabel={qrModal.label} data={qrData} onClose={closeQrModal} /> : null}
+      {importModal ? (
+        <ImportHistoryModal
+          channelId={importModal.channelId}
+          label={importModal.label}
+          onClose={() => setImportModal(null)}
+        />
+      ) : null}
 
     </div>
   );

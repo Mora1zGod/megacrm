@@ -151,3 +151,86 @@ export async function uazapiGetChatDetails(
     name: pick(['wa_contactName', 'wa_name', 'name', 'lead_name']),
   };
 }
+
+// --- Histórico (importação das mensagens antigas do celular) ----------------
+// A UAZAPI guarda as mensagens que o WhatsApp sincroniza no pareamento.
+// POST /chat/find  → lista de chats (paginada; compact=true, máx 200/página).
+// POST /message/find {chatid, limit, offset} → mensagens do chat, mais
+//   recentes primeiro, com hasMore/nextOffset.
+// GET  /instance/history-sync/status → andamento do sync inicial.
+
+export interface UazapiChat {
+  wa_chatid?: string;
+  phone?: string;
+  wa_contactName?: string;
+  wa_name?: string;
+  name?: string;
+  image?: string;
+  imagePreview?: string;
+  wa_isGroup?: boolean;
+  wa_lastMsgTimestamp?: number;
+}
+
+export interface UazapiMessage {
+  id?: string;
+  messageid?: string;
+  chatid?: string;
+  fromMe?: boolean;
+  isGroup?: boolean;
+  messageType?: string;
+  messageTimestamp?: number;
+  text?: string;
+  fileURL?: string;
+  senderName?: string;
+  wasSentByApi?: boolean;
+}
+
+export async function uazapiFindChats(
+  ctx: UazapiContext,
+  input: { limit: number; offset: number },
+): Promise<{ chats: UazapiChat[]; total: number | null }> {
+  const root = await ufetch(ctx, '/chat/find', {
+    compact: true,
+    wa_isGroup: false,
+    sort: '-wa_lastMsgTimestamp',
+    limit: input.limit,
+    offset: input.offset,
+  });
+  const chats = Array.isArray(root.chats) ? (root.chats as UazapiChat[]) : [];
+  const pag = root.pagination && typeof root.pagination === 'object'
+    ? (root.pagination as Record<string, unknown>)
+    : {};
+  const total = typeof pag.totalRecords === 'number' ? pag.totalRecords : null;
+  return { chats, total };
+}
+
+export async function uazapiFindMessages(
+  ctx: UazapiContext,
+  input: { chatid: string; limit: number; offset: number },
+): Promise<{ messages: UazapiMessage[]; hasMore: boolean; nextOffset: number }> {
+  const root = await ufetch(ctx, '/message/find', {
+    chatid: input.chatid,
+    limit: input.limit,
+    offset: input.offset,
+  });
+  const messages = Array.isArray(root.messages) ? (root.messages as UazapiMessage[]) : [];
+  const hasMore = root.hasMore === true;
+  const nextOffset = typeof root.nextOffset === 'number'
+    ? root.nextOffset
+    : input.offset + messages.length;
+  return { messages, hasMore, nextOffset };
+}
+
+export async function uazapiHistorySyncStatus(
+  ctx: UazapiContext,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${ctx.serverUrl}/instance/history-sync/status`, {
+    headers: { token: ctx.token },
+  });
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { raw: text.slice(0, 300), status: res.status };
+  }
+}
