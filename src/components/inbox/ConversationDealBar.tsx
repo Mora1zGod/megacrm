@@ -111,7 +111,7 @@ export function ConversationDealBar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[rgba(14,154,160,0.12)] bg-[rgba(14,154,160,0.04)] px-4 py-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[var(--color-border-card)] bg-[var(--color-accent-subtle)] px-4 py-2">
       <div className="flex items-center gap-1.5 min-w-0">
         <Briefcase className="h-3 w-3 shrink-0 text-[var(--accent-primary)]" />
         <span className="truncate text-xs text-[var(--color-text-secondary)]">{deal.title}</span>
@@ -130,7 +130,7 @@ export function ConversationDealBar({
                 if (e.key === 'Escape') setEditandoValor(false);
               }}
               placeholder="0,00"
-              className="w-24 rounded border border-[rgba(14,154,160,0.3)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
+              className="w-24 rounded border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
             />
             <button type="button" onClick={() => void salvarValor()} disabled={salvando} aria-label="Salvar valor">
               {salvando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-[#10B981]" />}
@@ -160,7 +160,7 @@ export function ConversationDealBar({
           <select
             value={deal.stage_id ?? ''}
             onChange={(e) => void mudarEtapa(e.target.value)}
-            className="rounded border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
+            className="rounded border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)]"
           >
             {stages.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>

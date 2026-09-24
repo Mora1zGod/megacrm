@@ -31,7 +31,7 @@ interface Visit {
 
 const STATUS_STYLE: Record<Visit['status'], { label: string; className: string }> = {
   pending: { label: 'Aguardando', className: 'bg-[rgba(148,163,184,0.18)] text-[var(--color-text-secondary)]' },
-  confirmed: { label: 'Confirmada', className: 'bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]' },
+  confirmed: { label: 'Confirmada', className: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' },
   completed: { label: 'Concluída', className: 'bg-[rgba(16,185,129,0.18)] text-[#10B981]' },
   cancelled: { label: 'Cancelada', className: 'bg-[rgba(239,68,68,0.18)] text-[#EF4444]' },
   no_show: { label: 'Não compareceu', className: 'bg-[rgba(242,185,55,0.18)] text-[#F2B937]' },
@@ -197,7 +197,7 @@ export default function VisitsPage() {
       </div>
 
       {/* Abas de visualização */}
-      <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-[var(--color-fill-subtle)] w-fit">
+      <div className="flex items-center gap-1 rounded-lg border border-[var(--color-border-card)] p-1 bg-[var(--color-fill-subtle)] w-fit">
         {([
           ['agenda', 'Agenda', CalendarDays],
           ['lista', 'Lista', List],
@@ -206,7 +206,7 @@ export default function VisitsPage() {
             key={id}
             onClick={() => setView(id)}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-              view === id ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              view === id ? 'bg-[var(--accent-fill)] text-white' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
             <Icon className="h-3.5 w-3.5" /> {label}
@@ -222,7 +222,7 @@ export default function VisitsPage() {
           <button
             type="button"
             onClick={() => setAnchor((d) => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; })}
-            className="rounded-lg p-2 hover:bg-[rgba(14,154,160,0.1)]"
+            className="rounded-lg p-2 hover:bg-[var(--color-accent-subtle)]"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -233,7 +233,7 @@ export default function VisitsPage() {
           <button
             type="button"
             onClick={() => setAnchor((d) => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; })}
-            className="rounded-lg p-2 hover:bg-[rgba(14,154,160,0.1)]"
+            className="rounded-lg p-2 hover:bg-[var(--color-accent-subtle)]"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -326,7 +326,7 @@ export default function VisitsPage() {
             <VisitDealLink contactId={detailVisit.contact_id} />
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-3 border-t border-[rgba(14,154,160,0.1)] mt-3">
+          <div className="flex flex-wrap gap-2 pt-3 border-t border-[var(--color-border-card)] mt-3">
             <Button size="sm" variant="outline" onClick={() => navigate(`/contacts/${detailVisit.contact_id}`)}>
               <User className="h-3.5 w-3.5" /> Abrir contato
             </Button>
@@ -339,7 +339,7 @@ export default function VisitsPage() {
             {(detailVisit.status === 'pending' || detailVisit.status === 'confirmed') && (
               <>
                 {detailVisit.status === 'pending' && (
-                  <button type="button" onClick={() => void updateStatus(detailVisit, 'confirmed')} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]">Confirmar presença</button>
+                  <button type="button" onClick={() => void updateStatus(detailVisit, 'confirmed')} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]">Confirmar presença</button>
                 )}
                 {detailVisit.status === 'confirmed' && (
                   <button type="button" onClick={() => void updateStatus(detailVisit, 'completed')} className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[rgba(16,185,129,0.18)] text-[#10B981]">Marcar compareceu</button>
@@ -436,7 +436,7 @@ function CreateVisitDialog({ onClose, onCreated }: { onClose: () => void; onCrea
                         key={c.id}
                         type="button"
                         onClick={() => { setSelected(c); setResults([]); setQuery(''); }}
-                        className="block w-full text-left px-3 py-2 text-sm hover:bg-[rgba(14,154,160,0.1)]"
+                        className="block w-full text-left px-3 py-2 text-sm hover:bg-[var(--color-accent-subtle)]"
                       >
                         {c.name ?? 'Sem nome'} — {c.phone}
                       </button>
@@ -582,7 +582,7 @@ function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit
     <div className="glass-card overflow-hidden p-0">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[rgba(14,154,160,0.12)] text-left text-xs text-[var(--color-text-secondary)]">
+          <tr className="border-b border-[var(--color-border-card)] text-left text-xs text-[var(--color-text-secondary)]">
             <th className="px-4 py-2 font-medium">Data</th>
             <th className="px-4 py-2 font-medium">Horário</th>
             <th className="px-4 py-2 font-medium">Contato</th>
@@ -596,7 +596,7 @@ function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit
             const nome = (v.contact?.name ?? '').trim();
             const rotulo = /\p{L}/u.test(nome) ? nome : (v.contact?.phone ?? 'Sem nome');
             return (
-              <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[rgba(14,154,160,0.08)] last:border-0 hover:bg-[var(--color-fill-subtle)]">
+              <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[var(--color-border-card)] last:border-0 hover:bg-[var(--color-fill-subtle)]">
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{new Date(`${v.visit_date}T00:00:00`).toLocaleDateString('pt-BR')}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{v.visit_time.slice(0, 5)}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{rotulo}</td>

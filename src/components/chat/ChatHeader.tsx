@@ -78,7 +78,7 @@ export function ChatHeader({
 
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-[rgba(14,154,160,0.08)] p-3">
+      <header className="flex items-center gap-3 border-b border-[var(--color-border-card)] p-3">
         <Button
           type="button"
           variant="ghost"
@@ -109,7 +109,7 @@ export function ChatHeader({
                   if (e.key === 'Enter') { e.preventDefault(); void commitRename(); }
                   if (e.key === 'Escape') setRenaming(false);
                 }}
-                className="w-full max-w-xs rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                className="w-full max-w-xs rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
               />
               <Button type="button" size="icon" variant="ghost" onClick={() => void commitRename()} disabled={busy} aria-label="Salvar nome">
                 <Check className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function ChatHeader({
           </ul>
 
           {candidates.length > 0 && (
-            <div className="space-y-2 border-t border-[rgba(14,154,160,0.08)] pt-3">
+            <div className="space-y-2 border-t border-[var(--color-border-card)] pt-3">
               <div className="text-label">Adicionar ao grupo</div>
               <ul className="max-h-40 space-y-1 overflow-y-auto">
                 {candidates.map((op) => {

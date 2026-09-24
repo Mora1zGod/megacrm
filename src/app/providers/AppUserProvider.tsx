@@ -39,12 +39,17 @@ interface AppUserContextValue {
   avatarUrl: string | null;
   orgName: string | null;
   orgStatus: OrgStatus | null;
+  /** Tema da organização (Configurações → Identidade Visual). */
   themeMode: ThemeMode;
+  /** Tema em uso: a preferência do usuário (botão do topo) ou, sem ela, o da org. */
+  effectiveTheme: ThemeMode;
+  toggleTheme: () => void;
   loading: boolean;
   refreshProfile: () => Promise<void>;
 }
 
 const AppUserContext = createContext<AppUserContextValue | null>(null);
+const THEME_KEY = 'megacrm_theme';
 
 function readRoleFromUser(appMetadata: Record<string, unknown> | undefined): AppRole | null {
   if (!appMetadata) return null;
@@ -80,7 +85,17 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   // 'light' é o padrão até a org carregar (identidade nova, ver
   // globals.css) — mesmo valor que o <html> já tem antes do JS rodar
   // (index.html), então não há flash de tema errado.
-  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  // Preferência pessoal de tema (botão sol/lua do topo). Fica só neste
+  // navegador e vence o tema da org; sem ela, vale o da org.
+  const [themeOverride, setThemeOverride] = useState<ThemeMode | null>(() => {
+    try {
+      const v = localStorage.getItem(THEME_KEY);
+      return v === 'dark' || v === 'light' ? v : null;
+    } catch {
+      return null;
+    }
+  });
 
   const userId = user?.id ?? null;
 
@@ -126,7 +141,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setOrgName((data?.name as string | null) ?? null);
       setOrgStatus((data?.status as OrgStatus | null) ?? null);
-      setThemeMode((data?.theme_mode as ThemeMode | null) ?? 'light');
+      setThemeMode((data?.theme_mode as ThemeMode | null) ?? 'dark');
     })();
     return () => {
       cancelled = true;
@@ -137,9 +152,20 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   // (ex.: admin troca o tema em Configurações e o hook local já chama
   // document.documentElement.setAttribute — isso aqui garante que uma
   // segunda aba/próximo load também reflita, via themeMode do contexto).
+  const effectiveTheme: ThemeMode = themeOverride ?? themeMode;
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', themeMode);
-  }, [themeMode]);
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
+  }, [effectiveTheme]);
+
+  const toggleTheme = useCallback(() => {
+    const next: ThemeMode = effectiveTheme === 'dark' ? 'light' : 'dark';
+    setThemeOverride(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Sem storage (aba anônima bloqueada): vale só nesta sessão.
+    }
+  }, [effectiveTheme]);
 
   const value = useMemo<AppUserContextValue>(
     () => ({
@@ -152,10 +178,12 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       orgName,
       orgStatus,
       themeMode,
+      effectiveTheme,
+      toggleTheme,
       loading,
       refreshProfile,
     }),
-    [userId, role, orgId, isSuperAdmin, displayName, avatarUrl, orgName, orgStatus, themeMode, loading, refreshProfile],
+    [userId, role, orgId, isSuperAdmin, displayName, avatarUrl, orgName, orgStatus, themeMode, effectiveTheme, toggleTheme, loading, refreshProfile],
   );
 
   return (
@@ -187,7 +215,7 @@ function ArchivedOrgScreen() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="inline-flex items-center justify-center rounded-lg border border-[rgba(14,154,160,0.25)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)]"
+          className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border-card)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)]"
         >
           Sair
         </button>

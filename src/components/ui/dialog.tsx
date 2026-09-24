@@ -56,7 +56,7 @@ export function Dialog({
           'fade-scale-in relative w-full glass-card p-6 shadow-[var(--shadow-lg)] max-h-[calc(100vh-4rem)] overflow-auto',
           // background-color sólida por baixo do gradiente translúcido do
           // glass-card: nada do fundo vaza, mantendo o tint azul e a borda.
-          opaque && 'bg-[#0d101f]',
+          opaque && 'bg-[var(--color-surface)]',
           widthClass,
         )}
         onClick={(e) => e.stopPropagation()}

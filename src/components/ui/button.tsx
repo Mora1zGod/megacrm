@@ -11,13 +11,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-[var(--accent-primary)] text-[#04201D] font-semibold hover:bg-[var(--color-accent-secondary)]',
+          'bg-[var(--accent-fill)] text-white font-semibold hover:bg-[var(--accent-fill-hover)]',
         secondary:
-          'bg-[var(--color-surface-hover)] text-[var(--color-text-primary)] border border-[var(--color-border-card)] hover:border-[#2E333B] hover:bg-[#1F242B]',
+          'bg-[var(--color-surface-hover)] text-[var(--color-text-primary)] border border-[var(--color-border-card)] hover:border-[var(--color-border-card)] hover:bg-[var(--color-surface-raised)]',
         ghost:
           'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]',
         outline:
-          'border border-[var(--color-border-card)] bg-transparent text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] hover:border-[#2E333B]',
+          'border border-[var(--color-border-card)] bg-transparent text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] hover:border-[var(--color-border-card)]',
         destructive:
           'bg-[var(--color-error)] text-white hover:bg-[var(--color-error)]/90',
         success:

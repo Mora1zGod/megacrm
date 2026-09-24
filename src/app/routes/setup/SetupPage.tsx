@@ -80,10 +80,10 @@ function StepIndicator({ step }: { step: Step }) {
                 className={[
                   'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold',
                   active
-                    ? 'bg-[#0E9AA0] text-white shadow-[0_0_30px_rgba(14,154,160,0.5)]'
+                    ? 'bg-[#0E9AA0] text-white shadow-[var(--shadow-lg)]'
                     : complete
                       ? 'bg-[#1E3A8A] text-white'
-                      : 'border border-[rgba(14,154,160,0.3)] bg-transparent text-[#94A3B8]',
+                      : 'border border-[var(--color-border-card)] bg-transparent text-[#94A3B8]',
                 ].join(' ')}
               >
                 {complete ? <Check className="h-4 w-4" /> : n}
@@ -91,14 +91,14 @@ function StepIndicator({ step }: { step: Step }) {
               <div
                 className={[
                   'mt-3 whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.1em]',
-                  active ? 'text-[#F8FAFC]' : 'text-[#94A3B8]',
+                  active ? 'text-[var(--color-text-primary)]' : 'text-[#94A3B8]',
                 ].join(' ')}
               >
                 {label}
               </div>
             </div>
             {index < STEP_LABELS.length - 1 ? (
-              <div className="mx-2 mt-5 h-px w-8 border-t border-[rgba(14,154,160,0.2)] sm:mx-5 sm:w-20" />
+              <div className="mx-2 mt-5 h-px w-8 border-t border-[var(--color-border-card)] sm:mx-5 sm:w-20" />
             ) : null}
           </div>
         );
@@ -109,7 +109,7 @@ function StepIndicator({ step }: { step: Step }) {
 
 function SetupCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-[40px] md:p-12">
+    <div className="rounded-2xl border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-[40px] md:p-12">
       {children}
     </div>
   );
@@ -129,19 +129,19 @@ function PrepItem({
   pills: string[];
 }) {
   return (
-    <div className="relative rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-5">
+    <div className="relative rounded-xl border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-5">
       <div className="flex gap-4 pr-16">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(14,154,160,0.4)] text-sm font-medium text-[#8FE3DC]">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--accent-primary)] text-sm font-medium text-[#8FE3DC]">
           {n}
         </div>
         <div>
-          <h2 className="text-base font-semibold text-[#F8FAFC]">{title}</h2>
+          <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{title}</h2>
           <p className="mt-1 text-[13px] leading-5 text-[#94A3B8]">{text}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {pills.map((pill) => (
               <span
                 key={pill}
-                className="rounded-full border border-[rgba(14,154,160,0.3)] bg-[rgba(30,58,138,0.4)] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.05em] text-[#8FE3DC]"
+                className="rounded-full border border-[var(--color-border-card)] bg-[rgba(30,58,138,0.4)] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.05em] text-[#8FE3DC]"
               >
                 {pill}
               </span>
@@ -375,13 +375,13 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#062720] px-4 py-8 text-[#F8FAFC] md:py-12">
+    <div className="min-h-screen bg-[var(--color-surface-raised)] px-4 py-8 text-[var(--color-text-primary)] md:py-12">
       <div className="mx-auto w-full max-w-[760px]">
         <StepIndicator step={step} />
         <SetupCard>
           {step === 1 ? (
             <>
-              <h1 className="mb-2 text-[28px] font-semibold text-[#F8FAFC]">{setupConfig.toolName}</h1>
+              <h1 className="mb-2 text-[28px] font-semibold text-[var(--color-text-primary)]">{setupConfig.toolName}</h1>
               <p className="mb-8 text-base leading-[1.6] text-[#94A3B8]">
                 Antes de iniciar, deixe abertas as contas onde voce vai copiar os tokens de bootstrap.
               </p>
@@ -398,7 +398,7 @@ export default function SetupPage() {
 
           {step === 2 ? (
             <>
-              <h1 className="mb-2 text-[28px] font-semibold text-[#F8FAFC]">Credenciais core</h1>
+              <h1 className="mb-2 text-[28px] font-semibold text-[var(--color-text-primary)]">Credenciais core</h1>
               <p className="mb-8 text-base leading-[1.6] text-[#94A3B8]">
                 Estas credenciais sao usadas uma vez para preparar a instancia. Senha do owner nao fica salva.
               </p>
@@ -421,7 +421,7 @@ export default function SetupPage() {
                             setCore((prev) => ({ ...prev, [key]: next }));
                           }}
                           autoComplete={key === 'owner_password' ? 'new-password' : 'off'}
-                          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-3 pr-16 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
+                          className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-4 py-3 pr-16 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus: shadow-[var(--shadow-lg)]"
                         />
                         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
                           {isSecret ? (
@@ -429,7 +429,7 @@ export default function SetupPage() {
                               type="button"
                               aria-label={revealed ? 'Ocultar' : 'Mostrar'}
                               onClick={() => setShowCorePassword((prev) => ({ ...prev, [key]: !prev[key] }))}
-                              className="text-[#94A3B8] hover:text-[#F8FAFC]"
+                              className="text-[#94A3B8] hover:text-[var(--color-text-primary)]"
                             >
                               {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
@@ -450,7 +450,7 @@ export default function SetupPage() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="min-h-11 w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-5 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0] sm:w-auto"
+                  className="min-h-11 w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-5 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)] sm:w-auto"
                 >
                   Voltar
                 </button>
@@ -463,15 +463,15 @@ export default function SetupPage() {
 
           {step === 3 ? (
             <>
-              <h1 className="mb-2 text-[28px] font-semibold text-[#F8FAFC]">Setup</h1>
+              <h1 className="mb-2 text-[28px] font-semibold text-[var(--color-text-primary)]">Setup</h1>
               <p className="mb-8 text-base leading-[1.6] text-[#94A3B8]">
                 Preparando Supabase, Edge Functions, owner e Vercel.
               </p>
               <div className="space-y-3">
                 {TIMELINE_STEPS.map((entry) => (
-                  <div key={entry.label} className="flex items-center gap-3 rounded-xl border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-4">
+                  <div key={entry.label} className="flex items-center gap-3 rounded-xl border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-4">
                     {timeline.includes(entry.label) ? <Check className="h-5 w-5 text-[#10B981]" /> : <Loader2 className="h-5 w-5 animate-spin text-[#8FE3DC]" />}
-                    <span className="text-sm text-[#F8FAFC]">{entry.label}</span>
+                    <span className="text-sm text-[var(--color-text-primary)]">{entry.label}</span>
                   </div>
                 ))}
               </div>
@@ -483,7 +483,7 @@ export default function SetupPage() {
 
               {setupDone ? (
                 <div className="mt-8 rounded-xl border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.06)] p-5">
-                  <p className="text-sm leading-5 text-[#F8FAFC]">
+                  <p className="text-sm leading-5 text-[var(--color-text-primary)]">
                     Setup concluido! Entre no CRM com o e-mail e a senha do owner. As chaves de
                     API (Zernio, OpenAI, UAZAPI) sao configuradas depois, em Configuracoes →
                     Credenciais.
@@ -498,7 +498,7 @@ export default function SetupPage() {
 
               {deployTimedOut ? (
                 <div className="mt-8 rounded-xl border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.06)] p-5">
-                  <p className="text-sm leading-5 text-[#F8FAFC]">
+                  <p className="text-sm leading-5 text-[var(--color-text-primary)]">
                     O redeploy esta demorando mais que o esperado. Verifique o status em{' '}
                     <a
                       href="https://vercel.com/dashboard"
@@ -514,7 +514,7 @@ export default function SetupPage() {
                     <button
                       type="button"
                       onClick={() => void waitForAppLive()}
-                      className="min-h-11 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-5 text-sm font-medium text-[#F8FAFC] transition hover:border-[#0E9AA0]"
+                      className="min-h-11 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-5 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
                     >
                       Verificar de novo
                     </button>
@@ -536,7 +536,7 @@ export default function SetupPage() {
                         onChange={(event) => setCore((prev) => ({ ...prev, owner_password: event.target.value }))}
                         placeholder="senha do owner"
                         autoComplete="current-password"
-                        className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-3 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:border-[#0E9AA0] focus:outline-none focus:shadow-[0_0_20px_rgba(14,154,160,0.2)]"
+                        className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--accent-primary)] focus:outline-none focus: shadow-[var(--shadow-lg)]"
                       />
                     </div>
                   ) : null}

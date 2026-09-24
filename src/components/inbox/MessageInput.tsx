@@ -261,7 +261,7 @@ export function MessageInput({
       onSubmit={handleSubmit}
       className="inbox-composer border-t border-[var(--color-border-card)] p-4 space-y-3 glass-surface"
     >
-      <div className="flex items-center gap-1 border-b border-[rgba(14,154,160,0.1)] pb-1.5">
+      <div className="flex items-center gap-1 border-b border-[var(--color-border-card)] pb-1.5">
         <button
           type="button"
           onClick={() => setIsPrivate(false)}
@@ -324,7 +324,7 @@ export function MessageInput({
       ) : null}
 
       {(!requiresTemplateRestart || isPrivate) && file && (
-        <div className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
           <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
           <span className="truncate text-[var(--color-text-primary)]">{file.name}</span>
           <span className="text-[var(--color-text-secondary)]">
@@ -399,7 +399,7 @@ export function MessageInput({
         {!recording && (
         <div className="relative flex-1">
           {qrOpen && (
-            <div className="absolute bottom-[calc(100%+6px)] left-0 z-20 w-full max-w-sm rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-surface-raised)] p-1 shadow-lg">
+            <div className="absolute bottom-[calc(100%+6px)] left-0 z-20 w-full max-w-sm rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg">
               {qrMatches.map((q, i) => (
                 <button
                   key={q.id}
@@ -436,7 +436,7 @@ export function MessageInput({
             className={
               isPrivate
                 ? 'w-full rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[#FBBF24] resize-none'
-                : 'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
+                : 'w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
             }
           />
         </div>

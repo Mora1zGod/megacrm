@@ -24,7 +24,7 @@ const TRIGGER_LABEL: Record<FollowUpTrigger, string> = {
 };
 
 const inputCls =
-  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 const labelCls = 'mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]';
 
 export function FollowUpsTab() {
@@ -75,7 +75,7 @@ export function FollowUpsTab() {
         </p>
         <button
           onClick={() => setCreating(true)}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-gradient-to-br from-[#1E3A8A] to-[#0E9AA0] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[var(--accent-fill)] hover:bg-[var(--accent-fill-hover)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
         >
           <Plus className="h-4 w-4" /> Nova regra
         </button>
@@ -138,7 +138,7 @@ export function FollowUpsTab() {
                     onClick={() => void update(r.id, { is_active: !r.is_active }).catch((e) => toast.error(e.message))}
                     role="switch"
                     aria-checked={r.is_active}
-                    className={`relative h-6 w-11 rounded-full transition-colors ${r.is_active ? 'bg-[var(--accent-primary)]' : 'bg-[var(--color-fill-subtle)]'}`}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${r.is_active ? 'bg-[var(--accent-fill)]' : 'bg-[var(--color-fill-subtle)]'}`}
                   >
                     <span className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${r.is_active ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </button>
@@ -259,12 +259,12 @@ function RuleForm({
       <div>
         <span className={labelCls}>Canal de envio</span>
         <div className="flex flex-wrap gap-2">
-          <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${effectiveProvider === 'zernio' ? 'border-[#0E9AA0] bg-[rgba(14,154,160,0.08)]' : 'border-[rgba(14,154,160,0.2)]'}`}>
+          <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${effectiveProvider === 'zernio' ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)]' : 'border-[var(--color-border-card)]'}`}>
             <input type="radio" checked={effectiveProvider === 'zernio'} onChange={() => setProvider('zernio')} className="accent-[var(--accent-primary)]" />
             API Oficial (Meta) — template aprovado
           </label>
           <label
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${!uazapiOk || trigger === 'no_reply' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${effectiveProvider === 'uazapi' ? 'border-[#2DD4BF] bg-[rgba(45,212,191,0.08)]' : 'border-[rgba(14,154,160,0.2)]'}`}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${!uazapiOk || trigger === 'no_reply' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${effectiveProvider === 'uazapi' ? 'border-[#2DD4BF] bg-[rgba(45,212,191,0.08)]' : 'border-[var(--color-border-card)]'}`}
             title={!uazapiOk ? 'Conecte a UAZAPI em Configurações → Canais' : trigger === 'no_reply' ? 'Reengajamento de campanha usa a API oficial' : undefined}
           >
             <input
@@ -323,10 +323,10 @@ function RuleForm({
       </div>
 
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="rounded-lg border border-[rgba(14,154,160,0.2)] px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+        <button onClick={onCancel} className="rounded-lg border border-[var(--color-border-card)] px-4 py-2 text-sm text-[var(--color-text-secondary)]">
           Cancelar
         </button>
-        <button onClick={() => void save()} disabled={saving} className="rounded-lg bg-gradient-to-br from-[#1E3A8A] to-[#0E9AA0] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        <button onClick={() => void save()} disabled={saving} className="rounded-lg bg-[var(--accent-fill)] hover:bg-[var(--accent-fill-hover)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
           {saving ? 'Salvando…' : 'Criar regra'}
         </button>
       </div>

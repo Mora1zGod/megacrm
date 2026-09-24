@@ -170,7 +170,7 @@ export function ConversationList({
                     </span>
                   )}
                   {c.unread_count > 0 && (
-                    <span className="ml-auto shrink-0 rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className="ml-auto shrink-0 rounded-full bg-[var(--accent-fill)] px-2 py-0.5 text-[10px] font-bold text-white">
                       {c.unread_count}
                     </span>
                   )}

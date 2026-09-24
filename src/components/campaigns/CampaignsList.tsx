@@ -20,7 +20,7 @@ const STATUS_LABEL: Record<CampaignStatus, string> = {
 const STATUS_COLORS: Record<CampaignStatus, string> = {
   draft: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]',
   scheduled: 'bg-[rgba(245,158,11,0.12)] text-[#FBBF24]',
-  sending: 'bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)] animate-pulse',
+  sending: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)] animate-pulse',
   completed: 'bg-[rgba(16,185,129,0.12)] text-[var(--color-success)]',
   paused: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]',
   failed: 'bg-[rgba(239,68,68,0.12)] text-[var(--color-error)]',
@@ -152,7 +152,7 @@ export function CampaignsList() {
                   </div>
                   <div className="h-2.5 rounded-full bg-[var(--color-fill-subtle)] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#1E3A8A] to-[#0E9AA0] shadow-[0_0_12px_rgba(14,154,160,0.5)] transition-all"
+                      className="h-full rounded-full bg-[var(--accent-fill)] hover:bg-[var(--accent-fill-hover)] shadow-[var(--shadow-lg)] transition-all"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -198,7 +198,7 @@ function Metric({
           : 'text-[var(--color-text-primary)]';
   const rate = pctOf && pctOf > 0 ? Math.round((value / pctOf) * 100) : null;
   return (
-    <div className="rounded-xl bg-[var(--color-fill-subtle)] border border-[rgba(14,154,160,0.1)] p-3 text-center transition hover:border-[rgba(14,154,160,0.3)]">
+    <div className="rounded-xl bg-[var(--color-fill-subtle)] border border-[var(--color-border-card)] p-3 text-center transition hover:border-[var(--accent-primary)]">
       <div className={`text-xl font-bold ${colorClass}`}>{value}</div>
       <div className="text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)] mt-0.5">
         {label}

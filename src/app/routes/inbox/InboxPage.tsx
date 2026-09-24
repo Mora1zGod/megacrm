@@ -3,7 +3,7 @@ import './inbox.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Inbox as InboxIcon, Info, MessageSquarePlus, PanelRightClose, PanelRightOpen, Pin, Share2, Star, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, CheckCircle2, Inbox as InboxIcon, Info, MessageSquarePlus, PanelRightClose, PanelRightOpen, Pin, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
@@ -51,6 +51,8 @@ export default function InboxPage() {
   const [showPanelMobile, setShowPanelMobile] = useState(false);
   // "Compartilhar com a equipe": joga a conversa no Chat Interno.
   const [showForward, setShowForward] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  useEffect(() => { setTransferOpen(false); }, [selectedId]);
   // Painel de contato (coluna direita, xl+) recolhível; preferência persiste.
   const [panelCollapsed, setPanelCollapsed] = useState(
     () => localStorage.getItem('inbox_panel_collapsed') === '1',
@@ -330,8 +332,10 @@ export default function InboxPage() {
                   <div className="font-semibold text-[var(--color-text-primary)] text-sm truncate">
                     {selected.contact?.name?.trim() || selected.contact?.phone || '—'}
                   </div>
-                  <div className="text-xs text-[var(--color-text-secondary)] truncate mt-1">
+                  <div className="text-[13px] text-[var(--color-text-muted)] truncate mt-0.5">
                     {selected.contact?.phone}
+                    {selected.contact?.phone ? ' · ' : ''}
+                    Responsável: <span className="text-[var(--color-text-secondary)]">{operatorName(selected.assigned_to) ?? 'ninguém'}</span>
                   </div>
                 </div>
                 <button
@@ -358,12 +362,75 @@ export default function InboxPage() {
                         toast.error('Falha ao assumir', { description: err instanceof Error ? err.message : String(err) });
                       }
                     }}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent-primary)] bg-[rgba(14,154,160,0.12)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[rgba(14,154,160,0.2)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--color-accent-subtle)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
                   >
                     <UserCheck className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Assumir</span>
                   </button>
                 )}
+                <div className="relative shrink-0">
+                  <button
+                    onClick={() => setTransferOpen((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={transferOpen}
+                    title="Transferir conversa"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors duration-150 hover:bg-[var(--color-surface-hover)]"
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                    <span className="hidden md:inline">Transferir</span>
+                  </button>
+                  {transferOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setTransferOpen(false)} />
+                      <div role="menu" className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-64 max-h-80 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
+                        <div className="px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]">Transferir para</div>
+                        {operators.filter((o) => o.user_id !== selected.assigned_to).map((o) => (
+                          <button
+                            key={o.user_id}
+                            role="menuitem"
+                            onClick={async () => {
+                              setTransferOpen(false);
+                              try {
+                                await setAssigned(selected.id, o.user_id);
+                                toast.success(`Conversa transferida para ${operatorLabel(o)}.`);
+                              } catch (err) {
+                                toast.error('Falha ao transferir', { description: err instanceof Error ? err.message : String(err) });
+                              }
+                            }}
+                            className="flex w-full min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
+                          >
+                            <Avatar src={o.avatar_url} name={operatorLabel(o)} size="sm" />
+                            <span className="truncate">{operatorLabel(o)}{o.user_id === userId ? ' (você)' : ''}</span>
+                          </button>
+                        ))}
+                        {operators.filter((o) => o.user_id !== selected.assigned_to).length === 0 && (
+                          <div className="px-2.5 py-2 text-sm text-[var(--color-text-muted)]">Nenhum outro membro na equipe.</div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={async () => {
+                    const closing = selected.status !== 'closed';
+                    try {
+                      await setStatus(selected.id, closing ? 'closed' : 'human_active');
+                      toast.success(closing ? 'Conversa concluída.' : 'Conversa reaberta.');
+                    } catch (err) {
+                      toast.error(closing ? 'Falha ao concluir' : 'Falha ao reabrir', { description: err instanceof Error ? err.message : String(err) });
+                    }
+                  }}
+                  title={selected.status !== 'closed' ? 'Concluir atendimento' : 'Reabrir atendimento'}
+                  className={cn(
+                    'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition-colors duration-150',
+                    selected.status !== 'closed'
+                      ? 'bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]'
+                      : 'border border-[var(--color-border-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]',
+                  )}
+                >
+                  {selected.status !== 'closed' ? <CheckCircle2 className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                  <span className="hidden md:inline">{selected.status !== 'closed' ? 'Concluir' : 'Reabrir'}</span>
+                </button>
                 <button
                   onClick={() => setShowForward(true)}
                   aria-label="Compartilhar com a equipe"
@@ -375,7 +442,7 @@ export default function InboxPage() {
                 <button
                   onClick={() => setShowPanelMobile(true)}
                   aria-label="Detalhes da conversa"
-                  className="xl:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  className="min-[1440px]:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
                 >
                   <Info className="h-4.5 w-4.5" />
                 </button>
@@ -417,7 +484,7 @@ export default function InboxPage() {
 
         {/* Right: contact panel — coluna fixa só em xl; abaixo disso é overlay.
             Recolhível: vira uma régua estreita com botão de expandir. */}
-        <div className="inbox-details hidden xl:flex p-0 overflow-hidden h-full flex-col">
+        <div className="inbox-details hidden min-[1440px]:flex p-0 overflow-hidden h-full flex-col">
           {panelCollapsed ? (
             <button
               onClick={togglePanel}
@@ -429,7 +496,7 @@ export default function InboxPage() {
             </button>
           ) : selected ? (
             <>
-              <div className="flex items-center justify-between px-4 py-2 border-b border-[rgba(14,154,160,0.08)]">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--color-border-card)]">
                 <span className="text-label">Detalhes</span>
                 <button
                   onClick={togglePanel}
@@ -484,12 +551,12 @@ export default function InboxPage() {
 
       {/* Overlay do painel de contato em telas < xl */}
       {selected && showPanelMobile && (
-        <div className="fixed inset-0 z-50 xl:hidden">
+        <div className="fixed inset-0 z-50 min-[1440px]:hidden">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowPanelMobile(false)}
           />
-          <div className="absolute right-0 top-0 h-full w-80 max-w-[85vw] glass-surface border-l border-[rgba(14,154,160,0.15)] overflow-y-auto">
+          <div className="absolute right-0 top-0 h-full w-80 max-w-[85vw] glass-surface border-l border-[var(--color-border-card)] overflow-y-auto">
             <div className="flex justify-end p-2">
               <button
                 onClick={() => setShowPanelMobile(false)}

@@ -110,7 +110,7 @@ export function BrandingSettings() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex.: AMAI Park"
-            className="flex-1 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="flex-1 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           />
           <Button onClick={() => void handleSaveName()} disabled={savingName}>
             {savingName ? 'Salvando...' : 'Salvar'}
@@ -171,7 +171,7 @@ export function BrandingSettings() {
                 className={cn(
                   'flex items-center gap-3 rounded-lg border p-3 text-left transition-colors',
                   isActive
-                    ? 'border-[var(--accent-primary)] bg-[rgba(14,154,160,0.1)]'
+                    ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)]'
                     : 'border-[var(--color-border-card)] hover:bg-[var(--color-fill-subtle)]',
                 )}
               >

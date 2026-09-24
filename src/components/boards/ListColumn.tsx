@@ -95,7 +95,7 @@ export function ListColumn({
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[#0F1223] p-1 shadow-lg z-10">
+            <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg z-10">
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); void arquivarLista(); }}
@@ -113,7 +113,7 @@ export function ListColumn({
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onCardDrop(); }}
         className={cn(
           'flex-1 min-h-[40px] overflow-y-auto space-y-1.5 rounded-lg transition-colors',
-          isDropTarget && 'bg-[rgba(14,154,160,0.06)] ring-1 ring-[var(--accent-primary)]',
+          isDropTarget && 'bg-[var(--color-accent-subtle)] ring-1 ring-[var(--accent-primary)]',
         )}
       >
         {cards.map((c) => (
@@ -175,7 +175,7 @@ function NovoCartao({ onCreate }: { onCreate: (title: string) => void }) {
         }}
         onBlur={enviar}
         placeholder="Título do cartão"
-        className="w-full rounded-lg border border-[rgba(14,154,160,0.25)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+        className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
       />
     </div>
   );

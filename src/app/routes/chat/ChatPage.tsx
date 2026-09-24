@@ -103,7 +103,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[rgba(14,154,160,0.12)]">
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--color-border-card)]">
         <div className={activeChatId ? 'hidden sm:flex' : 'flex w-full'}>
           <ChatSidebar
             chats={chats}

@@ -47,7 +47,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
       >
         <div className="h-[76px] shrink-0 flex items-center justify-between px-4 border-b border-[var(--color-border-card)]">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[var(--accent-primary)] text-white">
+            <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[var(--accent-fill)] text-white">
               <MessagesSquare className="h-5 w-5" />
             </span>
             <span className="text-lg font-extrabold tracking-[-0.04em] text-[var(--color-text-primary)]">

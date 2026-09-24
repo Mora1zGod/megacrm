@@ -74,7 +74,7 @@ export function QuickRepliesSettings() {
             {quickReplies.map((q) => (
               <div
                 key={q.id}
-                className="flex items-start gap-3 rounded-lg border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] p-3"
+                className="flex items-start gap-3 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-3"
               >
                 <Zap className="h-4 w-4 shrink-0 mt-0.5 text-[var(--accent-primary)]" />
                 <div className="min-w-0 flex-1">
@@ -86,7 +86,7 @@ export function QuickRepliesSettings() {
                     type="button"
                     onClick={() => openEdit(q)}
                     aria-label="Editar"
-                    className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] p-2 text-[var(--color-text-secondary)] transition hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
+                    className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-2 text-[var(--color-text-secondary)] transition hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -187,7 +187,7 @@ function QuickReplyDialog({
               onChange={(e) => setContent(e.target.value)}
               rows={4}
               disabled={saving}
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+              className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">

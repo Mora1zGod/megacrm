@@ -13,7 +13,7 @@ import { operatorLabel, type Operator } from '@/hooks/useOperators';
 import { positionBetween, type Attachment, type BoardCard, type BoardList, type Label } from '@/hooks/useBoards';
 
 const fieldCls =
-  'w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+  'w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 const sectionLabel = 'flex items-center gap-1.5 text-label mb-1.5';
 
 const LABEL_COLORS = ['#EF4444', '#F2B937', '#10B981', '#0E9AA0', '#60A5FA', '#A78BFA', '#F472B6', '#94A3B8'];
@@ -297,7 +297,7 @@ export function CardModal({
               <ChevronDown className="h-3 w-3" />
             </button>
             {listPickerOpen && (
-              <div className="absolute left-0 top-full mt-1 w-52 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[#0F1223] p-1 shadow-lg z-10">
+              <div className="absolute left-0 top-full mt-1 w-52 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg z-10">
                 {lists.map((l) => (
                   <button
                     key={l.id}
@@ -336,7 +336,7 @@ export function CardModal({
                 <MoreHorizontal className="h-4 w-4" />
               </button>
               {actionsOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[#0F1223] p-1 shadow-lg z-10">
+                <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg z-10">
                   <button
                     type="button"
                     onClick={() => { setActionsOpen(false); void alternarFeito(); }}
@@ -359,7 +359,7 @@ export function CardModal({
                   >
                     <Copy className="h-3.5 w-3.5" /> Copiar
                   </button>
-                  <div className="my-1 border-t border-[rgba(14,154,160,0.15)]" />
+                  <div className="my-1 border-t border-[var(--color-border-card)]" />
                   <button
                     type="button"
                     onClick={() => { setActionsOpen(false); void arquivar(); }}
@@ -421,7 +421,7 @@ export function CardModal({
             <button
               type="button"
               onClick={() => setLabelPickerOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[rgba(14,154,160,0.2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-card)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
             >
               <Tag className="h-3.5 w-3.5" /> Etiquetas
             </button>
@@ -430,7 +430,7 @@ export function CardModal({
             <button
               type="button"
               onClick={() => setDatesOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[rgba(14,154,160,0.2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-card)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
             >
               <Calendar className="h-3.5 w-3.5" /> Datas
             </button>
@@ -439,7 +439,7 @@ export function CardModal({
             <button
               type="button"
               onClick={() => void addChecklist()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[rgba(14,154,160,0.2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-card)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
             >
               <CheckSquare className="h-3.5 w-3.5" /> Checklist
             </button>
@@ -448,7 +448,7 @@ export function CardModal({
             <button
               type="button"
               onClick={() => setMemberPickerOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[rgba(14,154,160,0.2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-card)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--color-text-primary)]"
             >
               <UserPlus className="h-3.5 w-3.5" /> Membros
             </button>
@@ -472,13 +472,13 @@ export function CardModal({
               <button
                 type="button"
                 onClick={() => setLabelPickerOpen((v) => !v)}
-                className="h-6 w-6 flex items-center justify-center rounded-md border border-[rgba(14,154,160,0.25)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--accent-primary)]"
+                className="h-6 w-6 flex items-center justify-center rounded-md border border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--accent-primary)]"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
             {labelPickerOpen && (
-              <div className="mt-2 space-y-1.5 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[#0F1223] p-2">
+              <div className="mt-2 space-y-1.5 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-2">
                 {labels.map((l) => (
                   <div key={l.id} className="flex items-center gap-2">
                     <button
@@ -497,7 +497,7 @@ export function CardModal({
                       defaultValue={l.name ?? ''}
                       placeholder="nome"
                       onBlur={(e) => { if (e.target.value !== (l.name ?? '')) void renomearEtiqueta(l.id, e.target.value); }}
-                      className="w-20 rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-1.5 py-1 text-[10px] text-[var(--color-text-primary)]"
+                      className="w-20 rounded-md border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-1.5 py-1 text-[10px] text-[var(--color-text-primary)]"
                     />
                   </div>
                 ))}
@@ -529,13 +529,13 @@ export function CardModal({
               <button
                 type="button"
                 onClick={() => setMemberPickerOpen((v) => !v)}
-                className="h-6 w-6 flex items-center justify-center rounded-md border border-[rgba(14,154,160,0.25)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--accent-primary)]"
+                className="h-6 w-6 flex items-center justify-center rounded-md border border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--accent-primary)]"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
             {memberPickerOpen && (
-              <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[#0F1223] p-2">
+              <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-2">
                 {operators.map((o) => (
                   <button
                     key={o.user_id}
@@ -544,8 +544,8 @@ export function CardModal({
                     className={cn(
                       'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
                       card.memberIds.includes(o.user_id)
-                        ? 'border-[var(--accent-primary)] bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]'
-                        : 'border-[rgba(14,154,160,0.2)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+                        ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
+                        : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
                     )}
                   >
                     {operatorLabel(o)}
@@ -613,7 +613,7 @@ export function CardModal({
             const done = cl.items.filter((i) => i.done).length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             return (
-              <div key={cl.id} className="rounded-lg border border-[rgba(14,154,160,0.15)] p-3 space-y-2">
+              <div key={cl.id} className="rounded-lg border border-[var(--color-border-card)] p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <input
                     defaultValue={cl.title}
@@ -627,7 +627,7 @@ export function CardModal({
                 {total > 0 && (
                   <div className="flex items-center gap-2">
                     <div className="h-1.5 flex-1 rounded-full bg-[var(--color-fill-subtle)] overflow-hidden">
-                      <div className="h-full rounded-full bg-[var(--accent-primary)] transition-all" style={{ width: `${pct}%` }} />
+                      <div className="h-full rounded-full bg-[var(--accent-fill)] transition-all" style={{ width: `${pct}%` }} />
                     </div>
                     <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">{done}/{total}</span>
                   </div>
@@ -659,7 +659,7 @@ export function CardModal({
           <div className={sectionLabel}><Paperclip className="h-3.5 w-3.5" /> Anexos</div>
           <div className="space-y-1.5 mb-2">
             {card.attachments.map((att) => (
-              <div key={att.id} className="flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.15)] px-2.5 py-1.5 text-xs group">
+              <div key={att.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border-card)] px-2.5 py-1.5 text-xs group">
                 {att.kind === 'file' ? <Upload className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" /> : <LinkIcon className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />}
                 <a href={att.url} target="_blank" rel="noreferrer" className="flex-1 truncate text-[var(--accent-primary)] hover:underline">
                   {att.name}
@@ -678,19 +678,19 @@ export function CardModal({
               value={novoAnexoNome}
               onChange={(e) => setNovoAnexoNome(e.target.value)}
               placeholder="Nome (opcional)"
-              className="w-36 rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+              className="w-36 rounded-md border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
             />
             <input
               value={novoAnexoUrl}
               onChange={(e) => setNovoAnexoUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void addLinkAttachment(); }}
               placeholder="https://…"
-              className="flex-1 min-w-[140px] rounded-md border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+              className="flex-1 min-w-[140px] rounded-md border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
             />
             <Button size="sm" variant="outline" onClick={() => void addLinkAttachment()}>
               <LinkIcon className="h-3.5 w-3.5" /> Link
             </Button>
-            <label className="inline-flex items-center gap-1 cursor-pointer rounded-lg border border-[rgba(14,154,160,0.2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+            <label className="inline-flex items-center gap-1 cursor-pointer rounded-lg border border-[var(--color-border-card)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
               <Upload className="h-3.5 w-3.5" /> {uploading ? 'Enviando…' : 'Arquivo'}
               <input
                 type="file"
@@ -733,7 +733,7 @@ export function CardModal({
         </div>
 
         {/* Ações */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgba(14,154,160,0.1)] pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border-card)] pt-4">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => void alternarFeito()}>
               <CheckSquare className="h-3.5 w-3.5" /> {card.done ? 'Reabrir' : 'Concluir'}
@@ -743,7 +743,7 @@ export function CardModal({
                 <ArrowRightLeft className="h-3.5 w-3.5" /> Mover
               </Button>
               {movePickerOpen && (
-                <div className="absolute bottom-full left-0 mb-1 w-48 rounded-lg border border-[rgba(14,154,160,0.25)] bg-[#0F1223] p-1 shadow-lg z-10">
+                <div className="absolute bottom-full left-0 mb-1 w-48 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg z-10">
                   {lists.map((l) => (
                     <button
                       key={l.id}
@@ -787,7 +787,7 @@ function ChecklistItemInput({ onAdd }: { onAdd: (text: string) => void }) {
         if (e.key === 'Enter' && txt.trim()) { e.preventDefault(); onAdd(txt); setTxt(''); }
       }}
       placeholder="Adicionar item + Enter"
-      className="w-full rounded-md border border-[rgba(14,154,160,0.15)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
+      className="w-full rounded-md border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]"
     />
   );
 }

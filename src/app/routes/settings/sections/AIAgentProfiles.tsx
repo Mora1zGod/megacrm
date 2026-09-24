@@ -153,7 +153,7 @@ export function AIAgentProfiles() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-display">{p.name}</span>
                     {p.is_active ? (
-                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-bold bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-bold bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]">
                         <CheckCircle2 className="h-3 w-3" /> ATIVO
                       </span>
                     ) : (
@@ -363,7 +363,7 @@ function ProfileTester({ profile, accessToken, onClose }: { profile: Profile; ac
         <span className={cn(
           'rounded-full px-2 py-0.5 text-[0.65rem] font-bold',
           profile.is_active
-            ? 'bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]'
+            ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
             : 'bg-[rgba(242,185,55,0.18)] text-[#F2B937]',
         )}>
           {profile.is_active ? 'ATIVO' : 'RASCUNHO'}
@@ -377,14 +377,14 @@ function ProfileTester({ profile, accessToken, onClose }: { profile: Profile; ac
         <button
           type="button"
           onClick={() => setTab('preview')}
-          className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold', tab === 'preview' ? 'bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)]')}
+          className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold', tab === 'preview' ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)]')}
         >
           <FileText className="h-3.5 w-3.5 inline mr-1" /> Ver prompt montado
         </button>
         <button
           type="button"
           onClick={() => setTab('chat')}
-          className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold', tab === 'chat' ? 'bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)]')}
+          className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold', tab === 'chat' ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)]')}
         >
           <Play className="h-3.5 w-3.5 inline mr-1" /> Testar com a AMAIA
         </button>
@@ -433,7 +433,7 @@ function ProfileTester({ profile, accessToken, onClose }: { profile: Profile; ac
               </p>
             )}
             {turns.map((t, i) => (
-              <div key={i} className={cn('max-w-[85%] rounded-lg px-3 py-2 text-sm', t.role === 'user' ? 'ml-auto bg-[rgba(14,154,160,0.15)]' : 'bg-[rgba(255,255,255,0.05)]')}>
+              <div key={i} className={cn('max-w-[85%] rounded-lg px-3 py-2 text-sm', t.role === 'user' ? 'ml-auto bg-[var(--color-accent-subtle)]' : 'bg-[rgba(255,255,255,0.05)]')}>
                 <div className="whitespace-pre-wrap">{t.content}</div>
                 {t.actions && (t.actions.handoff || t.actions.media.length > 0) && (
                   <div className="mt-2 space-y-1 border-t border-[var(--color-border-divider)] pt-2">

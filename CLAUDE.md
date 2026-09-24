@@ -548,97 +548,33 @@ supabase/functions/
 
 ---
 
-## Design System — Tema claro/teal (padrão atual, ref. ZapChatPro)
+## Design System — MegaCRM (azul-marinho + azul, atualizado 24/09/2026)
 
-**Histórico:** até set/2026 a plataforma era dark-mode-only (seção abaixo
-mantida só como registro do visual antigo/legado — nenhum componente novo
-deve usar esses valores). A partir daí:
+Fonte de verdade: `src/styles/globals.css`. Escuro (azul-marinho) é o padrão das
+orgs; claro disponível. Tema = preferência do usuário (botão sol/lua no topo,
+`localStorage.megacrm_theme`) ou, sem ela, `organizations.theme_mode`
+(Configurações → Identidade Visual). Referência visual: protótipo "MegaCRM"
+(Atendimento / Visão geral / Funil) publicado como artifact de design.
 
-1. Já existia em produção — criado fora do histórico de migrations, mesma
-   situação do `automation_flows` — um sistema de tema **por organização**:
-   `organizations.theme_mode` (`'dark' | 'light'`) + `organizations.logo_url`
-   + bucket `org-branding`, lido/escrito por `useOrgBranding.ts` e
-   `Settings → Identidade Visual` (`BrandingSettings.tsx`). Aplicado via
-   `document.documentElement.setAttribute('data-theme', mode)`. Documentado
-   e trazido pro histórico de migrations em
-   `20260922120000_org_branding.sql`.
-2. Pedido do Gabriel (referência: telas do ZapChatPro, `demo.zapchatpro.com.br`):
-   o tema **claro** vira o DEFAULT da plataforma (era dark), com **paleta
-   copiada do ZapChatPro** (não a paleta AMAI antiga) — fundo neutro
-   claro, sidebar/cards brancos, accent teal, faixa superior (topbar) em
-   teal sólido.
+| Token | Escuro | Claro | Uso |
+|---|---|---|---|
+| `--color-bg-primary` | `#0A1120` | `#F3F5F9` | fundo da página |
+| `--color-surface` / `-raised` | `#101A2E` / `#152239` | `#FFFFFF` | menu, topo, cards, menus |
+| `--color-surface-hover` | `#1A2945` | `#EEF2F8` | hover |
+| `--color-border-card` / `-soft` | `#223252` / `#1B2944` | `#DAE1EC` / `#E6EBF2` | bordas |
+| `--color-text-primary/secondary/muted` | `#E7EDF8` `#A6B3CC` `#8190AB` | `#0F1B2E` `#475569` `#5B687D` | texto |
+| `--accent-primary` | `#5B9BFF` | `#1D4ED8` | **texto/ícone/borda** azul (≥5,2:1) |
+| `--accent-fill` / `-hover` | `#2563EB` / `#1D4ED8` | `#1D4ED8` / `#1E40AF` | **fundo** azul com texto branco |
+| `--color-accent-secondary` | `#3B82F6` | `#2563EB` | barras/gráficos |
+| `--color-accent-subtle` | azul 15% | `#E7EFFD` | item ativo, chips |
+| `--color-bubble-out(-text)` | `#1F3B70` | `#1D4ED8` | balão enviado |
+| `--color-note-bg/border/text` | âmbar 9% | `#FFF8EA` | nota interna |
 
-**Portanto:** a regra antiga "não implementar light mode / não criar toggle
-de tema" está **revogada**. O toggle já existe (`BrandingSettings.tsx`); o
-que mudou é o default e a paleta.
-
-### Tokens de cor — tema claro (default, `src/styles/globals.css`)
-
-| Token                     | Valor                        | Uso                                    |
-|----------------------------|------------------------------|-----------------------------------------|
-| `--color-bg-primary`       | `#F2F5F6`                    | fundo da página                         |
-| `--color-surface` / `-raised` / `-card` | `#FFFFFF`        | sidebar, cards, superfícies             |
-| `--color-surface-hover`    | `#EEF3F3`                    | hover de item de lista/menu             |
-| `--color-border-card`      | `#E2E8EA`                    | borda padrão                            |
-| `--color-text-primary`     | `#16211F`                    | texto principal                         |
-| `--color-text-secondary`   | `#5C6B69`                    | texto secundário                        |
-| `--color-accent-primary` / `--accent-primary` | `#0F9C95`  | acento/CTA/active state                 |
-| `--color-accent-secondary` | `#14B8AE`                    | acento secundário                       |
-| `--color-topbar`           | `#0E7D78`                    | faixa superior (Header) — cor de marca fixa, **não** inverte com o tema |
-| `--color-topbar-hover`     | `#0B6864`                    | hover sobre a faixa                     |
-| `--color-on-topbar`        | `#FFFFFF`                    | texto/ícone sobre a faixa teal          |
-
-Tema escuro continua disponível por org (`:root[data-theme='dark']`, valores
-antigos preservados em `globals.css` — não removidos, só deixaram de ser o
-default).
-
-### Padrão de superfície
-
-`.glass-card` / `.surface-card` (`globals.css`) já são **token-based** (sem
-cor fixa, sem blur pesado) — herdam o tema automaticamente:
-
-```css
-.surface-card {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-card);
-  border-radius: var(--radius-card);
-}
-```
-
-Componentes devem sempre usar `var(--color-*)` / `var(--accent-primary)` —
-nunca hardcodear hex. Isso é o que faz o app inteiro re-tingir sozinho
-quando o tema muda (ver Header.tsx / Sidebar.tsx como referência: Sidebar
-não precisou de nenhuma mudança estrutural pro novo tema, só herdou os
-tokens).
-
-### Tipografia
-
-Sem mudança — escala em `globals.css` (`.text-display`, `.text-page-title`,
-`.text-section-title`, `.text-body`, `.text-label`, etc.), fonte
-`Plus Jakarta Sans`.
-
----
-
-<details>
-<summary>Legado — paleta dark-mode-only anterior a set/2026 (não usar em código novo)</summary>
-
-| Token                  | Valor                                        |
-|------------------------|----------------------------------------------|
-| `--bg-primary`         | `#0A0A0F`                                    |
-| `--bg-card`            | `rgba(15, 18, 35, 0.6)`                      |
-| `--border-card`        | `rgba(59, 130, 246, 0.15)`                   |
-| `--accent-primary`     | `#3B82F6`                                    |
-| `--accent-secondary`   | `#60A5FA`                                    |
-| `--text-primary`       | `#F8FAFC`                                    |
-| `--text-secondary`     | `#94A3B8`                                    |
-
-Glassmorphism com `backdrop-filter: blur(40px)` e bordas azuis translúcidas.
-Substituído pelos tokens `--color-*` de `globals.css`, hoje a fonte de
-verdade real (esta tabela nunca refletiu 1:1 o CSS do repo).
-
-</details>
-
----
+Regras:
+- Nunca `bg-[var(--accent-primary)]` com texto branco (contraste reprovado): use `--accent-fill`.
+- Nunca cor fixa de tema (hex escuro, `bg-white/5`, `rgba(14,154,160,…)` do tema verde-água antigo) — sempre token. Exceção: `/setup`.
+- Raio: `--radius-card` 12px, `--radius-control` 10px. Fonte Inter; corpo 14–16px.
+- Atendimento: lista 300px | conversa | detalhes 288px (só ≥1440px; abaixo, overlay pelo botão ⓘ) — a conversa não pode ficar espremida.
 
 ## Notas de migração e variáveis não-triviais
 

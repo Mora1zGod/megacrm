@@ -43,21 +43,21 @@ export function Sidebar() {
     <aside
       className={cn(
         'hidden md:flex md:flex-col shrink-0 bg-[var(--color-surface)] border-r border-[var(--color-border-card)] will-change-[width] transition-[width] duration-200 ease-out',
-        collapsed ? 'w-[68px]' : 'w-60',
+        collapsed ? 'w-[68px]' : 'w-[216px]',
       )}
       aria-label="Navegação principal"
     >
-      <div className={cn('h-[76px] shrink-0 flex items-center', collapsed ? 'justify-center' : 'px-4')}>
+      <div className={cn('h-16 shrink-0 flex items-center border-b border-[var(--color-border-soft)]', collapsed ? 'justify-center' : 'px-4')}>
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[var(--accent-primary)] text-white shadow-sm">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[var(--accent-fill)] text-white">
             <MessagesSquare className="h-5 w-5" />
           </span>
           {!collapsed && (
             <div className="min-w-0 leading-none">
-              <div className="text-xl font-extrabold tracking-[-0.045em] text-[var(--color-text-primary)]">
-                Mega<span className="font-normal text-[var(--accent-primary)]">CRM</span>
+              <div className="text-lg font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
+                Mega<span className="text-[var(--accent-primary)]">CRM</span>
               </div>
-              <div className="mt-1 text-[7px] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
+              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                 Conexões que crescem
               </div>
             </div>
@@ -65,30 +65,30 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className={cn('mx-3 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)]', collapsed ? 'p-2' : 'p-2.5')}>
+      <div className={cn('mx-3 mt-3 rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-fill-subtle)]', collapsed ? 'p-2' : 'p-2.5')}>
         <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-2.5')}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent-primary)] text-xs font-bold text-white">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--color-accent-subtle)] text-[13px] font-bold text-[var(--accent-primary)]">
             {(orgName?.trim()?.[0] ?? 'A').toUpperCase()}
           </span>
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-xs font-semibold text-[var(--color-text-primary)]">{orgName ?? 'Organização'}</div>
-              <div className="mt-0.5 truncate text-[10px] text-[var(--color-text-secondary)]">Seu espaço de trabalho</div>
+              <div className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">{orgName ?? 'Organização'}</div>
+              <div className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">Seu espaço de trabalho</div>
             </div>
           )}
           {!collapsed && <Building2 className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />}
         </div>
       </div>
 
-      <nav className={cn('flex-1 overflow-y-auto py-4 space-y-5', collapsed ? 'px-2' : 'px-3')}>
+      <nav className={cn('flex-1 overflow-y-auto py-4 space-y-5', collapsed ? 'px-2' : 'px-2.5')}>
         {groups.map(({ group, items }) => (
           <div key={group}>
             {!collapsed && (
-              <div className="px-2 pb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+              <div className="px-3 pb-1.5 text-xs font-semibold text-[var(--color-text-muted)]">
                 {group}
               </div>
             )}
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {items.map((item) => {
                 const Icon = item.icon;
                 const badgeCount = badgeFor(item.to);
@@ -97,8 +97,8 @@ export function Sidebar() {
                     key={item.to}
                     to={item.to}
                     className={({ isActive }) => cn(
-                      'group relative flex min-h-10 items-center rounded-[var(--radius-control)] text-[13px] font-medium transition-colors duration-[var(--motion-base)]',
-                      collapsed ? 'justify-center px-0' : 'gap-2.5 px-2.5',
+                      'group relative flex min-h-[42px] items-center rounded-[9px] text-sm font-medium transition-colors duration-[var(--motion-base)]',
+                      collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                       isActive
                         ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
                         : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]',
@@ -107,7 +107,7 @@ export function Sidebar() {
                     <Icon className="h-[18px] w-[18px] shrink-0" />
                     {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
                     {!collapsed && badgeCount > 0 && (
-                      <span className="min-w-[20px] rounded-md bg-[var(--accent-primary)] px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+                      <span className="min-w-[22px] rounded-full bg-[var(--accent-fill)] px-1.5 py-0.5 text-center text-xs font-semibold text-white">
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </span>
                     )}
@@ -129,8 +129,8 @@ export function Sidebar() {
           <Avatar src={avatarUrl} name={displayName} size="sm" className="bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]" />
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-xs font-semibold text-[var(--color-text-primary)]">{displayName?.trim() || 'Usuário'}</div>
-              <div className="mt-0.5 text-[10px] capitalize text-[var(--color-text-secondary)]">{role === 'admin' ? 'Administrador' : 'Operador'}</div>
+              <div className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">{displayName?.trim() || 'Usuário'}</div>
+              <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{role === 'admin' ? 'Administrador' : 'Operador'}</div>
             </div>
           )}
           {!collapsed && <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" title="Online" />}
@@ -143,7 +143,7 @@ export function Sidebar() {
         aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
         className={cn(
           'fixed top-1/2 z-30 hidden h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] shadow-sm transition-[left] duration-200 hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] md:flex',
-          collapsed ? 'left-[68px]' : 'left-60',
+          collapsed ? 'left-[68px]' : 'left-[216px]',
         )}
       >
         {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}

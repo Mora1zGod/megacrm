@@ -159,7 +159,7 @@ export default function FilesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome do arquivo ou contato..."
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+            className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -171,7 +171,7 @@ export default function FilesPage() {
               className={
                 typeFilter === t.id
                   ? 'rounded-full bg-[var(--color-accent-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-primary)]'
-                  : 'rounded-full border border-[rgba(14,154,160,0.2)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  : 'rounded-full border border-[var(--color-border-card)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }
             >
               {t.label}
@@ -230,7 +230,7 @@ export default function FilesPage() {
               type="button"
               onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] py-2.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
+              className="w-full rounded-lg border border-[var(--color-border-card)] py-2.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
             >
               {loadingMore ? 'Carregando...' : 'Carregar mais'}
             </button>

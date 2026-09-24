@@ -14,7 +14,7 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            'glass-card !border-[rgba(14,154,160,0.25)] !bg-[var(--color-surface-raised)] !text-[var(--color-text-primary)]',
+            'glass-card !border-[var(--color-border-card)] !bg-[var(--color-surface-raised)] !text-[var(--color-text-primary)]',
           description: '!text-[var(--color-text-secondary)]',
         },
       }}

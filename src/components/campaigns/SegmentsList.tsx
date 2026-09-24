@@ -107,7 +107,7 @@ function NovoSegmentoDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex.: Leads AMAI PRIME"
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           />
         </div>
         <div>
@@ -116,7 +116,7 @@ function NovoSegmentoDialog({
             id="seg-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           />
         </div>
         <div>

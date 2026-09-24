@@ -283,7 +283,7 @@ export function FlowEditor({
                   <button
                     key={t}
                     onClick={() => setPaletteTab(t)}
-                    className={`flex-1 rounded-md py-1 text-[11px] font-semibold capitalize ${paletteTab === t ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--color-text-secondary)]'}`}
+                    className={`flex-1 rounded-md py-1 text-[11px] font-semibold capitalize ${paletteTab === t ? 'bg-[var(--accent-fill)] text-white' : 'text-[var(--color-text-secondary)]'}`}
                   >
                     {t}
                   </button>

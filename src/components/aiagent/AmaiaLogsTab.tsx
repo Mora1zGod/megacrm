@@ -53,7 +53,7 @@ export function AmaiaLogsTab() {
       <div className="glass-card overflow-hidden p-0">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[rgba(14,154,160,0.12)] text-left text-xs text-[var(--color-text-secondary)]">
+            <tr className="border-b border-[var(--color-border-card)] text-left text-xs text-[var(--color-text-secondary)]">
               <th className="px-4 py-2 font-medium">Quando</th>
               <th className="px-4 py-2 font-medium">Evento</th>
               <th className="px-4 py-2 font-medium">Modelo</th>
@@ -63,7 +63,7 @@ export function AmaiaLogsTab() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b border-[rgba(14,154,160,0.08)] last:border-0">
+              <tr key={r.id} className="border-b border-[var(--color-border-card)] last:border-0">
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)] whitespace-nowrap">{new Date(r.created_at).toLocaleString('pt-BR')}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{KIND_LABEL[r.kind] ?? r.kind}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{r.model ?? '—'} <span className="opacity-60">({r.provider})</span></td>

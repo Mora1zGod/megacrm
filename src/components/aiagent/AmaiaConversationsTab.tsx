@@ -45,7 +45,7 @@ export function AmaiaConversationsTab() {
     <div className="glass-card overflow-hidden p-0">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[rgba(14,154,160,0.12)] text-left text-xs text-[var(--color-text-secondary)]">
+          <tr className="border-b border-[var(--color-border-card)] text-left text-xs text-[var(--color-text-secondary)]">
             <th className="px-4 py-2 font-medium">Contato</th>
             <th className="px-4 py-2 font-medium">Canal</th>
             <th className="px-4 py-2 font-medium">Resultado</th>
@@ -55,7 +55,7 @@ export function AmaiaConversationsTab() {
         </thead>
         <tbody>
           {rows.map((c) => (
-            <tr key={c.id} className="border-b border-[rgba(14,154,160,0.08)] last:border-0">
+            <tr key={c.id} className="border-b border-[var(--color-border-card)] last:border-0">
               <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{c.contact?.name || c.contact?.phone || '—'}</td>
               <td className="px-4 py-2.5 text-[var(--color-text-secondary)] capitalize">{c.channel}</td>
               <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{STATUS_LABEL[c.status] ?? c.status}</td>

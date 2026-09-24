@@ -108,7 +108,7 @@ export function TemplatesList() {
         </div>
       </div>
 
-      <div className="flex items-start gap-2 rounded-lg border border-[rgba(14,154,160,0.15)] bg-[rgba(14,154,160,0.05)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+      <div className="flex items-start gap-2 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-accent-subtle)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-[var(--accent-primary)]" />
         <span>
           Templates enviados passam por análise da Meta, que costuma levar de
@@ -121,7 +121,7 @@ export function TemplatesList() {
       {error && <LoadErrorBanner message={error} onRetry={() => void reload()} />}
 
       <div className="glass-card p-4">
-        <div className="rounded-lg border border-[rgba(14,154,160,0.08)] overflow-x-auto">
+        <div className="rounded-lg border border-[var(--color-border-card)] overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="bg-[var(--color-fill-subtle)] text-left">
@@ -152,7 +152,7 @@ export function TemplatesList() {
                   return (
                     <tr
                       key={t.id}
-                      className="border-t border-[rgba(14,154,160,0.06)] hover:bg-[var(--color-fill-subtle)]"
+                      className="border-t border-[var(--color-border-card)] hover:bg-[var(--color-fill-subtle)]"
                     >
                       <td className="p-3 font-mono text-[var(--color-text-primary)]">
                         {t.name}

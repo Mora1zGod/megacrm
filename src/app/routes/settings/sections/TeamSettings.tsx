@@ -238,7 +238,7 @@ export function TeamSettings() {
                       value={m.role}
                       onChange={(e) => void mudarRole(m, e.target.value as Role)}
                       disabled={m.user_id === userId}
-                      className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
+                      className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
                     >
                       <option value="admin">Administrador</option>
                       <option value="operator">Operador</option>
@@ -299,7 +299,7 @@ export function TeamSettings() {
                   <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: q.color ?? 'var(--accent-primary)' }} />
                   <span className="font-semibold text-sm">{q.name}</span>
                   {q.is_default && (
-                    <span className="rounded-full bg-[rgba(14,154,160,0.15)] px-1.5 py-0.5 text-[0.6rem] font-semibold text-[var(--accent-primary)]">
+                    <span className="rounded-full bg-[var(--color-accent-subtle)] px-1.5 py-0.5 text-[0.6rem] font-semibold text-[var(--accent-primary)]">
                       padrão
                     </span>
                   )}
@@ -338,8 +338,8 @@ export function TeamSettings() {
                           className={cn(
                             'rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold transition-colors disabled:opacity-60',
                             dentro
-                              ? 'border-[var(--accent-primary)] bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]'
-                              : 'border-[rgba(14,154,160,0.2)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+                              ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
+                              : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
                           )}
                         >
                           {m.display_name ?? m.email ?? '—'}
@@ -378,7 +378,7 @@ export function TeamSettings() {
                   value={c.queue_id ?? ''}
                   disabled={!isAdmin}
                   onChange={(e) => void mudarCanalFila(c.id, e.target.value)}
-                  className="rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)] disabled:opacity-60"
+                  className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1.5 text-xs text-[var(--color-text-primary)] disabled:opacity-60"
                 >
                   <option value="">Sem fila</option>
                   {queues.map((q) => (
@@ -440,7 +440,7 @@ function ConviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () =>
             id="inv-role"
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
           >
             <option value="operator">Operador — vê só as filas dele</option>
             <option value="admin">Administrador — vê tudo</option>

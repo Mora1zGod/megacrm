@@ -97,7 +97,7 @@ export function StartWhatsappChat({ onClose, onOpenConversation }: StartWhatsapp
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void buscar(); }}
               placeholder="(68) 99975-5247"
-              className="flex-1 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              className="flex-1 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
             />
             <Button onClick={() => void buscar()} disabled={buscando || !input.trim()}>
               <Search className="h-4 w-4" />
@@ -106,7 +106,7 @@ export function StartWhatsappChat({ onClose, onOpenConversation }: StartWhatsapp
         </div>
 
         {resultado?.tipo === 'existente' && (
-          <div className="rounded-lg border border-[rgba(14,154,160,0.25)] bg-[rgba(14,154,160,0.06)] p-3 text-sm">
+          <div className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-accent-subtle)] p-3 text-sm">
             <p className="mb-2">
               Já existe conversa com {resultado.nome?.trim() || 'este número'}.
             </p>

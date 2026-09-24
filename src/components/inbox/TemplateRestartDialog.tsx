@@ -76,7 +76,7 @@ export function TemplateRestartDialog({ open, onClose, conversationId, onSent }:
               setTemplateId(e.target.value);
               setValues({});
             }}
-            className="h-11 w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 text-sm text-[var(--color-text-primary)]"
+            className="h-11 w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-4 text-sm text-[var(--color-text-primary)]"
           >
             <option value="">Selecione…</option>
             {approved.map((t) => (
@@ -91,7 +91,7 @@ export function TemplateRestartDialog({ open, onClose, conversationId, onSent }:
         </div>
 
         {selected && (
-          <div className="rounded-lg border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] p-3 text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap">
+          <div className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-3 text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap">
             {selected.body}
           </div>
         )}

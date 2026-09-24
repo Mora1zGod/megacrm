@@ -16,31 +16,34 @@
 
 @theme {
   /* ---- Superfícies -------------------------------------------------------- */
-  --color-bg-primary: #0B1220;
-  --color-surface: #111B2E;
-  --color-surface-raised: #17233A;
-  --color-surface-hover: #1D2D48;
-  --color-bg-card: #17233A;
+  --color-bg-primary: #0A1120;
+  --color-surface: #101A2E;
+  --color-surface-raised: #152239;
+  --color-surface-hover: #1A2945;
+  --color-bg-card: #152239;
 
   /* ---- Bordas --------------------------------------------------------------- */
-  --color-border-card: #28354A;
-  --color-border-soft: #223047;
-  --color-border-divider: #1F2B40;
+  --color-border-card: #223252;
+  --color-border-soft: #1B2944;
+  --color-border-divider: #1B2944;
 
   /* ---- Accent — AMAI teal, só onde tem função ------------------------------ */
-  --color-accent-primary: #3B82B4;
-  --color-accent-secondary: #65A7D2;
-  --color-accent-subtle: rgba(59, 130, 180, 0.18);
+  /* MegaCRM (24/09/2026): azul vivo. --accent-primary = TEXTO/ícone/borda
+     (contraste ≥ 5,2:1 em todas as superfícies escuras); fundo com texto
+     branco usa --accent-fill (5,2:1). Barras de gráfico: --color-accent-secondary. */
+  --color-accent-primary: #5B9BFF;
+  --color-accent-secondary: #3B82F6;
+  --color-accent-subtle: rgba(59, 130, 246, 0.15);
 
   /* ---- CTA / destaque institucional (uso pontual) -------------------------- */
   --color-cta: #F0503F;
   --color-highlight: #F2B937;
 
   /* ---- Texto ----------------------------------------------------------------- */
-  --color-text-primary: #E6EDF8;
-  --color-text-secondary: #A9B6CC;
+  --color-text-primary: #E7EDF8;
+  --color-text-secondary: #A6B3CC;
   --color-text-label: #C1CAD9;
-  --color-text-muted: #75849B;
+  --color-text-muted: #8190AB;
 
   /* ---- Semântico --------------------------------------------------------------- */
   --color-success: #22C55E;
@@ -53,8 +56,8 @@
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   /* ---- Raio ----------------------------------------------------------------------- */
-  --radius-card: 10px;
-  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-control: 10px;
 }
 
 /* -----------------------------------------------------------------------------
@@ -72,13 +75,22 @@
   --amai-text: var(--color-text-primary);
   --amai-text-muted: var(--color-text-secondary);
   --amai-brand: var(--color-accent-primary);
-  --amai-brand-hover: #084269;
+  --amai-brand-hover: var(--accent-fill-hover);
   --amai-success: var(--color-success);
   --amai-warning: var(--color-warning);
   --amai-danger: var(--color-error);
 
-  --accent-primary: #3B82B4;
-  --accent-secondary: #65A7D2;
+  --accent-primary: #5B9BFF;
+  --accent-secondary: #3B82F6;
+  --accent-fill: #2563EB;
+  --accent-fill-hover: #1D4ED8;
+  /* Balão de mensagem enviada (atendimento) */
+  --color-bubble-out: #1F3B70;
+  --color-bubble-out-text: #EEF3FF;
+  /* Nota interna (atendimento) */
+  --color-note-bg: rgba(245, 181, 68, 0.09);
+  --color-note-border: rgba(245, 181, 68, 0.38);
+  --color-note-text: #F5B544;
   --cta: #F0503F;
   --highlight: #F2B937;
 
@@ -104,7 +116,10 @@
 }
 
 /* -----------------------------------------------------------------------------
-   Tema claro — identidade nova (referência: ZapChatPro), agora o DEFAULT do
+   Tema claro — paleta MegaCRM (24/09/2026: azul #1D4ED8, neutros frios).
+   Antes: referência ZapChatPro. O escuro azul-marinho é o padrão das orgs;
+   cada usuário pode alternar no botão de tema do topo (localStorage).
+   Histórico: era o DEFAULT do
    CRM (ver AppUserProvider.tsx e a migration 20260922120000_org_branding —
    organizations.theme_mode default 'light'). Fundo neutro claro, sidebar/
    cards brancos, accent teal — mesmo teal usado na faixa superior
@@ -113,31 +128,40 @@
    ----------------------------------------------------------------------------- */
 :root[data-theme='light'] {
   color-scheme: light;
-  --color-bg-primary: #F3F6FA;
+  --color-bg-primary: #F3F5F9;
   --color-surface: #FFFFFF;
   --color-surface-raised: #FFFFFF;
-  --color-surface-hover: #F3F6FA;
+  --color-surface-hover: #EEF2F8;
   --color-bg-card: #FFFFFF;
-  --color-border-card: #E5EAF1;
-  --color-border-soft: #EDF1F6;
-  --color-border-divider: #EFF3F7;
-  --color-text-primary: #1B293B;
-  --color-text-secondary: #728095;
-  --color-text-label: #4F5E72;
-  --color-text-muted: #91A0B4;
-  --color-accent-primary: #065183;
-  --color-accent-secondary: #297BAC;
-  --color-accent-subtle: #EAF3FB;
-  --accent-primary: #065183;
-  --accent-secondary: #297BAC;
+  --color-border-card: #DAE1EC;
+  --color-border-soft: #E6EBF2;
+  --color-border-divider: #E6EBF2;
+  --color-text-primary: #0F1B2E;
+  --color-text-secondary: #475569;
+  --color-text-label: #334155;
+  --color-text-muted: #5B687D;
+  --color-accent-primary: #1D4ED8;
+  --color-accent-secondary: #2563EB;
+  --color-accent-subtle: #E7EFFD;
+  --accent-primary: #1D4ED8;
+  --accent-secondary: #2563EB;
+  --accent-fill: #1D4ED8;
+  --accent-fill-hover: #1E40AF;
+  --color-bubble-out: #1D4ED8;
+  --color-bubble-out-text: #FFFFFF;
+  --color-note-bg: #FFF8EA;
+  --color-note-border: #EFCF8E;
+  --color-note-text: #92400E;
 }
 
 /* Faixa/topbar teal — cor de marca fixa (não inverte com o tema), igual à
    referência do ZapChatPro. Usada no Header.tsx. */
 :root {
-  --color-topbar: #065183;
-  --color-topbar-hover: #084269;
-  --color-on-topbar: #FFFFFF;
+  /* Topo neutro desde 24/09/2026 (Header usa superfície + borda). Mantidos
+     como alias pra quem ainda referenciar. */
+  --color-topbar: var(--color-surface);
+  --color-topbar-hover: var(--color-surface-hover);
+  --color-on-topbar: var(--color-text-primary);
 }
 
 /* Preenchimento sutil — inputs, badges "neutros", toggle desligado, hover de
@@ -149,7 +173,7 @@
    Ver ImageLightbox.tsx e Header.tsx: ficaram de fora de propósito (overlay
    fullscreen sempre escuro / faixa teal sempre colorida — não são tema). */
 :root[data-theme='light'] {
-  --color-fill-subtle: #F3F6FA;
+  --color-fill-subtle: #EEF2F8;
 }
 :root {
   --color-fill-subtle: rgba(255, 255, 255, 0.04);

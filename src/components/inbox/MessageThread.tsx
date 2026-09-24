@@ -35,7 +35,7 @@ function StatusTicks({ status }: { status: Message['meta_status'] }) {
       </span>
     );
   }
-  if (status === 'read') return <CheckCheck className="h-3 w-3 text-[#0E9AA0]" />;
+  if (status === 'read') return <CheckCheck className="h-3 w-3 text-[var(--accent-primary)]" />;
   if (status === 'delivered') return <CheckCheck className="h-3 w-3 opacity-60" />;
   return <Check className="h-3 w-3 opacity-60" />;
 }
@@ -72,7 +72,7 @@ function DateSeparator({ iso }: { iso: string }) {
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="h-px flex-1 bg-[var(--color-border-card)]" />
-      <span className="rounded-full border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <span className="rounded-full border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-text-muted)]">
         {formatDayLabel(iso)}
       </span>
       <div className="h-px flex-1 bg-[var(--color-border-card)]" />
@@ -333,14 +333,14 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
               {separator}
             <div
               className={cn(
-                'mx-auto max-w-[85%] rounded-lg border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.06)] p-3',
+                'ml-auto max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-md border border-dashed border-[var(--color-note-border)] bg-[var(--color-note-bg)] px-4 py-2.5',
                 m._state === 'pending' && 'opacity-70',
                 isFresh && 'message-in',
               )}
             >
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-[#FBBF24] mb-1">
-                <StickyNote className="h-3 w-3" />
-                Nota privada entre operadores
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-note-text)] mb-1">
+                <StickyNote className="h-3.5 w-3.5" />
+                Nota interna · só a equipe vê
                 <span className="ml-auto opacity-70 inline-flex items-center gap-1">
                   {m._state === 'pending' && <Clock className="h-3 w-3 animate-pulse" />}
                   {formatTime(m.created_at)}
@@ -365,22 +365,22 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
           >
             <div
               className={cn(
-                'inbox-message-bubble max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm transition-opacity',
+                'inbox-message-bubble max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 transition-opacity',
                 isInbound
-                  ? 'bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] rounded-bl-md'
+                  ? 'border border-[var(--color-border-soft)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] rounded-bl-md'
                   : m.sender_type === 'ai'
                     // AMAIA: contorno na cor de marca, fundo transparente —
                     // identidade própria sem virar mais uma caixa teal sólida
                     // igual ao operador humano (era a mesma cor pros dois).
                     ? 'border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] rounded-br-md'
-                    : 'bg-[var(--accent-primary)] text-white rounded-br-md',
+                    : 'bg-[var(--color-bubble-out)] text-[var(--color-bubble-out-text)] rounded-br-md',
                 m._state === 'pending' && 'opacity-70',
                 (m._state === 'failed' || m.meta_status === 'failed') &&
                   'ring-1 ring-[var(--color-error)]',
               )}
             >
               {!isInbound && m.sender_type !== 'contact' && (
-                <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-70 mb-1">
+                <div className="flex items-center gap-1 text-xs font-semibold opacity-75 mb-1">
                   <SenderIcon sender={m.sender_type} />
                   {m.sender_type === 'ai' ? 'AMAIA' : m.sender_type === 'owner' ? 'WhatsApp' : 'Operador'}
                 </div>

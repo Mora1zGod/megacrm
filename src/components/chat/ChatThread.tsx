@@ -89,7 +89,7 @@ export function ChatThread({
           type="button"
           onClick={() => void loadOlder()}
           disabled={loadingOlder}
-          className="mx-auto block rounded-full border border-[rgba(14,154,160,0.2)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
+          className="mx-auto block rounded-full border border-[var(--color-border-card)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
         >
           {loadingOlder ? 'Carregando...' : 'Carregar mensagens anteriores'}
         </button>

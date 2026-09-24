@@ -36,8 +36,8 @@ export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: C
   }, [chats, search]);
 
   return (
-    <aside className="flex w-full flex-col border-r border-[rgba(14,154,160,0.1)] sm:w-[300px] sm:shrink-0">
-      <div className="space-y-3 border-b border-[rgba(14,154,160,0.08)] p-3">
+    <aside className="flex w-full flex-col border-r border-[var(--color-border-card)] sm:w-[300px] sm:shrink-0">
+      <div className="space-y-3 border-b border-[var(--color-border-card)] p-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-label">Conversas</h2>
           <Button type="button" size="sm" variant="ghost" onClick={onNew}>
@@ -51,7 +51,7 @@ export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: C
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar..."
-            className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+            className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] pl-9 pr-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
       </div>
@@ -111,7 +111,7 @@ export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: C
                           {chat.last_message_preview || 'Sem mensagens'}
                         </span>
                         {chat.unread_count > 0 && (
-                          <span className="shrink-0 rounded-full bg-[var(--accent-primary)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-bg-primary)]">
+                          <span className="shrink-0 rounded-full bg-[var(--accent-fill)] px-1.5 py-0.5 text-[10px] font-bold text-white">
                             {chat.unread_count > 99 ? '99+' : chat.unread_count}
                           </span>
                         )}

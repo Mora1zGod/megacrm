@@ -93,7 +93,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
           value={busca}
           onChange={(e) => onBuscaChange(e.target.value)}
           aria-label="Buscar por nome, telefone ou mensagem" placeholder="Buscar conversa..."
-          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] py-1.5 pl-8 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
+          className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] py-1.5 pl-8 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
         />
         {busca && (
           <button
@@ -121,8 +121,8 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
               className={cn(
                 'rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold transition-colors',
                 ativo
-                  ? 'border-[var(--accent-primary)] bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]'
-                  : 'border-[rgba(14,154,160,0.2)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+                  ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
+                  : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
               )}
             >
               {c.label}

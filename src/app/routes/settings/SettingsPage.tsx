@@ -153,7 +153,7 @@ export default function SettingsPage() {
                   className={cn(
                     'flex items-center gap-3 p-2.5 rounded-lg text-left transition-colors',
                     isActive
-                      ? 'bg-[rgba(14,154,160,0.1)] text-[var(--color-text-primary)]'
+                      ? 'bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)]'
                       : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-fill-subtle)]',
                   )}
                 >

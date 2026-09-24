@@ -130,7 +130,7 @@ export function ChatBubble({
                 onChange={(e) => setDraft(e.target.value)}
                 rows={2}
                 autoFocus
-                className="w-full min-w-[220px] rounded-lg border border-[rgba(14,154,160,0.25)] bg-black/20 px-2 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
+                className="w-full min-w-[220px] rounded-lg border border-[var(--color-border-card)] bg-black/20 px-2 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
               />
               <div className="flex items-center gap-1">
                 <Button type="button" size="sm" onClick={() => void commitEdit()} disabled={busy}>
@@ -186,7 +186,7 @@ export function ChatBubble({
               {message.ref_conversation_id && (
                 <Link
                   to={`/inbox?conversation=${message.ref_conversation_id}`}
-                  className="mb-1 flex items-center gap-2 rounded-lg border border-[rgba(14,154,160,0.25)] bg-black/20 px-2.5 py-2 hover:border-[var(--accent-primary)]"
+                  className="mb-1 flex items-center gap-2 rounded-lg border border-[var(--color-border-card)] bg-black/20 px-2.5 py-2 hover:border-[var(--accent-primary)]"
                 >
                   <MessageSquareText className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
                   <span className="text-xs font-medium text-[var(--accent-primary)]">

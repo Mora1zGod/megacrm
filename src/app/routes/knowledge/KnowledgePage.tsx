@@ -76,7 +76,7 @@ export default function KnowledgePage() {
             items.map((it) => {
               const Icon = it.type === 'url' ? Globe : FileText;
               return (
-                <div key={it.id} className="rounded-lg border border-[rgba(14,154,160,0.1)] bg-[var(--color-fill-subtle)] p-3">
+                <div key={it.id} className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-3">
                   <div className="flex items-start gap-2">
                     <Icon className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)] mt-0.5" />
                     <div className="min-w-0 flex-1">
@@ -105,7 +105,7 @@ export default function KnowledgePage() {
         </div>
 
         {/* Desktop (md+): tabela. */}
-        <div className="hidden md:block rounded-lg border border-[rgba(14,154,160,0.08)] overflow-x-auto">
+        <div className="hidden md:block rounded-lg border border-[var(--color-border-card)] overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="bg-[var(--color-fill-subtle)] text-left">
@@ -138,7 +138,7 @@ export default function KnowledgePage() {
                 items.map((it) => {
                   const Icon = it.type === 'url' ? Globe : FileText;
                   return (
-                    <tr key={it.id} className="border-t border-[rgba(14,154,160,0.06)]">
+                    <tr key={it.id} className="border-t border-[var(--color-border-card)]">
                       <td className="p-3">
                         <Icon className="h-4 w-4 text-[var(--color-text-secondary)]" />
                       </td>
@@ -293,8 +293,8 @@ function KnowledgeFormDialog({
                 onClick={() => setSourceType(id)}
                 className={
                   sourceType === id
-                    ? 'p-3 rounded-lg border border-[var(--accent-primary)] bg-[rgba(14,154,160,0.08)] text-sm'
-                    : 'p-3 rounded-lg border border-[rgba(14,154,160,0.12)] bg-[var(--color-fill-subtle)] text-sm text-[var(--color-text-secondary)]'
+                    ? 'p-3 rounded-lg border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-sm'
+                    : 'p-3 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] text-sm text-[var(--color-text-secondary)]'
                 }
                 disabled={submitting}
               >
@@ -315,7 +315,7 @@ function KnowledgeFormDialog({
               rows={8}
               disabled={submitting}
               placeholder="Cole o texto que deve alimentar o agente de IA (FAQ, procedimentos, políticas...)"
-              className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-4 py-3 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+              className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-4 py-3 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
         )}
@@ -339,7 +339,7 @@ function KnowledgeFormDialog({
             <Label htmlFor="kb_file">PDF (máx 30MB)</Label>
             <label
               htmlFor="kb_file"
-              className="flex items-center gap-3 h-11 px-4 rounded-lg border border-dashed border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] cursor-pointer hover:border-[rgba(14,154,160,0.4)]"
+              className="flex items-center gap-3 h-11 px-4 rounded-lg border border-dashed border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] cursor-pointer hover:border-[var(--accent-primary)]"
             >
               <Upload className="h-4 w-4 text-[var(--color-text-secondary)]" />
               <span className="text-sm text-[var(--color-text-secondary)] truncate">

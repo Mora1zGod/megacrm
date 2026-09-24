@@ -182,7 +182,7 @@ export default function BoardsPage() {
               className={cn(
                 'shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
                 boardId === b.id
-                  ? 'bg-[rgba(14,154,160,0.18)] text-[var(--accent-primary)]'
+                  ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
               )}
             >
@@ -352,7 +352,7 @@ function NovoQuadroDialog({ onClose, onCreated }: { onClose: () => void; onCreat
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void criar(); }}
           placeholder="Ex.: Obras, Marketing"
-          className="w-full rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
         />
       </div>
       <div className="flex justify-end gap-2 pt-4">

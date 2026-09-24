@@ -80,7 +80,7 @@ export function CardMini({ card, labels, operators, currentUserId, onOpen, onDra
                   key={m.user_id}
                   src={m.avatar_url}
                   name={m.display_name ?? m.email}
-                  className="h-5 w-5 text-[9px] ring-2 ring-[#062720]"
+                  className="h-5 w-5 text-[9px] ring-2 ring-[var(--color-surface-raised)]"
                 />
               ))}
             </span>

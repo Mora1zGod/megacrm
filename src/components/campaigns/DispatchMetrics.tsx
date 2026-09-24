@@ -28,7 +28,7 @@ const PERIODS: { value: DashboardPeriod; label: string }[] = [
 
 // Recharts default colors don't mix with the dark glass theme; we hand-pick
 // palette slots that echo the sidebar / status chips used elsewhere.
-const CHART_BLUE = '#0E9AA0';
+const CHART_BLUE = '#3B82F6';
 const CHART_GREEN = '#22C55E';
 const CHART_AMBER = '#F59E0B';
 const CHART_ROSE = '#EF4444';
@@ -79,14 +79,14 @@ export function DispatchMetrics() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-[rgba(14,154,160,0.12)] p-1 bg-[var(--color-fill-subtle)]">
+        <div className="flex items-center gap-1 rounded-lg border border-[var(--color-border-card)] p-1 bg-[var(--color-fill-subtle)]">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={
                 period === p.value
-                  ? 'rounded-md px-3 py-1 text-xs font-semibold bg-[var(--accent-primary)] text-white'
+                  ? 'rounded-md px-3 py-1 text-xs font-semibold bg-[var(--accent-fill)] text-white'
                   : 'rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }
             >
@@ -129,7 +129,7 @@ export function DispatchMetrics() {
                   .map(([label, v]) => (
                     <span
                       key={label}
-                      className="rounded-full border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-1 text-[11px] text-[var(--color-text-secondary)]"
+                      className="rounded-full border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-1 text-[11px] text-[var(--color-text-secondary)]"
                     >
                       {label}: <span className="font-mono text-[var(--color-text-primary)]">{v}</span>
                     </span>
@@ -184,18 +184,18 @@ export function DispatchMetrics() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={volumeByDay} margin={{ top: 4, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid stroke="rgba(14,154,160,0.08)" vertical={false} />
+                  <CartesianGrid stroke="rgba(148,163,184,0.14)" vertical={false} />
                   <XAxis
                     dataKey="day"
                     tick={{ fontSize: 11, fill: '#94A3B8' }}
                     tickFormatter={(d) => (typeof d === 'string' ? d.slice(5) : '')}
-                    stroke="rgba(14,154,160,0.2)"
+                    stroke="rgba(148,163,184,0.3)"
                   />
-                  <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="rgba(14,154,160,0.2)" allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="rgba(148,163,184,0.3)" allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       background: 'rgba(15,18,35,0.95)',
-                      border: '1px solid rgba(14,154,160,0.25)',
+                      border: '1px solid rgba(148,163,184,0.3)',
                       borderRadius: 10,
                       fontSize: 12,
                     }}
@@ -258,7 +258,7 @@ export function DispatchMetrics() {
                   <Tooltip
                     contentStyle={{
                       background: 'rgba(15,18,35,0.95)',
-                      border: '1px solid rgba(14,154,160,0.25)',
+                      border: '1px solid rgba(148,163,184,0.3)',
                       borderRadius: 10,
                       fontSize: 12,
                     }}
@@ -294,19 +294,19 @@ export function DispatchMetrics() {
                 margin={{ top: 4, right: 10, left: 90, bottom: 0 }}
                 barCategoryGap={10}
               >
-                <CartesianGrid stroke="rgba(14,154,160,0.08)" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="rgba(14,154,160,0.2)" allowDecimals={false} />
+                <CartesianGrid stroke="rgba(148,163,184,0.14)" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#94A3B8' }} stroke="rgba(148,163,184,0.3)" allowDecimals={false} />
                 <YAxis
                   type="category"
                   dataKey="name"
                   width={90}
                   tick={{ fontSize: 11, fill: '#CBD5E1' }}
-                  stroke="rgba(14,154,160,0.2)"
+                  stroke="rgba(148,163,184,0.3)"
                 />
                 <Tooltip
                   contentStyle={{
                     background: 'rgba(15,18,35,0.95)',
-                    border: '1px solid rgba(14,154,160,0.25)',
+                    border: '1px solid rgba(148,163,184,0.3)',
                     borderRadius: 10,
                     fontSize: 12,
                   }}

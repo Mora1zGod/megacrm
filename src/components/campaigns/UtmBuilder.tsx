@@ -108,8 +108,8 @@ export function UtmBuilder() {
               className={
                 'rounded-full px-3 py-1 text-xs font-semibold border transition-colors ' +
                 (source === p.source && medium === p.medium
-                  ? 'border-[var(--accent-primary)] bg-[rgba(14,154,160,0.15)] text-[var(--color-text-primary)]'
-                  : 'border-[rgba(14,154,160,0.15)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[rgba(14,154,160,0.35)]')
+                  ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)]'
+                  : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--accent-primary)]')
               }
             >
               {p.label}
@@ -160,7 +160,7 @@ export function UtmBuilder() {
         <div className="space-y-2">
           <Label>URL final</Label>
           <div className="flex items-start gap-2">
-            <div className="flex-1 min-w-0 rounded-lg border border-[rgba(14,154,160,0.2)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs font-mono text-[var(--color-text-primary)] break-all min-h-[40px]">
+            <div className="flex-1 min-w-0 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs font-mono text-[var(--color-text-primary)] break-all min-h-[40px]">
               {finalUrl || <span className="opacity-40">Preencha a URL base e os parâmetros obrigatórios…</span>}
             </div>
             <Button
@@ -203,7 +203,7 @@ export function UtmBuilder() {
               {links.map((l) => (
                 <div
                   key={l.id}
-                  className="flex items-start gap-3 rounded-lg border border-[rgba(14,154,160,0.08)] bg-[var(--color-fill-subtle)] p-3"
+                  className="flex items-start gap-3 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
