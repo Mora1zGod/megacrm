@@ -23,6 +23,11 @@
 // bulk-importados no Zernio com nome antes dos recipients, e linhas de contato
 // SEM nome falham em vez de enviar placeholder vazio). email/phone/custom_field
 // nao tem equivalente na API de broadcast e falham a linha com motivo legivel.
+//
+// MULTI-CONTA ZERNIO: o contexto (chave + accountId) é resolvido POR CANAL da
+// campanha via channel.zernio_credential_id — cada canal sabe de qual conta
+// Zernio (login) ele é, então o broadcast sai pela conta certa mesmo quando a
+// org tem várias contas Zernio cadastradas.
 // ============================================================================
 
 import { getAdminClient } from '../_shared/supabase-admin.ts';
@@ -397,18 +402,22 @@ Deno.serve(async (req) => {
   const activeOrgs = new Set(((activeOrgRows ?? []) as Array<{ id: string }>).map((o) => o.id));
 
   // Contexto Zernio resolvido POR CANAL da campanha (cache no request). Se a
-  // campanha define um canal, usa o accountId dele; senão o default da org.
+  // campanha define um canal, usa o accountId E a conta Zernio (chave) dele —
+  // multi-conta: cada canal pode pertencer a um login Zernio diferente; senao
+  // cai no default legado da org (chave unica antiga).
   const ctxCache = new Map<string, ZernioContext>();
   const resolveCampaignCtx = async (c: CampaignRow): Promise<ZernioContext> => {
     let accountId: string | null = null;
+    let credentialId: string | null = null;
     if (c.channel_id) {
       const channel = await getChannelById(admin, c.channel_id);
       accountId = channel?.zernio_account_id ?? null;
+      credentialId = channel?.zernio_credential_id ?? null;
     }
-    const cacheKey = `${c.org_id}:${accountId ?? 'default'}`;
+    const cacheKey = `${c.org_id}:${accountId ?? 'default'}:${credentialId ?? 'legacy'}`;
     const cached = ctxCache.get(cacheKey);
     if (cached) return cached;
-    const ctx = await loadOrgZernioContext(admin, c.org_id, accountId);
+    const ctx = await loadOrgZernioContext(admin, c.org_id, accountId, credentialId);
     ctxCache.set(cacheKey, ctx);
     return ctx;
   };

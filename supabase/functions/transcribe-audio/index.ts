@@ -30,10 +30,23 @@ interface MessageRow {
   content: string | null;
 }
 
-async function downloadAudio(url: string): Promise<{ blob: Blob; mime: string }> {
-  // A URL do Zernio (media/upload-direct ou attachment do webhook) e
-  // diretamente baixavel — sem Bearer da Meta.
-  const res = await fetch(url);
+async function downloadAudio(url: string, zernioApiKey: string | null): Promise<{ blob: Blob; mime: string }> {
+  // As URLs de midia do WhatsApp via Zernio apontam para a API deles
+  // (https://zernio.com/api/v1/whatsapp/media/<id>?accountId=...) e NAO sao
+  // publicas: sem o Bearer da conta o endpoint responde 401 e a transcricao
+  // falhava silenciosamente com "[audio - transcricao falhou]". Anexos de
+  // outras origens (CDN da Meta, por exemplo) continuam baixando sem header,
+  // por isso o Authorization so e enviado para o dominio do Zernio — mandar a
+  // chave para um host de terceiro seria vazamento de credencial.
+  const headers: Record<string, string> = {};
+  try {
+    if (zernioApiKey && new URL(url).hostname.endsWith('zernio.com')) {
+      headers.Authorization = `Bearer ${zernioApiKey}`;
+    }
+  } catch {
+    // URL malformada: segue sem header e o fetch abaixo reporta o erro real.
+  }
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Download do audio ${res.status}`);
   const blob = await res.blob();
   const mime = res.headers.get('content-type') ?? 'audio/ogg';
@@ -136,7 +149,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { blob, mime } = await downloadAudio(message.media_url);
+    const { blob, mime } = await downloadAudio(message.media_url, creds.zernio_api_key);
     const transcript = await transcribeWithWhisper(creds.openai_api_key, blob, mime);
 
     await admin

@@ -12,6 +12,12 @@
 //     { type: 'FOOTER', text },
 //     { type: 'BUTTONS', buttons: [{type:'QUICK_REPLY',text},{type:'URL',text,url},{type:'PHONE_NUMBER',text,phone_number}] },
 //   ]
+//
+// MULTI-CONTA ZERNIO: templates não têm canal próprio (não são por número),
+// então por padrão o submit sai pela conta Zernio DEFAULT da org (mesmo
+// comportamento de sempre). Se o body trouxer `credential_id`, submete por
+// aquela conta específica em vez da default — útil quando a org tem várias
+// contas Zernio (ex.: um template só aprovado/disponível numa delas).
 // ============================================================================
 
 import { requireAdmin, AuthError } from '../_shared/auth.ts';
@@ -111,7 +117,7 @@ Deno.serve(async (req) => {
   try {
     const caller = await requireAdmin(req);
 
-    let body: { template_id?: string };
+    let body: { template_id?: string; credential_id?: string };
     try {
       body = await req.json();
     } catch {
@@ -138,7 +144,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'Template não encontrado.' }, { status: 404 });
     }
 
-    const ctx = await loadOrgZernioContext(admin, caller.orgId);
+    // Sem credential_id: usa a conta Zernio default da org (comportamento de
+    // sempre). Com credential_id: submete por aquela conta específica —
+    // multi-conta (várias contas Zernio na mesma org).
+    const credentialId = typeof body.credential_id === 'string' && body.credential_id.trim()
+      ? body.credential_id.trim()
+      : null;
+    const ctx = await loadOrgZernioContext(admin, caller.orgId, null, credentialId);
 
     // Zernio repassa para a Meta, que so aceita MARKETING, UTILITY e
     // AUTHENTICATION. A categoria interna legada 'service' (atendimento livre)

@@ -20,6 +20,10 @@
 // Os shapes seguem o OpenAPI do Zernio (WebhookPayloadMessage /
 // WebhookPayloadMessageDeliveryStatus / WebhookPayloadWhatsAppTemplateStatusUpdated).
 // A normalizacao abaixo continua tolerante a variacoes menores de campo.
+//
+// Nome do contato: nunca deixamos o "nome" ser, no fundo, o próprio telefone
+// (acontece quando o WhatsApp do lead não tem nome de exibição configurado e
+// a API devolve o número no campo de nome) — ver isPhoneLike/sanitizeName.
 // ============================================================================
 
 import { getAdminClient } from '../_shared/supabase-admin.ts';
@@ -104,6 +108,19 @@ function normalizePhone(raw: string | null): string | null {
   return trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
 }
 
+// Nunca deixa o "nome" do contato ser, no fundo, o próprio telefone.
+function isPhoneLike(s: string): boolean {
+  const stripped = s.replace(/[\s()+\-.]/g, '');
+  return stripped.length >= 8 && /^\d+$/.test(stripped);
+}
+
+function sanitizeName(name: string | null): string | null {
+  if (!name) return null;
+  const trimmed = name.trim();
+  if (!trimmed || isPhoneLike(trimmed)) return null;
+  return trimmed;
+}
+
 // --- helpers de dominio -----------------------------------------------------
 
 async function findOrCreateContact(
@@ -111,17 +128,42 @@ async function findOrCreateContact(
   orgId: string,
   phone: string,
   name: string | null,
+  pictureUrl?: string | null,
 ): Promise<string | null> {
   const { data: existing } = await admin
     .from('contacts')
-    .select('id')
+    .select('id, name, profile_pic_url')
     .eq('org_id', orgId)
     .eq('phone', phone)
     .maybeSingle();
-  if (existing) return (existing as { id: string }).id;
+  if (existing) {
+    const e = existing as { id: string; name: string | null; profile_pic_url: string | null };
+    // Preenche o nome depois, se a primeira mensagem não tinha (a Meta nem
+    // sempre manda o nome do perfil logo de cara). Nunca troca um nome que já
+    // existe — só preenche o que tava vazio.
+    const patch: Record<string, unknown> = {};
+    if (pictureUrl && pictureUrl !== e.profile_pic_url) {
+      patch.profile_pic_url = pictureUrl;
+      patch.profile_pic_updated_at = new Date().toISOString();
+    }
+    if (!e.name && name) {
+      patch.name = name;
+    }
+    if (Object.keys(patch).length > 0) {
+      await admin.from('contacts').update(patch).eq('id', e.id);
+    }
+    return e.id;
+  }
   const { data: created, error } = await admin
     .from('contacts')
-    .insert({ org_id: orgId, phone, name, source: 'whatsapp' })
+    .insert({
+      org_id: orgId,
+      phone,
+      name,
+      source: 'whatsapp',
+      profile_pic_url: pictureUrl ?? null,
+      profile_pic_updated_at: pictureUrl ? new Date().toISOString() : null,
+    })
     .select('id')
     .single();
   if (error) return null;
@@ -135,17 +177,44 @@ async function findOrCreateInstagramContact(
   orgId: string,
   igId: string,
   name: string | null,
+  pictureUrl?: string | null,
 ): Promise<string | null> {
   const { data: existing } = await admin
     .from('contacts')
-    .select('id')
+    .select('id, name, profile_pic_url')
     .eq('org_id', orgId)
     .eq('instagram_id', igId)
     .maybeSingle();
-  if (existing) return (existing as { id: string }).id;
+  if (existing) {
+    const e = existing as { id: string; name: string | null; profile_pic_url: string | null };
+    // Mesmo backfill do WhatsApp: preenche nome só se tava vazio, nunca troca
+    // um nome que já existe. Aqui é ainda mais comum — o 1º evento de um
+    // contato do Instagram às vezes só traz o id, sem username/nome.
+    const patch: Record<string, unknown> = {};
+    if (pictureUrl && pictureUrl !== e.profile_pic_url) {
+      patch.profile_pic_url = pictureUrl;
+      patch.profile_pic_updated_at = new Date().toISOString();
+    }
+    // Nunca deixa o próprio igId (o id numérico) virar nome — mesma regra do
+    // sanitizeName aplicada pelo chamador. Guarda extra aqui, defensiva.
+    if (!e.name && name && name !== igId) {
+      patch.name = name;
+    }
+    if (Object.keys(patch).length > 0) {
+      await admin.from('contacts').update(patch).eq('id', e.id);
+    }
+    return e.id;
+  }
   const { data: created, error } = await admin
     .from('contacts')
-    .insert({ org_id: orgId, instagram_id: igId, name, source: 'instagram' })
+    .insert({
+      org_id: orgId,
+      instagram_id: igId,
+      name,
+      source: 'instagram',
+      profile_pic_url: pictureUrl ?? null,
+      profile_pic_updated_at: pictureUrl ? new Date().toISOString() : null,
+    })
     .select('id')
     .single();
   if (error) return null;
@@ -279,7 +348,8 @@ async function handleMessageReceived(
   const sender = asObject(message.sender);
   const zernioConversationId = str(conversation, ['id']) ?? str(message, ['conversationId']);
   const zernioMessageId = str(message, ['id', '_id']);
-  const contactName = str(sender, ['name']) ?? str(conversation, ['participantName']);
+  const contactName = sanitizeName(str(sender, ['name']) ?? str(conversation, ['participantName']));
+  const contactPicture = str(conversation, ['participantPicture']);
 
   // Resolução de identidade depende do canal. WhatsApp usa telefone (E.164);
   // Instagram usa o IG-scoped id/username (sem telefone).
@@ -294,7 +364,7 @@ async function handleMessageReceived(
       errors.push('message.received (instagram) sem identidade');
       return;
     }
-    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName ?? igId);
+    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName, contactPicture);
     if (!contactId) {
       errors.push(`contato instagram falhou: ${igId}`);
       return;
@@ -310,7 +380,7 @@ async function handleMessageReceived(
       errors.push('message.received sem telefone');
       return;
     }
-    contactId = await findOrCreateContact(admin, orgId, phone, contactName);
+    contactId = await findOrCreateContact(admin, orgId, phone, contactName, contactPicture);
     if (!contactId) {
       errors.push(`contato falhou: ${phone}`);
       return;
@@ -413,11 +483,116 @@ async function handleMessageReceived(
 // pelo message.id interno. O payload NÃO carrega broadcastId — a correlação por
 // destinatário de broadcast usa GET /broadcasts/{id}/recipients (fora deste
 // handler). Aqui atualizamos a mensagem 1:1 (IA/operador) na tabela messages.
+//
+// CORRIGIDO (2026-08-25): quando "message.sent" chega e NÃO existe linha
+// correspondente (zernio_message_id não encontrado), a mensagem foi enviada
+// por FORA do CRM — celular físico em modo Coexistence, não pelo
+// send-operator-message. Antes disso era silenciosamente descartado
+// (`if (!msg) return;`), fazendo o operador "sumir" com a mensagem no CRM
+// mesmo ela tendo saído normalmente pelo WhatsApp. Agora criamos a linha.
+async function insertOutboundFromCompanionDevice(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  data: Record<string, unknown>,
+  channel: 'whatsapp' | 'instagram',
+  zernioMessageId: string,
+): Promise<void> {
+  const message = asObject(data.message);
+  const conversation = asObject(data.conversation);
+  const contactName = sanitizeName(str(conversation, ['participantName']));
+  const contactPicture = str(conversation, ['participantPicture']);
+
+  let contactId: string | null;
+  if (channel === 'instagram') {
+    const igId = str(conversation, ['participantId']);
+    if (!igId) return;
+    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName, contactPicture);
+  } else {
+    const recipient = asObject(message.recipient);
+    const phone =
+      normalizePhone(str(conversation, ['participantId'])) ??
+      normalizePhone(str(recipient, ['phoneNumber', 'id']));
+    if (!phone) return;
+    contactId = await findOrCreateContact(admin, orgId, phone, contactName, contactPicture);
+  }
+  if (!contactId) return;
+
+  const account = asObject(data.account);
+  const zernioAccountId =
+    str(account, ['id', '_id', 'accountId']) ?? str(message, ['accountId', 'account_id']);
+  let channelRow: ChannelRow | null = null;
+  if (zernioAccountId) {
+    channelRow = await getChannelByZernioAccount(admin, zernioAccountId);
+    if (channelRow && channelRow.org_id !== orgId) channelRow = null;
+  }
+
+  const zernioConversationId = str(conversation, ['id']) ?? str(message, ['conversationId']);
+  const conversationId = await findOrCreateConversation(
+    admin,
+    orgId,
+    contactId,
+    zernioConversationId,
+    channel,
+    zernioAccountId,
+    channelRow,
+    contactName,
+  );
+  if (!conversationId) return;
+
+  const { contentType, content, mediaUrl } = decodeInbound(message);
+
+  // Guarda contra corrida: quando o envio parte do PRÓPRIO CRM (operador, IA
+  // ou automação de visita), a linha já foi gravada — mas o webhook
+  // message.sent às vezes chega antes do zernio_message_id estar visível na
+  // busca de handleStatus, e aí duplicaríamos a mensagem na thread. Se existe
+  // uma outbound idêntica na mesma conversa nos últimos 2 minutos, é a mesma
+  // mensagem: só carimbamos o id externo nela.
+  const recentCutoff = new Date(Date.now() - 120_000).toISOString();
+  const { data: dupe } = await admin
+    .from('messages')
+    .select('id, zernio_message_id')
+    .eq('org_id', orgId)
+    .eq('conversation_id', conversationId)
+    .eq('direction', 'outbound')
+    .eq('content', content)
+    .gte('created_at', recentCutoff)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const existing = dupe as { id: string; zernio_message_id: string | null } | null;
+  if (existing) {
+    if (!existing.zernio_message_id) {
+      await admin
+        .from('messages')
+        .update({ zernio_message_id: zernioMessageId, meta_status: 'sent' })
+        .eq('id', existing.id);
+    }
+    return;
+  }
+
+  const { error: insErr } = await admin.from('messages').insert({
+    org_id: orgId,
+    conversation_id: conversationId,
+    direction: 'outbound',
+    sender_type: 'operator',
+    content_type: contentType,
+    content,
+    media_url: mediaUrl,
+    zernio_message_id: zernioMessageId,
+    is_private_note: false,
+    meta_status: 'sent',
+  });
+  if (insErr && (insErr as { code?: string }).code !== '23505') {
+    console.error(JSON.stringify({ event: 'zernio_companion_insert_failed', message: insErr.message }));
+  }
+}
+
 async function handleStatus(
   admin: ReturnType<typeof getAdminClient>,
   orgId: string,
   status: DeliveryStatus,
   data: Record<string, unknown>,
+  channel: 'whatsapp' | 'instagram' = 'whatsapp',
 ): Promise<void> {
   const message = asObject(data.message);
   const zernioMessageId = str(message, ['id', '_id']) ?? str(message, ['platformMessageId']);
@@ -434,7 +609,12 @@ async function handleStatus(
     .eq('org_id', orgId)
     .eq('zernio_message_id', zernioMessageId)
     .maybeSingle();
-  if (!msg) return;
+  if (!msg) {
+    if (status === 'sent') {
+      await insertOutboundFromCompanionDevice(admin, orgId, data, channel, zernioMessageId);
+    }
+    return;
+  }
   const m = msg as { id: string; meta_status: string | null };
   if (status === 'failed') {
     // Motivo da falha: `error` pode vir como string ou objeto ({ message, ... }).
@@ -660,16 +840,16 @@ Deno.serve(async (req) => {
         await handleMessageReceived(admin, orgId, event.data, errors, channel);
         break;
       case 'message.sent':
-        await handleStatus(admin, orgId, 'sent', event.data);
+        await handleStatus(admin, orgId, 'sent', event.data, channel);
         break;
       case 'message.delivered':
-        await handleStatus(admin, orgId, 'delivered', event.data);
+        await handleStatus(admin, orgId, 'delivered', event.data, channel);
         break;
       case 'message.read':
-        await handleStatus(admin, orgId, 'read', event.data);
+        await handleStatus(admin, orgId, 'read', event.data, channel);
         break;
       case 'message.failed':
-        await handleStatus(admin, orgId, 'failed', event.data);
+        await handleStatus(admin, orgId, 'failed', event.data, channel);
         break;
       case 'whatsapp.template.status_updated':
         await handleTemplateStatus(admin, orgId, event.data);

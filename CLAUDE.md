@@ -470,6 +470,24 @@ src/
 
 ## Edge Functions
 
+> **⚠️ DEPLOY — LER ANTES (incidente de 17–23/09/2026).** Várias funções foram
+> editadas e deployadas direto no Supabase sem commit. Em 17/09 um deploy geral
+> a partir do repo sobrescreveu a `process-ai-message` boa (prompt em camadas:
+> Base Global `ai_agent_config.guardrails_prompt` + Modelo ativo
+> `ai_agent_profiles`, via `_shared/agent-prompt.ts`) por uma versão que só lia
+> o `system_prompt` legado genérico: a AMAIA ficou 6 dias sem treinamento e
+> inventou preços e uma chave PIX para clientes reais. Em 23/09 o repo foi
+> sincronizado com produção (todas as 28 funções). Regras:
+> 1. **Nunca** `supabase functions deploy` sem nome (deploy de todas).
+>    Deploye só a função que você alterou.
+> 2. Antes de deployar, baixe a versão em produção
+>    (`supabase functions download <nome>`) e compare com o repo
+>    (`diff --strip-trailing-cr`). Se produção tiver algo que o repo não tem,
+>    traga para o repo primeiro.
+> 3. Nunca edite função direto no painel do Supabase — sempre commit + deploy.
+> 4. Depois de mexer em `process-ai-message`, confira que o botão "Testar"
+>    (test-agent-profile) e o atendimento real respondem igual.
+
 ```
 supabase/functions/
 ├── _shared/
