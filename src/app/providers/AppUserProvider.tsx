@@ -46,6 +46,19 @@ interface AppUserContextValue {
   /** Tema em uso: a preferência do usuário (botão do topo) ou, sem ela, o da org. */
   effectiveTheme: ThemeMode;
   toggleTheme: () => void;
+  /**
+   * Troca o tema da org e apaga a preferência pessoal deste navegador.
+   *
+   * Existe porque sem isso as duas coisas ficavam desligadas uma da outra:
+   * bastava clicar UMA vez no sol/lua do topo para `themeOverride` ficar
+   * gravado pra sempre, e a partir daí trocar o tema em Configurações →
+   * Identidade Visual não mudava nada na tela. O admin salvava, via o toast
+   * de sucesso e continuava tudo igual.
+   *
+   * Quem mexe no tema da organização está decidindo de propósito — essa
+   * escolha vence a preferência antiga.
+   */
+  applyOrgTheme: (mode: ThemeMode) => void;
   loading: boolean;
   refreshProfile: () => Promise<void>;
 }
@@ -182,6 +195,16 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
     }
   }, [effectiveTheme]);
 
+  const applyOrgTheme = useCallback((mode: ThemeMode) => {
+    setThemeMode(mode);
+    setThemeOverride(null);
+    try {
+      localStorage.removeItem(THEME_KEY);
+    } catch {
+      // Sem storage não havia override gravado: nada a limpar.
+    }
+  }, []);
+
   const value = useMemo<AppUserContextValue>(
     () => ({
       userId,
@@ -196,10 +219,11 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       themeMode,
       effectiveTheme,
       toggleTheme,
+      applyOrgTheme,
       loading,
       refreshProfile,
     }),
-    [userId, role, orgId, isSuperAdmin, displayName, avatarUrl, orgName, orgLogoUrl, orgStatus, themeMode, effectiveTheme, toggleTheme, loading, refreshProfile],
+    [userId, role, orgId, isSuperAdmin, displayName, avatarUrl, orgName, orgLogoUrl, orgStatus, themeMode, effectiveTheme, toggleTheme, applyOrgTheme, loading, refreshProfile],
   );
 
   return (

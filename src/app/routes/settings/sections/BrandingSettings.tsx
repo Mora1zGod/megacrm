@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, Loader2, Moon, Sun, Upload } from 'lucide-react';
 import { useOrgBranding } from '@/hooks/useOrgBranding';
+import { useAppUser } from '@/app/providers/AppUserProvider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,7 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2MB
 
 export function BrandingSettings() {
   const { branding, loading, error, save, uploadLogo } = useOrgBranding();
+  const { applyOrgTheme } = useAppUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -66,7 +68,12 @@ export function BrandingSettings() {
     setSavingTheme(mode);
     try {
       await save({ theme_mode: mode });
-      document.documentElement.setAttribute('data-theme', mode);
+      // Não mexe no <html> na mão: quem manda no `data-theme` é o
+      // AppUserProvider. Escrever o atributo aqui só pintava a tela até o
+      // provider rodar de novo com o tema antigo — e não pintava nada se o
+      // usuário já tivesse clicado no sol/lua do topo alguma vez, porque a
+      // preferência pessoal daquele navegador vence o tema da org.
+      applyOrgTheme(mode);
       toast.success(mode === 'light' ? 'Tema claro ativado.' : 'Tema escuro ativado.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha ao trocar o tema.');
