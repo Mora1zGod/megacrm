@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
-import { useAppUser } from '@/app/providers/AppUserProvider';
+import { ORG_BRANDING_EVENT, useAppUser } from '@/app/providers/AppUserProvider';
 
 export interface OrgBranding {
   id: string;
@@ -50,6 +50,7 @@ export function useOrgBranding() {
       .eq('id', branding.id);
     if (err) throw new Error(err.message);
     await load();
+    window.dispatchEvent(new Event(ORG_BRANDING_EVENT));
   }, [branding, load]);
 
   const uploadLogo = useCallback(async (file: File) => {
@@ -72,6 +73,7 @@ export function useOrgBranding() {
       .eq('id', branding.id);
     if (updErr) throw new Error(updErr.message);
     await load();
+    window.dispatchEvent(new Event(ORG_BRANDING_EVENT));
   }, [branding, load]);
 
   return { branding, loading, error, save, uploadLogo, reload: load };

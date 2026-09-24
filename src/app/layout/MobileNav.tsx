@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { MessagesSquare, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS, type NavItem } from './nav-config';
 import { useAppUser } from '@/app/providers/AppUserProvider';
+import { BrandMark } from './BrandMark';
 
 interface MobileNavProps {
   open: boolean;
@@ -46,14 +47,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
         aria-label="Navegação"
       >
         <div className="h-[76px] shrink-0 flex items-center justify-between px-4 border-b border-[var(--color-border-card)]">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[var(--accent-fill)] text-white">
-              <MessagesSquare className="h-5 w-5" />
-            </span>
-            <span className="text-lg font-extrabold tracking-[-0.04em] text-[var(--color-text-primary)]">
-              Mega<span className="font-normal text-[var(--accent-primary)]">CRM</span>
-            </span>
-          </div>
+          <BrandMark />
           <button
             onClick={onClose}
             aria-label="Fechar menu"

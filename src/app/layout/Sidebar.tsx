@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Building2, ChevronLeft, ChevronRight, MessagesSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS, type NavItem } from './nav-config';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { useTasks } from '@/hooks/useTasks';
 import { useInternalChat } from '@/hooks/useInternalChat';
 import { Avatar } from '@/components/ui/Avatar';
+import { BrandMark } from './BrandMark';
 
 const GROUP_ORDER: NavItem['group'][] = ['Operação', 'Engajamento', 'Gestão', 'Administração'];
 
 export function Sidebar() {
-  const { role, isSuperAdmin, displayName, avatarUrl, orgName } = useAppUser();
+  const { role, isSuperAdmin, displayName, avatarUrl } = useAppUser();
   const { pendingCount } = useTasks();
   const { unreadTotal } = useInternalChat();
   const [collapsed, setCollapsed] = useState(
@@ -48,39 +49,10 @@ export function Sidebar() {
       aria-label="Navegação principal"
     >
       <div className={cn('h-16 shrink-0 flex items-center border-b border-[var(--color-border-soft)]', collapsed ? 'justify-center' : 'px-4')}>
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[var(--accent-fill)] text-white">
-            <MessagesSquare className="h-5 w-5" />
-          </span>
-          {!collapsed && (
-            <div className="min-w-0 leading-none">
-              <div className="text-lg font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                Mega<span className="text-[var(--accent-primary)]">CRM</span>
-              </div>
-              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                Conexões que crescem
-              </div>
-            </div>
-          )}
-        </div>
+        <BrandMark compact={collapsed} />
       </div>
 
-      <div className={cn('mx-3 mt-3 rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-fill-subtle)]', collapsed ? 'p-2' : 'p-2.5')}>
-        <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-2.5')}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--color-accent-subtle)] text-[13px] font-bold text-[var(--accent-primary)]">
-            {(orgName?.trim()?.[0] ?? 'A').toUpperCase()}
-          </span>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">{orgName ?? 'Organização'}</div>
-              <div className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">Seu espaço de trabalho</div>
-            </div>
-          )}
-          {!collapsed && <Building2 className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />}
-        </div>
-      </div>
-
-      <nav className={cn('flex-1 overflow-y-auto py-4 space-y-5', collapsed ? 'px-2' : 'px-2.5')}>
+      <nav className={cn('flex-1 overflow-y-auto py-3 space-y-5', collapsed ? 'px-2' : 'px-2.5')}>
         {groups.map(({ group, items }) => (
           <div key={group}>
             {!collapsed && (

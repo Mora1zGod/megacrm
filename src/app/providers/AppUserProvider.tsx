@@ -38,6 +38,8 @@ interface AppUserContextValue {
   displayName: string | null;
   avatarUrl: string | null;
   orgName: string | null;
+  /** Logo da org (Configurações → Identidade Visual). */
+  orgLogoUrl: string | null;
   orgStatus: OrgStatus | null;
   /** Tema da organização (Configurações → Identidade Visual). */
   themeMode: ThemeMode;
@@ -50,6 +52,8 @@ interface AppUserContextValue {
 
 const AppUserContext = createContext<AppUserContextValue | null>(null);
 const THEME_KEY = 'megacrm_theme';
+/** Disparado por useOrgBranding ao salvar nome/logo da org. */
+export const ORG_BRANDING_EVENT = 'org-branding-changed';
 
 function readRoleFromUser(appMetadata: Record<string, unknown> | undefined): AppRole | null {
   if (!appMetadata) return null;
@@ -81,6 +85,15 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
+  // Incrementado quando Identidade Visual salva nome/logo, para o menu
+  // refletir na hora sem recarregar a página.
+  const [orgTick, setOrgTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setOrgTick((n) => n + 1);
+    window.addEventListener(ORG_BRANDING_EVENT, bump);
+    return () => window.removeEventListener(ORG_BRANDING_EVENT, bump);
+  }, []);
   const [orgStatus, setOrgStatus] = useState<OrgStatus | null>(null);
   // 'light' é o padrão até a org carregar (identidade nova, ver
   // globals.css) — mesmo valor que o <html> já tem antes do JS rodar
@@ -126,6 +139,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId || !orgId) {
       setOrgName(null);
+      setOrgLogoUrl(null);
       setOrgStatus(null);
       return;
     }
@@ -135,18 +149,19 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase
         .schema('whatsapp_hub')
         .from('organizations')
-        .select('name, status, theme_mode')
+        .select('name, status, theme_mode, logo_url')
         .eq('id', orgId)
         .maybeSingle();
       if (cancelled) return;
       setOrgName((data?.name as string | null) ?? null);
+      setOrgLogoUrl((data?.logo_url as string | null) ?? null);
       setOrgStatus((data?.status as OrgStatus | null) ?? null);
       setThemeMode((data?.theme_mode as ThemeMode | null) ?? 'dark');
     })();
     return () => {
       cancelled = true;
     };
-  }, [userId, orgId]);
+  }, [userId, orgId, orgTick]);
 
   // Aplica o tema da org no <html> assim que é conhecido, e sempre que mudar
   // (ex.: admin troca o tema em Configurações e o hook local já chama
@@ -176,6 +191,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       displayName,
       avatarUrl,
       orgName,
+      orgLogoUrl,
       orgStatus,
       themeMode,
       effectiveTheme,
@@ -183,7 +199,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       loading,
       refreshProfile,
     }),
-    [userId, role, orgId, isSuperAdmin, displayName, avatarUrl, orgName, orgStatus, themeMode, effectiveTheme, toggleTheme, loading, refreshProfile],
+    [userId, role, orgId, isSuperAdmin, displayName, avatarUrl, orgName, orgLogoUrl, orgStatus, themeMode, effectiveTheme, toggleTheme, loading, refreshProfile],
   );
 
   return (
