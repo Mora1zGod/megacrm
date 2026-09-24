@@ -28,11 +28,19 @@ BEGIN
      GROUP BY org_id
     HAVING count(*) = 1
   LOOP
-    UPDATE whatsapp_hub.conversations
+    -- CORRIGIDO em 24/09/2026: a versão original não conferia a conta
+    -- Zernio e ligou 813 conversas de WhatsApp da AMAI ao único canal Zernio
+    -- ativo — que era o do INSTAGRAM (conta diferente). Todo envio por elas
+    -- passou a falhar ("não entregue") a partir de 22/09. Agora só liga
+    -- quando a conta Zernio da conversa é a mesma do canal.
+    UPDATE whatsapp_hub.conversations cv
        SET channel_id = r.channel_id
-     WHERE org_id = r.org_id
-       AND channel_id IS NULL
-       AND channel = 'whatsapp'
-       AND provider = 'zernio';
+      FROM whatsapp_hub.channels ch
+     WHERE ch.id = r.channel_id
+       AND cv.org_id = r.org_id
+       AND cv.channel_id IS NULL
+       AND cv.channel = 'whatsapp'
+       AND cv.provider = 'zernio'
+       AND cv.zernio_account_id = ch.zernio_account_id;
   END LOOP;
 END $$;
