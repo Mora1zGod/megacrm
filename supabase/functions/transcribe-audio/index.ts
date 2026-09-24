@@ -19,7 +19,7 @@
 import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { loadAppCredentials } from '../_shared/tenant-credentials.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
-import { requireServiceRole } from '../_shared/auth.ts';
+import { requireOrgCaller, requireServiceRole } from '../_shared/auth.ts';
 
 interface MessageRow {
   id: string;
@@ -100,11 +100,24 @@ Deno.serve(async (req) => {
   const pre = preflight(req);
   if (pre) return pre;
 
+  // Dois chamadores:
+  //   · o trigger on_audio_inbound (service role) — fluxo automático;
+  //   · o botão "Transcrever áudio" do Inbox (JWT do operador). Antes só o
+  //     service role passava, então o botão SEMPRE recebia 403 "Forbidden".
+  //     O operador só transcreve mensagem da própria organização (checado
+  //     abaixo, depois de carregar a linha).
+  let callerOrgId: string | null = null;
   try {
     await requireServiceRole(req);
   } catch {
-    return jsonResponse({ ok: false, error: 'Forbidden' }, { status: 403 });
+    try {
+      const caller = await requireOrgCaller(req);
+      callerOrgId = caller.orgId;
+    } catch {
+      return jsonResponse({ ok: false, error: 'Forbidden' }, { status: 403 });
+    }
   }
+  const manual = callerOrgId !== null;
 
   let body: { message_id?: string };
   try {
@@ -128,11 +141,17 @@ Deno.serve(async (req) => {
   }
   const message = row as MessageRow;
 
-  if (message.direction !== 'inbound' || message.content_type !== 'audio') {
-    return jsonResponse({ ok: true, skipped: 'not inbound audio' });
+  if (manual && message.org_id !== callerOrgId) {
+    return jsonResponse({ ok: false, error: 'Mensagem não encontrada.' }, { status: 404 });
+  }
+
+  // Automático: só áudio recebido do cliente. Manual: o operador também pode
+  // transcrever áudio enviado pela equipe.
+  if (message.content_type !== 'audio' || (!manual && message.direction !== 'inbound')) {
+    return jsonResponse({ ok: false, error: 'Esta mensagem não é um áudio para transcrever.' });
   }
   if (!message.media_url) {
-    return jsonResponse({ ok: true, skipped: 'no media_url' });
+    return jsonResponse({ ok: false, error: 'Áudio sem arquivo disponível para transcrever.' });
   }
 
   const markFailure = async (reason: string) => {
@@ -158,7 +177,9 @@ Deno.serve(async (req) => {
       .eq('id', message.id);
 
     // Com o texto pronto, aciona a IA (ela pulou este áudio no INSERT).
-    reinvokeAiPipeline(message.id);
+    // Só no fluxo automático: transcrever um áudio antigo pelo botão NÃO pode
+    // fazer a AMAIA responder de novo ao cliente.
+    if (!manual && message.direction === 'inbound') reinvokeAiPipeline(message.id);
 
     return jsonResponse({ ok: true, chars: transcript.length });
   } catch (err) {

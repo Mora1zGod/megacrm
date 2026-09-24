@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { extractFunctionErrorMessage } from '@/lib/functionError';
 import { useAppUser } from '@/app/providers/AppUserProvider';
@@ -31,20 +31,66 @@ interface UseMessagesResult {
   dismissFailed: (tempId: string) => void;
 }
 
+// Cache em memória das últimas conversas abertas. Voltar a uma conversa
+// mostra as mensagens na hora (e atualiza em segundo plano), em vez de piscar
+// "Carregando mensagens..." a cada troca.
+const MESSAGE_CACHE_MAX = 30;
+const messageCache = new Map<string, Message[]>();
+function cachePut(id: string, rows: Message[]) {
+  messageCache.delete(id);
+  messageCache.set(id, rows);
+  while (messageCache.size > MESSAGE_CACHE_MAX) {
+    const oldest = messageCache.keys().next().value;
+    if (oldest === undefined) break;
+    messageCache.delete(oldest);
+  }
+}
+
 export function useMessages(conversationId: string | null): UseMessagesResult {
   const { userId } = useAppUser();
-  const [real, setReal] = useState<Message[]>([]);
+  // As linhas guardam A QUAL conversa pertencem. Antes era um array solto: ao
+  // trocar de conversa a tela mostrava as mensagens da anterior até a busca
+  // terminar, e uma resposta atrasada da conversa A podia sobrescrever a B.
+  const [store, setStore] = useState<{ id: string | null; rows: Message[] }>(() => ({
+    id: conversationId,
+    rows: (conversationId && messageCache.get(conversationId)) || [],
+  }));
   const [optimistic, setOptimistic] = useState<ThreadMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef(0);
+
+  const current = store.id === conversationId;
+  const real = useMemo<Message[]>(
+    () => (current ? store.rows : (conversationId && messageCache.get(conversationId)) || []),
+    [current, store.rows, conversationId],
+  );
+  const hasData = current || (!!conversationId && messageCache.has(conversationId));
+  const loading = !!conversationId && !hasData && (fetching || !current);
+
+  const setReal = useCallback(
+    (fn: (prev: Message[]) => Message[]) => {
+      setStore((prev) =>
+        prev.id === conversationId ? { id: prev.id, rows: fn(prev.rows) } : prev,
+      );
+    },
+    [conversationId],
+  );
+
+  useEffect(() => {
+    if (store.id) cachePut(store.id, store.rows);
+  }, [store]);
 
   const reload = useCallback(async () => {
+    const request = ++requestRef.current;
     if (!conversationId) {
-      setReal([]);
-      setLoading(false);
+      setStore({ id: null, rows: [] });
+      setFetching(false);
       return;
     }
-    setLoading(true);
+    const cached = messageCache.get(conversationId);
+    if (cached) setStore({ id: conversationId, rows: cached });
+    setFetching(true);
     setError(null);
     const supabase = getSupabase();
     const { data, error: err } = await supabase.schema('whatsapp_hub')
@@ -52,9 +98,11 @@ export function useMessages(conversationId: string | null): UseMessagesResult {
       .select('*')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
+    // Outra conversa foi aberta enquanto esta carregava: descarta a resposta.
+    if (request !== requestRef.current) return;
     if (err) setError(err.message);
-    else setReal((data ?? []) as Message[]);
-    setLoading(false);
+    else setStore({ id: conversationId, rows: (data ?? []) as Message[] });
+    setFetching(false);
   }, [conversationId]);
 
   useEffect(() => {
@@ -98,7 +146,7 @@ export function useMessages(conversationId: string | null): UseMessagesResult {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, conversationId]);
+  }, [userId, conversationId, setReal]);
 
   // Concilia balões otimistas com as linhas reais. O casamento acontece assim
   // que a linha real CHEGA PELO REALTIME — não depende da resposta HTTP do

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // Avatar circular compartilhado: mostra a imagem redonda quando há `src`, senão
@@ -33,11 +34,19 @@ function initialsFrom(name: string | null | undefined): string {
 
 export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
   const sizeClass = SIZE_CLASS[size];
-  if (src) {
+  // Fotos do Instagram vêm da CDN da Meta com link assinado que EXPIRA em
+  // poucos dias. Sem este fallback o navegador mostrava imagem quebrada; agora
+  // cai nas iniciais quando a foto não carrega.
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [src]);
+  if (src && !broken) {
     return (
       <img
         src={src}
         alt={name ?? 'avatar'}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setBroken(true)}
         className={cn('rounded-full object-cover shrink-0', sizeClass, className)}
       />
     );
@@ -45,7 +54,7 @@ export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
   return (
     <div
       className={cn(
-        'rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center font-semibold text-[var(--color-text-primary)] shrink-0',
+        'rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-border-card)] flex items-center justify-center font-semibold text-[var(--color-text-secondary)] shrink-0',
         sizeClass,
         className,
       )}

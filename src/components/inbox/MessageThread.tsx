@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AlertCircle, Bot, Check, CheckCheck, Clock, FileText, Loader2, Smartphone, StickyNote, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -291,11 +291,20 @@ function FailedActions({
 export function MessageThread({ messages, loading, onRetry, onDismiss }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Auto-scroll to newest message. Setting block to 'end' and using a ref
-    // target below the last bubble avoids fighting with user scroll-up.
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length]);
+  const conversationKey = messages[0]?.conversation_id ?? null;
+  const lastConversationRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    // Ao ABRIR outra conversa o fim da thread aparece direto (sem animação):
+    // o scroll suave percorria o histórico inteiro a cada troca e dava a
+    // sensação de tela travando. Suave só para mensagem nova na mesma conversa.
+    const sameConversation = lastConversationRef.current === conversationKey;
+    lastConversationRef.current = conversationKey;
+    bottomRef.current?.scrollIntoView({
+      behavior: sameConversation ? 'smooth' : 'auto',
+      block: 'end',
+    });
+  }, [messages.length, conversationKey]);
 
   if (loading) {
     return (

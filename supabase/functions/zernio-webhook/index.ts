@@ -121,6 +121,65 @@ function sanitizeName(name: string | null): string | null {
   return trimmed;
 }
 
+// --- foto do contato ---------------------------------------------------------
+// A foto do Instagram chega como link assinado da CDN da Meta, que EXPIRA em
+// poucos dias (em 24/09, 116 de 138 fotos salvas já estavam mortas). Copiamos
+// a imagem para o nosso Storage em segundo plano e gravamos o link permanente.
+// Falha em silêncio: foto nunca pode atrapalhar o recebimento da mensagem.
+// (WhatsApp oficial não envia foto do cliente — nada a copiar ali.)
+const AVATAR_BUCKET = 'whatsapp-hub-media';
+const AVATAR_REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isArchivedPicture(url: string | null): boolean {
+  return !!url && url.includes(`/storage/v1/object/public/${AVATAR_BUCKET}/`);
+}
+
+// Já temos cópia própria recente? Então não baixa de novo a cada mensagem
+// (o link da Meta muda a cada evento mesmo quando a foto é a mesma).
+function pictureIsFresh(url: string | null, updatedAt: string | null): boolean {
+  if (!isArchivedPicture(url) || !updatedAt) return false;
+  return Date.now() - new Date(updatedAt).getTime() < AVATAR_REFRESH_MS;
+}
+
+function archiveContactPicture(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  contactId: string,
+  pictureUrl: string,
+): void {
+  const run = (async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(pictureUrl, { signal: ctrl.signal });
+      if (!res.ok) return;
+      const mime = (res.headers.get('content-type') ?? 'image/jpeg').split(';')[0].trim();
+      if (!mime.startsWith('image/')) return;
+      const buf = new Uint8Array(await res.arrayBuffer());
+      if (buf.byteLength === 0 || buf.byteLength > 5 * 1024 * 1024) return;
+      const path = `${orgId}/avatars/${contactId}.jpg`;
+      const { error: upErr } = await admin.storage
+        .from(AVATAR_BUCKET)
+        .upload(path, buf, { contentType: mime, upsert: true });
+      if (upErr) return;
+      const { data: pub } = admin.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+      await admin
+        .from('contacts')
+        .update({
+          profile_pic_url: `${pub.publicUrl}?v=${Date.now()}`,
+          profile_pic_updated_at: new Date().toISOString(),
+        })
+        .eq('id', contactId);
+    } catch (err) {
+      console.error(JSON.stringify({ event: 'avatar_archive_error', contactId, error: String(err) }));
+    } finally {
+      clearTimeout(timer);
+    }
+  })();
+  (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+    .EdgeRuntime?.waitUntil?.(run);
+}
+
 // --- helpers de dominio -----------------------------------------------------
 
 async function findOrCreateContact(
@@ -132,17 +191,24 @@ async function findOrCreateContact(
 ): Promise<string | null> {
   const { data: existing } = await admin
     .from('contacts')
-    .select('id, name, profile_pic_url')
+    .select('id, name, profile_pic_url, profile_pic_updated_at')
     .eq('org_id', orgId)
     .eq('phone', phone)
     .maybeSingle();
   if (existing) {
-    const e = existing as { id: string; name: string | null; profile_pic_url: string | null };
+    const e = existing as {
+      id: string;
+      name: string | null;
+      profile_pic_url: string | null;
+      profile_pic_updated_at: string | null;
+    };
     // Preenche o nome depois, se a primeira mensagem não tinha (a Meta nem
     // sempre manda o nome do perfil logo de cara). Nunca troca um nome que já
     // existe — só preenche o que tava vazio.
     const patch: Record<string, unknown> = {};
-    if (pictureUrl && pictureUrl !== e.profile_pic_url) {
+    const refreshPicture = !!pictureUrl && pictureUrl !== e.profile_pic_url
+      && !pictureIsFresh(e.profile_pic_url, e.profile_pic_updated_at);
+    if (refreshPicture) {
       patch.profile_pic_url = pictureUrl;
       patch.profile_pic_updated_at = new Date().toISOString();
     }
@@ -152,6 +218,7 @@ async function findOrCreateContact(
     if (Object.keys(patch).length > 0) {
       await admin.from('contacts').update(patch).eq('id', e.id);
     }
+    if (refreshPicture && pictureUrl) archiveContactPicture(admin, orgId, e.id, pictureUrl);
     return e.id;
   }
   const { data: created, error } = await admin
@@ -167,7 +234,9 @@ async function findOrCreateContact(
     .select('id')
     .single();
   if (error) return null;
-  return (created as { id: string }).id;
+  const createdId = (created as { id: string }).id;
+  if (pictureUrl) archiveContactPicture(admin, orgId, createdId, pictureUrl);
+  return createdId;
 }
 
 // Instagram: o contato é identificado pelo IG-scoped id (não tem telefone).
@@ -181,17 +250,24 @@ async function findOrCreateInstagramContact(
 ): Promise<string | null> {
   const { data: existing } = await admin
     .from('contacts')
-    .select('id, name, profile_pic_url')
+    .select('id, name, profile_pic_url, profile_pic_updated_at')
     .eq('org_id', orgId)
     .eq('instagram_id', igId)
     .maybeSingle();
   if (existing) {
-    const e = existing as { id: string; name: string | null; profile_pic_url: string | null };
+    const e = existing as {
+      id: string;
+      name: string | null;
+      profile_pic_url: string | null;
+      profile_pic_updated_at: string | null;
+    };
     // Mesmo backfill do WhatsApp: preenche nome só se tava vazio, nunca troca
     // um nome que já existe. Aqui é ainda mais comum — o 1º evento de um
     // contato do Instagram às vezes só traz o id, sem username/nome.
     const patch: Record<string, unknown> = {};
-    if (pictureUrl && pictureUrl !== e.profile_pic_url) {
+    const refreshPicture = !!pictureUrl && pictureUrl !== e.profile_pic_url
+      && !pictureIsFresh(e.profile_pic_url, e.profile_pic_updated_at);
+    if (refreshPicture) {
       patch.profile_pic_url = pictureUrl;
       patch.profile_pic_updated_at = new Date().toISOString();
     }
@@ -203,6 +279,7 @@ async function findOrCreateInstagramContact(
     if (Object.keys(patch).length > 0) {
       await admin.from('contacts').update(patch).eq('id', e.id);
     }
+    if (refreshPicture && pictureUrl) archiveContactPicture(admin, orgId, e.id, pictureUrl);
     return e.id;
   }
   const { data: created, error } = await admin
@@ -218,7 +295,9 @@ async function findOrCreateInstagramContact(
     .select('id')
     .single();
   if (error) return null;
-  return (created as { id: string }).id;
+  const createdId = (created as { id: string }).id;
+  if (pictureUrl) archiveContactPicture(admin, orgId, createdId, pictureUrl);
+  return createdId;
 }
 
 async function findOrCreateConversation(
