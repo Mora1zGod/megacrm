@@ -22,6 +22,9 @@ export interface LLMCallInput {
 export interface LLMCallResult {
   content: string;
   model: string;
+  // Contagem de tokens informada pelo provedor (quando disponível). Usada pelo
+  // process-ai-message para gravar custo em ai_usage_log.
+  usage?: { promptTokens: number; completionTokens: number };
 }
 
 export async function callLLM(input: LLMCallInput): Promise<LLMCallResult> {
@@ -59,7 +62,13 @@ async function callOpenAI(input: LLMCallInput): Promise<LLMCallResult> {
     throw new Error(`OpenAI ${res.status}: ${err}`);
   }
   const body = await res.json();
-  return { content: body.choices?.[0]?.message?.content ?? '', model };
+  return {
+    content: body.choices?.[0]?.message?.content ?? '',
+    model,
+    usage: body.usage
+      ? { promptTokens: body.usage.prompt_tokens ?? 0, completionTokens: body.usage.completion_tokens ?? 0 }
+      : undefined,
+  };
 }
 
 async function callClaude(input: LLMCallInput): Promise<LLMCallResult> {
@@ -90,7 +99,13 @@ async function callClaude(input: LLMCallInput): Promise<LLMCallResult> {
     Array.isArray(body.content)
       ? body.content.find((c: { type: string }) => c.type === 'text')?.text ?? ''
       : '';
-  return { content: text, model };
+  return {
+    content: text,
+    model,
+    usage: body.usage
+      ? { promptTokens: body.usage.input_tokens ?? 0, completionTokens: body.usage.output_tokens ?? 0 }
+      : undefined,
+  };
 }
 
 async function callGemini(input: LLMCallInput): Promise<LLMCallResult> {
@@ -117,7 +132,16 @@ async function callGemini(input: LLMCallInput): Promise<LLMCallResult> {
   const body = await res.json();
   const text =
     body.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
-  return { content: text, model };
+  return {
+    content: text,
+    model,
+    usage: body.usageMetadata
+      ? {
+        promptTokens: body.usageMetadata.promptTokenCount ?? 0,
+        completionTokens: body.usageMetadata.candidatesTokenCount ?? 0,
+      }
+      : undefined,
+  };
 }
 
 /**

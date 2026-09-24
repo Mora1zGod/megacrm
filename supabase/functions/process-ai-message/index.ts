@@ -329,15 +329,16 @@ function applyVariables(prompt: string, vars: Record<string, string> | null): st
 // Reconhece [HANDOFF] em QUALQUER posição — o modelo costuma emitir no fim da
 // frase, não em linha própria (mesma regra do test-agent-profile). [ENCERRAR]
 // também é removido para nunca chegar ao contato.
-function extractHandoff(reply: string): { text: string; handoff: boolean } {
+function extractHandoff(reply: string): { text: string; handoff: boolean; close: boolean } {
   const handoff = /\[\s*handoff\s*\]/i.test(reply);
+  const close = !handoff && /\[\s*encerrar\s*\]/i.test(reply);
   const text = reply
     .replace(/\[\s*handoff\s*\]/gi, '')
     .replace(/\[\s*encerrar\s*\]/gi, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
-  return { text, handoff };
+  return { text, handoff, close };
 }
 
 // Detecta marcadores [MEDIA:rotulo] (case-insensitive) e devolve o texto sem
@@ -354,7 +355,7 @@ function extractMedia(reply: string): { text: string; labels: string[] } {
   return { text, labels };
 }
 
-async function embed(openaiKey: string, text: string): Promise<number[]> {
+async function embed(openaiKey: string, text: string): Promise<{ embedding: number[]; tokens: number }> {
   const res = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -365,7 +366,59 @@ async function embed(openaiKey: string, text: string): Promise<number[]> {
   });
   if (!res.ok) throw new Error(`OpenAI embeddings ${res.status}: ${await res.text()}`);
   const body = await res.json();
-  return body?.data?.[0]?.embedding ?? [];
+  return { embedding: body?.data?.[0]?.embedding ?? [], tokens: body?.usage?.prompt_tokens ?? 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Custo em ai_usage_log (aba Logs / Visão geral da AMAIA). A versão que rodava
+// até 17/09 gravava isso; foi perdida junto com o prompt em camadas e
+// reconstruída aqui no mesmo formato dos registros antigos: um 'embedding' e
+// um 'chat' por resposta, com conversation_id + message_id (mensagem inbound).
+// Best-effort: falha ao gravar custo nunca impede a resposta.
+// ---------------------------------------------------------------------------
+const PRICE_PER_MILLION: Record<string, { input: number; output: number }> = {
+  'gpt-4.1': { input: 2.0, output: 8.0 },
+  'gpt-4.1-mini': { input: 0.4, output: 1.6 },
+  'gpt-4.1-nano': { input: 0.1, output: 0.4 },
+  'gpt-4o': { input: 2.5, output: 10.0 },
+  'gpt-4o-mini': { input: 0.15, output: 0.6 },
+  'text-embedding-3-small': { input: 0.02, output: 0 },
+};
+
+function estimateCostUsd(model: string, promptTokens: number, completionTokens: number): number {
+  // Match exato primeiro; depois o prefixo MAIS LONGO ('gpt-4.1-mini' começa
+  // com 'gpt-4.1-', então a ordem importa).
+  const base = model in PRICE_PER_MILLION
+    ? model
+    : Object.keys(PRICE_PER_MILLION)
+      .filter((k) => model.startsWith(`${k}-`))
+      .sort((a, b) => b.length - a.length)[0];
+  if (!base) return 0;
+  const p = PRICE_PER_MILLION[base];
+  return Number(((promptTokens / 1e6) * p.input + (completionTokens / 1e6) * p.output).toFixed(6));
+}
+
+async function logUsage(
+  admin: ReturnType<typeof getAdminClient>,
+  row: {
+    orgId: string; conversationId: string; messageId: string;
+    kind: 'chat' | 'embedding'; provider: string; model: string;
+    promptTokens: number; completionTokens: number;
+  },
+): Promise<void> {
+  const { error } = await admin.from('ai_usage_log').insert({
+    org_id: row.orgId,
+    conversation_id: row.conversationId,
+    message_id: row.messageId,
+    kind: row.kind,
+    provider: row.provider,
+    model: row.model,
+    prompt_tokens: row.promptTokens,
+    completion_tokens: row.completionTokens,
+    total_tokens: row.promptTokens + row.completionTokens,
+    estimated_cost_usd: estimateCostUsd(row.model, row.promptTokens, row.completionTokens),
+  });
+  if (error) console.error(JSON.stringify({ event: 'ai_usage_log_failed', kind: row.kind, message: error.message }));
 }
 
 function buildUserPrompt(history: MessageRow[], ragChunks: string[], inbound: string): string {
@@ -544,8 +597,11 @@ Deno.serve(async (req) => {
 
   // 4. Embed the inbound text.
   let queryEmbedding: number[];
+  let embedTokens = 0;
   try {
-    queryEmbedding = await embed(creds.openai_api_key, message.content);
+    const emb = await embed(creds.openai_api_key, message.content);
+    queryEmbedding = emb.embedding;
+    embedTokens = emb.tokens;
   } catch (err) {
     return jsonResponse(
       { ok: false, error: `embed: ${err instanceof Error ? err.message : String(err)}` },
@@ -650,6 +706,8 @@ Deno.serve(async (req) => {
   const userPrompt = buildUserPrompt(history, ragChunks, message.content);
 
   let reply: string;
+  let chatUsage: { promptTokens: number; completionTokens: number } | undefined;
+  let chatModel = agent.model ?? '';
   try {
     const result = await callLLM({
       provider,
@@ -661,6 +719,8 @@ Deno.serve(async (req) => {
       maxTokens: agent.max_tokens ?? 1000,
     });
     reply = result.content.trim();
+    chatUsage = result.usage;
+    chatModel = result.model;
     if (!reply) throw new Error('LLM retornou resposta vazia.');
   } catch (err) {
     return jsonResponse(
@@ -672,7 +732,20 @@ Deno.serve(async (req) => {
   // Marcadores: [MEDIA:rotulo] (envia mídias) e [HANDOFF] (transfere). Remove
   // ambos do texto antes de enviar.
   const mediaExtract = extractMedia(reply);
-  const { text: cleanedText, handoff } = extractHandoff(mediaExtract.text);
+  const { text: cleanedText, handoff, close } = extractHandoff(mediaExtract.text);
+
+  await Promise.all([
+    logUsage(admin, {
+      orgId, conversationId: conversation.id, messageId: message.id,
+      kind: 'embedding', provider: 'openai', model: EMBED_MODEL,
+      promptTokens: embedTokens, completionTokens: 0,
+    }),
+    logUsage(admin, {
+      orgId, conversationId: conversation.id, messageId: message.id,
+      kind: 'chat', provider, model: chatModel,
+      promptTokens: chatUsage?.promptTokens ?? 0, completionTokens: chatUsage?.completionTokens ?? 0,
+    }),
+  ]);
   const mediaToSend = mediaExtract.labels
     .map((l) => mediaByLabel.get(l))
     .filter((m): m is NonNullable<typeof m> => Boolean(m));
@@ -687,12 +760,18 @@ Deno.serve(async (req) => {
 
   // Handoff: pausa a IA e marca a conversa p/ atendimento humano (o trigger
   // _on_handoff_notify notifica os operadores quando ai_paused vira true).
+  // [ENCERRAR] (seção 21 da Base Global): fecha a conversa e tira da fila.
+  // Nunca junto com handoff — o humano precisa dela aberta. Se o contato
+  // escrever de novo, o trigger _reopen_closed_conversation reabre.
+  const nowIso = new Date().toISOString();
   await admin
     .from('conversations')
     .update(
       handoff
-        ? { last_message_at: new Date().toISOString(), status: 'human_active', ai_paused: true }
-        : { last_message_at: new Date().toISOString() },
+        ? { last_message_at: nowIso, status: 'human_active', ai_paused: true }
+        : close
+          ? { last_message_at: nowIso, status: 'closed', closed_at: nowIso }
+          : { last_message_at: nowIso },
     )
     .eq('id', conversation.id);
 
