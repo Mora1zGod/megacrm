@@ -24,6 +24,7 @@ import { callLLM, type LLMProvider } from '../_shared/llm.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { requireServiceRole } from '../_shared/auth.ts';
 import { sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
+import { buildSystemPrompt, loadActiveProfile } from '../_shared/agent-prompt.ts';
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const TOP_K = 5;
@@ -56,6 +57,7 @@ interface ConversationRow {
 
 interface AgentConfig {
   system_prompt: string | null;
+  guardrails_prompt: string | null;
   temperature: number;
   max_tokens: number;
   is_active: boolean;
@@ -324,9 +326,17 @@ function applyVariables(prompt: string, vars: Record<string, string> | null): st
 
 // Detecta o marcador [HANDOFF] (linha própria, case-insensitive) e devolve o
 // texto sem ele. A ferramenta nunca envia "[HANDOFF]" ao contato.
+// Reconhece [HANDOFF] em QUALQUER posição — o modelo costuma emitir no fim da
+// frase, não em linha própria (mesma regra do test-agent-profile). [ENCERRAR]
+// também é removido para nunca chegar ao contato.
 function extractHandoff(reply: string): { text: string; handoff: boolean } {
-  const handoff = /(^|\n)\s*\[handoff\]\s*(\n|$)/i.test(reply);
-  const text = reply.replace(/(^|\n)\s*\[handoff\]\s*(?=\n|$)/gi, '').trim();
+  const handoff = /\[\s*handoff\s*\]/i.test(reply);
+  const text = reply
+    .replace(/\[\s*handoff\s*\]/gi, '')
+    .replace(/\[\s*encerrar\s*\]/gi, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
   return { text, handoff };
 }
 
@@ -452,7 +462,7 @@ Deno.serve(async (req) => {
   // Config do agente DA ORG (não há mais singleton global).
   const { data: agentRow } = await admin
     .from('ai_agent_config')
-    .select('system_prompt, temperature, max_tokens, is_active, active_whatsapp, active_instagram, auto_move_leads, model, timezone, variables')
+    .select('system_prompt, guardrails_prompt, temperature, max_tokens, is_active, active_whatsapp, active_instagram, auto_move_leads, model, timezone, variables')
     .eq('org_id', orgId)
     .maybeSingle();
   const agent = (agentRow as AgentConfig | null) ?? null;
@@ -607,9 +617,19 @@ Deno.serve(async (req) => {
     midias_disponiveis: midiasDisponiveis,
   };
 
-  const basePrompt =
-    agent.system_prompt?.trim() ||
-    'Você é um assistente de atendimento via WhatsApp. Responda em português brasileiro, de forma objetiva e educada.';
+  // Prompt em camadas — Base Global (ai_agent_config.guardrails_prompt) +
+  // Modelo ativo (ai_agent_profiles, aba Modelos) + variáveis. Mesma montagem
+  // do botão "Testar" (test-agent-profile), via _shared/agent-prompt.ts.
+  // ATENÇÃO: essa montagem rodava em produção (v11) mas nunca tinha sido
+  // commitada; um deploy a partir do repo derrubou o treinamento da AMAIA em
+  // 23/09/2026. Não remover.
+  const activeProfile = await loadActiveProfile(admin, orgId);
+  const basePrompt = buildSystemPrompt({
+    guardrails: agent.guardrails_prompt ?? null,
+    profileBody: activeProfile?.body ?? null,
+    legacySystemPrompt: agent.system_prompt ?? null,
+    vars,
+  });
   // Trava anti-alucinação — aplicada sempre, por cima de qualquer
   // system_prompt configurado em Configurações → Agente de IA (o texto de lá
   // não pode desligar isso). Motivo: o agente não tem NENHUMA ferramenta de
@@ -626,7 +646,7 @@ Deno.serve(async (req) => {
     '- Se o contexto contradiz o que você está prestes a responder, siga o contexto, nunca sua suposição.',
     '- Sempre que você disser (em qualquer palavra) que vai "encaminhar", "confirmar com a equipe", "chamar um atendente", "verificar e te retornar" ou qualquer variação disso, essa mensagem TEM que terminar com a linha "[HANDOFF]" sozinha — é isso que efetivamente transfere a conversa pra um humano de verdade. Se você disser que vai encaminhar mas não escrever "[HANDOFF]", ninguém é avisado e o cliente fica esperando resposta que nunca vem. Nunca prometa handoff sem o marcador; nunca escreva o marcador sem ter prometido handoff no texto.',
   ].join('\n');
-  const systemPrompt = `${applyVariables(basePrompt, vars)}\n\n${ANTI_HALLUCINATION_GUARDRAIL}`;
+  const systemPrompt = `${basePrompt}\n\n${ANTI_HALLUCINATION_GUARDRAIL}`;
   const userPrompt = buildUserPrompt(history, ragChunks, message.content);
 
   let reply: string;
