@@ -56,6 +56,8 @@ export interface Message {
   error_reason: string | null;
   is_private_note: boolean;
   created_at: string;
+  // Autor da mensagem em GRUPO do WhatsApp (UAZAPI). null fora de grupo.
+  sender_name?: string | null;
 }
 
 export interface ConversationWithContact extends Conversation {

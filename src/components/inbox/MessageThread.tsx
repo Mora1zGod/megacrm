@@ -388,6 +388,10 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                   'ring-1 ring-[var(--color-error)]',
               )}
             >
+              {/* Grupo: cada mensagem recebida mostra quem escreveu. */}
+              {isInbound && m.sender_name && (
+                <div className="mb-0.5 text-xs font-semibold text-[var(--accent-primary)]">{m.sender_name}</div>
+              )}
               {!isInbound && m.sender_type !== 'contact' && (
                 <div className="flex items-center gap-1 text-xs font-semibold opacity-75 mb-1">
                   <SenderIcon sender={m.sender_type} />

@@ -106,7 +106,8 @@ export async function connectInstance(
 
 // POST /webhook — cria/atualiza o webhook da instância. Config espelhando o
 // padrão usado manualmente: POST, events connection+messages, excluindo
-// wasSentByApi (anti-loop) e isGroupYes (sem grupos).
+// wasSentByApi (anti-loop). Grupos entram (aba Grupos do Inbox, 25/09/2026);
+// o uazapi-webhook os grava sem acionar IA nem notificação.
 export async function configureWebhook(
   serverUrl: string,
   token: string,
@@ -116,7 +117,7 @@ export async function configureWebhook(
     enabled: true,
     url: input.url,
     events: ['connection', 'messages'],
-    excludeMessages: ['wasSentByApi', 'isGroupYes'],
+    excludeMessages: ['wasSentByApi'],
     addUrlEvents: false,
     addUrlTypesMessages: false,
     action: input.existingId ? 'update' : 'add',

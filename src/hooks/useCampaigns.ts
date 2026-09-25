@@ -79,7 +79,13 @@ async function resolveAudienceIds(filter: AudienceFilter): Promise<string[]> {
     if (candidateIds.length === 0) return [];
   }
 
-  let query = supabase.schema('whatsapp_hub').from('contacts').select('id, custom_fields');
+  // Grupos do WhatsApp (source 'whatsapp_group', phone …@g.us) nunca entram
+  // em campanha.
+  let query = supabase
+    .schema('whatsapp_hub')
+    .from('contacts')
+    .select('id, custom_fields')
+    .or('source.is.null,source.neq.whatsapp_group');
   if (candidateIds) query = query.in('id', candidateIds);
 
   const { data, error } = await query;

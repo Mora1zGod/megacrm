@@ -22,7 +22,8 @@ import { MessageThread } from '@/components/inbox/MessageThread';
 import { MessageInput } from '@/components/inbox/MessageInput';
 import { ContactPanel } from '@/components/inbox/ContactPanel';
 import { InboxFilters } from '@/components/inbox/InboxFilters';
-import { InboxQuickBar, matchesBusca, matchesQuickChip, type QuickChip } from '@/components/inbox/InboxQuickBar';
+import { InboxQuickBar, isGroupConversation, matchesBusca, matchesQuickChip, type QuickChip } from '@/components/inbox/InboxQuickBar';
+import { GroupsBar } from '@/components/inbox/GroupsBar';
 import {
   matchesFilters,
   readFiltersFromParams,
@@ -155,6 +156,7 @@ export default function InboxPage() {
     () => conversations.find((c) => c.id === selectedId) ?? null,
     [conversations, selectedId],
   );
+  const selectedIsGroup = selected ? isGroupConversation(selected) : false;
 
   // Se a conversa aberta for (re)atribuída a outro operador (deep-link ou
   // realtime), fecha imediatamente para quem não pode vê-la.
@@ -292,6 +294,9 @@ export default function InboxPage() {
               tags={tags}
               queues={queues}
             />
+            {quickChip === 'grupos' && (
+              <GroupsBar isAdmin={role === 'admin'} onDone={() => void reloadConvs()} />
+            )}
             <div className="flex justify-end">
               <span className="text-[11px] text-[var(--color-text-secondary)] whitespace-nowrap">
                 {visibleConversations.length} conversa{visibleConversations.length !== 1 ? 's' : ''}
@@ -333,10 +338,10 @@ export default function InboxPage() {
                     {selected.contact?.name?.trim() || selected.contact?.phone || '—'}
                   </div>
                   <div className="text-[13px] text-[var(--color-text-muted)] truncate mt-0.5">
-                    {selected.contact?.phone}
-                    {selected.contact?.phone ? ' · ' : ''}
+                    {selectedIsGroup ? 'Grupo do WhatsApp' : selected.contact?.phone}
+                    {selectedIsGroup || selected.contact?.phone ? ' · ' : ''}
                     Responsável: <span className="text-[var(--color-text-secondary)]">{operatorName(selected.assigned_to) ?? 'ninguém'}</span>
-                    {selected.status !== 'closed' && (
+                    {selected.status !== 'closed' && !selectedIsGroup && (
                       <>
                         {' · '}
                         <span className={selected.ai_paused ? 'font-medium text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}>

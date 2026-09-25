@@ -4,7 +4,14 @@ import { cn } from '@/lib/utils';
 import type { ConversationWithContact } from '@/types/inbox';
 import type { InboxFilterState } from './inbox-filters';
 
-export type QuickChip = 'todas' | 'nao_lidas' | 'aguardando' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas';
+export type QuickChip = 'todas' | 'nao_lidas' | 'aguardando' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas' | 'grupos';
+
+// Grupo do WhatsApp (UAZAPI): o contato do grupo tem como "telefone" o JID
+// do grupo (…@g.us). Grupos ficam só na aba Grupos — não misturam com os
+// atendimentos 1:1 nem entram nos contadores das outras abas.
+export function isGroupConversation(c: ConversationWithContact): boolean {
+  return (c.contact?.phone ?? '').endsWith('@g.us');
+}
 
 interface Props {
   // Busca livre: nome OU telefone. Um campo só, como no WhatsApp — o operador
@@ -25,6 +32,8 @@ export function isAguardando(c: ConversationWithContact): boolean {
 }
 
 export function matchesQuickChip(c: ConversationWithContact, chip: QuickChip): boolean {
+  if (chip === 'grupos') return isGroupConversation(c);
+  if (isGroupConversation(c)) return false;
   switch (chip) {
     case 'nao_lidas':
       return (c.unread_count ?? 0) > 0;
@@ -66,14 +75,18 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
     let aguardandoCliente = 0;
     let iaPausada = 0;
     let favoritas = 0;
+    let grupos = 0;
+    let todas = 0;
     for (const c of base) {
+      if (isGroupConversation(c)) { grupos++; continue; }
+      todas++;
       if ((c.unread_count ?? 0) > 0) naoLidas++;
       if (isAguardando(c)) aguardando++;
       else if (c.status !== 'closed') aguardandoCliente++;
       if (c.ai_paused) iaPausada++;
       if (c.is_favorite) favoritas++;
     }
-    return { todas: base.length, naoLidas, aguardando, aguardandoCliente, iaPausada, favoritas };
+    return { todas, naoLidas, aguardando, aguardandoCliente, iaPausada, favoritas, grupos };
   }, [base]);
 
   const chips: Array<{ id: QuickChip; label: string; count: number }> = [
@@ -83,6 +96,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
     { id: 'aguardando_cliente', label: 'Aguardando cliente', count: contagem.aguardandoCliente },
     { id: 'ia_pausada', label: 'IA pausada', count: contagem.iaPausada },
     { id: 'favoritas', label: 'Favoritas', count: contagem.favoritas },
+    { id: 'grupos', label: 'Grupos', count: contagem.grupos },
   ];
 
   return (
@@ -112,7 +126,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
           const ativo = chip === c.id;
           // Chip sem nada para mostrar (fora "Tudo") fica oculto — não faz
           // sentido oferecer um filtro que resultaria em lista vazia.
-          if (c.id !== 'todas' && c.count === 0 && !ativo) return null;
+          if (c.id !== 'todas' && c.id !== 'grupos' && c.count === 0 && !ativo) return null;
           return (
             <button
               key={c.id}

@@ -5,8 +5,10 @@
 //   {SUPABASE_URL}/functions/v1/uazapi-webhook?secret=<uazapi_webhook_secret>
 // (a UAZAPI não assina HMAC — o gate é o secret na URL, comparação
 // constant-time). Config do webhook: events connection+messages, excluindo
-// wasSentByApi (anti-loop) e isGroupYes (sem grupos) — os filtros também são
-// re-checados aqui por defesa.
+// wasSentByApi (anti-loop). Mensagens de GRUPO (isGroup) vão para
+// handleGroupMessage: o grupo vira um contato com phone = JID do grupo
+// (…@g.us), a conversa nasce com IA pausada e a mensagem é gravada pela RPC
+// import_history_messages — sem IA, sem notificação, sem transcrição.
 //
 // Payload: { event, instance, data } com data.message =
 //   { id, messageid, chatid, sender, senderName, isGroup, fromMe, messageType,
@@ -247,7 +249,12 @@ async function handleMessage(
   // (send-operator-*) já entram na inbox no envio — ignorar (anti-loop).
   // fromMe SEM wasSentByApi = o dono digitou direto no WhatsApp do celular →
   // registramos como mensagem OUTBOUND do próprio dono (sender_type 'owner').
-  if (isGroup || sentByApi) return;
+  if (sentByApi) return;
+  // Grupo: tratado à parte (aba Grupos do Inbox) — nunca aciona IA.
+  if (isGroup) {
+    await handleGroupMessage(admin, orgId, channel, data, message, errors);
+    return;
+  }
 
   // chatid é sempre o OUTRO lado do 1:1 (o lead), tanto no inbound quanto no
   // fromMe. No fromMe NÃO caímos em `sender` (que seria o próprio dono).
@@ -376,6 +383,132 @@ async function handleMessage(
       p_column: 'replied',
       p_delta: 1,
     });
+  }
+}
+
+
+// --- Grupos ------------------------------------------------------------------
+// O grupo é um contato cujo phone é o JID do grupo; cada mensagem guarda o
+// autor em messages.sender_name. A gravação passa pela RPC
+// import_history_messages (flag de importação): em grupo a IA nunca responde,
+// ninguém é notificado a cada mensagem e áudio não é transcrito sozinho.
+async function handleGroupMessage(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  channel: ChannelRow,
+  data: Record<string, unknown>,
+  message: Record<string, unknown>,
+  errors: string[],
+): Promise<void> {
+  const jid = str(message, ['chatid', 'chatId', 'chatID', 'remoteJid', 'remote_jid'])
+    ?? str(asObject(data.chat), ['wa_chatid', 'id']);
+  if (!jid || !jid.endsWith('@g.us')) {
+    errors.push('grupo sem JID');
+    return;
+  }
+  const fromMe = message.fromMe === true;
+  const chat = asObject(data.chat);
+  const groupName = str(chat, ['name', 'wa_name', 'wa_contactName']) ?? str(message, ['groupName', 'chatName']);
+
+  const { data: existing } = await admin
+    .from('contacts')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .eq('phone', jid)
+    .maybeSingle();
+  let contactId: string | null = null;
+  if (existing) {
+    const e = existing as { id: string; name: string | null };
+    contactId = e.id;
+    if (groupName && groupName !== e.name) {
+      await admin.from('contacts').update({ name: groupName }).eq('id', e.id);
+    }
+  } else {
+    const { data: created, error } = await admin
+      .from('contacts')
+      .insert({ org_id: orgId, phone: jid, name: groupName ?? 'Grupo', source: 'whatsapp_group' })
+      .select('id')
+      .single();
+    if (error) {
+      errors.push(`grupo contato: ${error.message}`);
+      return;
+    }
+    contactId = (created as { id: string }).id;
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: conv } = await admin
+    .from('conversations')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('contact_id', contactId)
+    .maybeSingle();
+  let conversationId = (conv as { id: string } | null)?.id ?? null;
+  if (conversationId) {
+    await admin.from('conversations').update({ last_message_at: nowIso }).eq('id', conversationId);
+  } else {
+    const insert: Record<string, unknown> = {
+      org_id: orgId,
+      contact_id: contactId,
+      status: 'human_active',
+      ai_paused: true,
+      channel: 'whatsapp',
+      provider: 'uazapi',
+      channel_id: channel.id,
+      last_message_at: nowIso,
+    };
+    const { data: created, error } = await admin.from('conversations').insert(insert).select('id').single();
+    if (error) {
+      errors.push(`grupo conversa: ${error.message}`);
+      return;
+    }
+    conversationId = (created as { id: string }).id;
+  }
+
+  const messageId = str(message, ['messageid', 'id']);
+  const decoded = decodeContent(message);
+  let contentType = decoded.contentType;
+  let mediaUrl = decoded.mediaUrl;
+  if (decoded.needsDownload && messageId) {
+    try {
+      const ctx = await uazapiContextFromChannel(channel);
+      const dl = await uazapiDownloadMessageFile(ctx, { messageId });
+      if (dl.fileUrl) {
+        mediaUrl = dl.fileUrl;
+        const mime = (dl.mimetype ?? '').toLowerCase();
+        if (mime.startsWith('image/')) contentType = 'image';
+        else if (mime.startsWith('audio/')) contentType = 'audio';
+        else if (mime.startsWith('video/')) contentType = 'video';
+        else contentType = 'document';
+      }
+    } catch (e) {
+      errors.push(`grupo download: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (contentType === 'text' && !decoded.content?.trim()) return; // reação/sistema
+
+  const tsRaw = message.messageTimestamp;
+  const tsMs = typeof tsRaw === 'number' && tsRaw > 0 ? (tsRaw < 1e12 ? tsRaw * 1000 : tsRaw) : Date.now();
+  const { data: inserted, error: rpcErr } = await admin.rpc('import_history_messages', {
+    p_org_id: orgId,
+    p_rows: [{
+      conversation_id: conversationId,
+      direction: fromMe ? 'outbound' : 'inbound',
+      sender_type: fromMe ? 'owner' : 'contact',
+      content_type: contentType,
+      content: contentType === 'audio' ? null : decoded.content,
+      media_url: mediaUrl,
+      external_id: messageId,
+      created_at: new Date(tsMs).toISOString(),
+      sender_name: fromMe ? null : (str(message, ['senderName', 'pushName']) ?? phoneFromJid(str(message, ['sender']))),
+    }],
+  });
+  if (rpcErr) {
+    errors.push(`grupo mensagem: ${rpcErr.message}`);
+    return;
+  }
+  if (!fromMe && Number(inserted) > 0) {
+    await admin.rpc('increment_unread_count', { p_conversation_id: conversationId });
   }
 }
 

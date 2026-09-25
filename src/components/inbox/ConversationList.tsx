@@ -1,4 +1,4 @@
-import { Bot, Inbox, Instagram, Lock, MessageCircle, User } from 'lucide-react';
+import { Bot, Inbox, Instagram, Lock, MessageCircle, User, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -112,6 +112,7 @@ export function ConversationList({
         const aiEnabled = aiEnabledForChannel?.(c.channel ?? null) ?? true;
         const status = statusChip(c, aiEnabled, assignedName);
         const StatusIcon = status.Icon;
+        const isGroup = (c.contact?.phone ?? '').endsWith('@g.us');
         const chan = channelBadge(
           c.channel,
           providerOf?.(c) ?? (c.channel === 'instagram' ? 'instagram' : 'meta'),
@@ -120,7 +121,7 @@ export function ConversationList({
         );
         const isActive = c.id === selectedId;
         const contact = c.contact;
-        const displayName = contact?.name?.trim() || contact?.phone || '—';
+        const displayName = contact?.name?.trim() || (isGroup ? 'Grupo' : contact?.phone) || '—';
 
         return (
           <button
@@ -166,12 +167,17 @@ export function ConversationList({
                   </span>
                   {/* Com responsável o chip acima mostra o nome dele e escondia
                       que a IA continua respondendo. */}
-                  {!c.ai_paused && aiEnabled && c.status !== 'closed' && c.assigned_to && (
+                  {isGroup && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                      <Users className="h-2.5 w-2.5" /> Grupo
+                    </span>
+                  )}
+                  {!isGroup && !c.ai_paused && aiEnabled && c.status !== 'closed' && c.assigned_to && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)]">
                       <Bot className="h-2.5 w-2.5" /> AMAIA ativa
                     </span>
                   )}
-                  {c.ai_paused && aiEnabled && (
+                  {!isGroup && c.ai_paused && aiEnabled && (
                     <span className="inline-flex items-center rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
                       AMAIA pausada
                     </span>

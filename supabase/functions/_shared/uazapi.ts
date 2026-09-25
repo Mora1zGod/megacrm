@@ -77,7 +77,10 @@ function messageIdOf(root: Record<string, unknown>): string | null {
 }
 
 // Telefone E.164/dígitos — a UAZAPI aceita número internacional sem '+'.
+// Grupo: o "telefone" do contato é o JID do grupo (…@g.us), que a UAZAPI
+// aceita como destino em /send/* — não pode perder o sufixo.
 function toNumber(phone: string): string {
+  if (phone.includes('@')) return phone.trim();
   return phone.replace(/\D/g, '');
 }
 
@@ -161,6 +164,7 @@ export async function uazapiGetChatDetails(
 
 export interface UazapiChat {
   wa_chatid?: string;
+  wa_isGroup_member?: boolean;
   phone?: string;
   wa_contactName?: string;
   wa_name?: string;
@@ -183,15 +187,16 @@ export interface UazapiMessage {
   fileURL?: string;
   senderName?: string;
   wasSentByApi?: boolean;
+  sender?: string;
 }
 
 export async function uazapiFindChats(
   ctx: UazapiContext,
-  input: { limit: number; offset: number },
+  input: { limit: number; offset: number; groups?: boolean },
 ): Promise<{ chats: UazapiChat[]; total: number | null }> {
   const root = await ufetch(ctx, '/chat/find', {
     compact: true,
-    wa_isGroup: false,
+    wa_isGroup: input.groups === true,
     sort: '-wa_lastMsgTimestamp',
     limit: input.limit,
     offset: input.offset,
@@ -233,4 +238,33 @@ export async function uazapiHistorySyncStatus(
   } catch {
     return { raw: text.slice(0, 300), status: res.status };
   }
+}
+
+// Webhook da instância: liga o recebimento de mensagens de GRUPO no webhook
+// que já aponta para o nosso uazapi-webhook (antes cadastrado com o filtro
+// isGroupYes, que descarta grupos). Mantém wasSentByApi (anti-loop).
+export async function uazapiEnableGroupsOnWebhook(
+  ctx: UazapiContext,
+): Promise<{ updated: boolean; id: string | null }> {
+  const res = await fetch(`${ctx.serverUrl}/webhook`, { headers: { token: ctx.token } });
+  const list = (await res.json().catch(() => [])) as Array<Record<string, unknown>>;
+  const ours = (Array.isArray(list) ? list : []).find(
+    (w) => typeof w.url === 'string' && w.url.includes('/functions/v1/uazapi-webhook'),
+  );
+  if (!ours) return { updated: false, id: null };
+  const exclude = Array.isArray(ours.excludeMessages)
+    ? (ours.excludeMessages as string[]).filter((x) => x !== 'isGroupYes')
+    : ['wasSentByApi'];
+  if (!exclude.includes('wasSentByApi')) exclude.push('wasSentByApi');
+  await ufetch(ctx, '/webhook', {
+    action: 'update',
+    id: ours.id,
+    enabled: true,
+    url: ours.url,
+    events: Array.isArray(ours.events) ? ours.events : ['connection', 'messages'],
+    excludeMessages: exclude,
+    addUrlEvents: false,
+    addUrlTypesMessages: false,
+  });
+  return { updated: true, id: typeof ours.id === 'string' ? ours.id : null };
 }

@@ -142,6 +142,8 @@ export function useContacts({
     let query = supabase
       .from('contacts')
       .select('*', { count: 'exact' })
+      // Grupos do WhatsApp ficam na aba Grupos do Inbox, não na lista de contatos.
+      .or('source.is.null,source.neq.whatsapp_group')
       .range(from, to);
 
     // Ordenação (coluna "Primeiro registro" e nome também ordenáveis).

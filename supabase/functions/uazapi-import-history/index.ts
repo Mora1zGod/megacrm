@@ -29,6 +29,7 @@ import {
   type UazapiChat,
   type UazapiMessage,
   uazapiContextFromChannel,
+  uazapiEnableGroupsOnWebhook,
   uazapiFindChats,
   uazapiFindMessages,
   uazapiHistorySyncStatus,
@@ -86,12 +87,13 @@ interface Row {
   media_url: string | null;
   external_id: string;
   created_at: string;
+  sender_name: string | null;
 }
 
-function toRow(m: UazapiMessage, conversationId: string): Row | null {
+function toRow(m: UazapiMessage, conversationId: string, isGroup = false): Row | null {
   const externalId = (m.messageid ?? m.id ?? '').trim();
   const ms = tsMs(m.messageTimestamp);
-  if (!externalId || !ms || m.isGroup) return null;
+  if (!externalId || !ms || (m.isGroup && !isGroup)) return null;
   const type = (m.messageType ?? '').toLowerCase();
   if (SKIP_TYPES.test(type)) return null;
 
@@ -113,6 +115,9 @@ function toRow(m: UazapiMessage, conversationId: string): Row | null {
     media_url: url,
     external_id: externalId,
     created_at: new Date(ms).toISOString(),
+    sender_name: isGroup && !m.fromMe
+      ? (m.senderName?.trim() || phoneFromJid(m.sender ?? null))
+      : null,
   };
 }
 
@@ -198,6 +203,67 @@ async function findOrCreateConversation(
   return { id: (created as { id: string }).id, created: true };
 }
 
+// Grupo: contato com phone = JID do grupo; conversa sempre com IA pausada e
+// em atendimento humano (aparece na aba Grupos do Inbox).
+async function findOrCreateGroup(
+  admin: Admin,
+  orgId: string,
+  channel: ChannelRow,
+  jid: string,
+  name: string | null,
+  lastAt: string,
+): Promise<{ id: string; created: boolean } | null> {
+  const { data: existing } = await admin
+    .from('contacts')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .eq('phone', jid)
+    .maybeSingle();
+  let contactId: string;
+  if (existing) {
+    const e = existing as { id: string; name: string | null };
+    contactId = e.id;
+    if (name && name !== e.name) await admin.from('contacts').update({ name }).eq('id', e.id);
+  } else {
+    const { data: created, error } = await admin
+      .from('contacts')
+      .insert({ org_id: orgId, phone: jid, name: name ?? 'Grupo', source: 'whatsapp_group' })
+      .select('id')
+      .single();
+    if (error) return null;
+    contactId = (created as { id: string }).id;
+  }
+  const { data: conv } = await admin
+    .from('conversations')
+    .select('id, last_message_at')
+    .eq('org_id', orgId)
+    .eq('contact_id', contactId)
+    .maybeSingle();
+  if (conv) {
+    const c = conv as { id: string; last_message_at: string | null };
+    if (!c.last_message_at || Date.parse(c.last_message_at) < Date.parse(lastAt)) {
+      await admin.from('conversations').update({ last_message_at: lastAt }).eq('id', c.id);
+    }
+    return { id: c.id, created: false };
+  }
+  const { data: created, error } = await admin
+    .from('conversations')
+    .insert({
+      org_id: orgId,
+      contact_id: contactId,
+      status: 'human_active',
+      ai_paused: true,
+      channel: 'whatsapp',
+      provider: 'uazapi',
+      channel_id: channel.id,
+      last_message_at: lastAt,
+    })
+    .select('id')
+    .single();
+  if (error) return null;
+  return { id: (created as { id: string }).id, created: true };
+}
+
 Deno.serve(async (req) => {
   const pre = preflight(req);
   if (pre) return pre;
@@ -211,7 +277,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, error: err instanceof Error ? err.message : 'Não autorizado' }, { status });
   }
 
-  let body: { channel_id?: string; action?: string; days?: number; chat_offset?: number };
+  let body: { channel_id?: string; action?: string; days?: number; chat_offset?: number; groups?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -232,11 +298,25 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, error: err instanceof Error ? err.message : 'Canal sem credenciais.' }, { status: 400 });
   }
 
+  if (body.action === 'enable_groups') {
+    try {
+      const r = await uazapiEnableGroupsOnWebhook(ctx);
+      if (!r.updated) {
+        return jsonResponse({ ok: false, error: 'Webhook do CRM não encontrado nesta instância. Reconecte o número em Configurações › Canais.' }, { status: 404 });
+      }
+      return jsonResponse({ ok: true, webhook_id: r.id });
+    } catch (err) {
+      return jsonResponse({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 502 });
+    }
+  }
+
+  const groups = body.groups === true;
+
   if (body.action === 'status') {
     try {
       const [sync, first] = await Promise.all([
         uazapiHistorySyncStatus(ctx),
-        uazapiFindChats(ctx, { limit: 1, offset: 0 }),
+        uazapiFindChats(ctx, { limit: 1, offset: 0, groups }),
       ]);
       return jsonResponse({ ok: true, sync, total_chats: first.total });
     } catch (err) {
@@ -258,7 +338,7 @@ Deno.serve(async (req) => {
 
   try {
     outer: while (Date.now() - started < TIME_BUDGET_MS) {
-      const page = await uazapiFindChats(ctx, { limit: CHAT_PAGE, offset });
+      const page = await uazapiFindChats(ctx, { limit: CHAT_PAGE, offset, groups });
       if (total === null) total = page.total;
       if (page.chats.length === 0) { done = true; break; }
 
@@ -270,8 +350,10 @@ Deno.serve(async (req) => {
         const last = tsMs(chat.wa_lastMsgTimestamp);
         // Chats vêm do mais recente para o mais antigo: passou do corte, acabou.
         if (last && last < cutoff) { done = true; break outer; }
-        if (!isPrivateChat(chat)) continue;
-        const phone = chatPhone(chat);
+        const jid = chat.wa_chatid ?? '';
+        const isGroupChat = groups && jid.endsWith('@g.us');
+        if (!isGroupChat && !isPrivateChat(chat)) continue;
+        const phone = isGroupChat ? jid : chatPhone(chat);
         if (!phone) continue;
 
         // Mensagens do chat, da mais recente para trás, até o corte.
@@ -291,15 +373,24 @@ Deno.serve(async (req) => {
         if (msgs.length === 0) continue;
 
         const newest = msgs.reduce((a, m) => Math.max(a, tsMs(m.messageTimestamp) ?? 0), 0);
-        const contactId = await findOrCreateContact(
-          admin, orgId, phone, chatName(chat), chat.imagePreview || chat.image || null,
-        );
-        if (!contactId) { errors.push(`contato ${phone}`); continue; }
-        const conv = await findOrCreateConversation(admin, orgId, contactId, channel, new Date(newest).toISOString());
+        const newestIso = new Date(newest).toISOString();
+        let conv: { id: string; created: boolean } | null;
+        if (isGroupChat) {
+          const groupName = [chat.name, chat.wa_name, chat.wa_contactName]
+            .find((v) => typeof v === 'string' && v.trim())?.trim() ?? null;
+          conv = await findOrCreateGroup(admin, orgId, channel, phone, groupName, newestIso);
+        } else {
+          const contactId = await findOrCreateContact(
+            admin, orgId, phone, chatName(chat), chat.imagePreview || chat.image || null,
+          );
+          if (!contactId) { errors.push(`contato ${phone}`); continue; }
+          conv = await findOrCreateConversation(admin, orgId, contactId, channel, newestIso);
+        }
         if (!conv) { errors.push(`conversa ${phone}`); continue; }
         if (conv.created) conversationsCreated += 1;
+        const convId = conv.id;
 
-        const rows = msgs.map((m) => toRow(m, conv.id)).filter((r): r is Row => r !== null);
+        const rows = msgs.map((m) => toRow(m, convId, isGroupChat)).filter((r): r is Row => r !== null);
         for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
           const { data, error } = await admin.rpc('import_history_messages', {
             p_org_id: orgId,
