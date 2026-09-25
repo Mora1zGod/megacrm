@@ -59,7 +59,17 @@ export function GroupsBar({ isAdmin, onDone }: { isAdmin: boolean; onDone: () =>
           if (d.done) break;
         }
       }
-      toast.success(`Grupos atualizados: ${grupos} grupos, ${total} mensagens dos últimos 7 dias.`);
+      // Fotos, áudios e documentos antigos vêm sem arquivo: busca um por um.
+      let midias = 0;
+      for (const ch of channels) {
+        for (let round = 0; round < 40; round++) {
+          const d = await invoke({ channel_id: ch.id, action: 'fetch_media' });
+          midias += Number(d.fixed) || 0;
+          setProgress(`${ch.label}: carregando mídias (${midias})... faltam ${Number(d.remaining) || 0}`);
+          if (d.done) break;
+        }
+      }
+      toast.success(`Grupos atualizados: ${grupos} grupos, ${total} mensagens, ${midias} mídias carregadas.`);
       onDone();
     } catch (e) {
       toast.error('Não consegui buscar os grupos.', { description: e instanceof Error ? e.message : String(e) });

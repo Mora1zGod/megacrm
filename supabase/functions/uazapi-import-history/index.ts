@@ -26,12 +26,14 @@ import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { AuthError, requireAdmin } from '../_shared/auth.ts';
 import { getChannelById, type ChannelRow } from '../_shared/channels.ts';
 import {
+  type UazapiContext,
   type UazapiChat,
   type UazapiMessage,
   uazapiContextFromChannel,
   uazapiEnableGroupsOnWebhook,
   uazapiFindChats,
   uazapiFindMessages,
+  uazapiDownloadMessageFile,
   uazapiHistorySyncStatus,
 } from '../_shared/uazapi.ts';
 
@@ -264,6 +266,79 @@ async function findOrCreateGroup(
   return { id: (created as { id: string }).id, created: true };
 }
 
+// Mídia sem arquivo: /message/find não traz fileURL de mensagem antiga. O
+// arquivo é resolvido por POST /message/download (link da UAZAPI, vale ~2
+// dias) e em seguida copiado para o nosso Storage pela archive-media.
+function mimeToType(mime: string | null, fallback: Row['content_type']): Row['content_type'] {
+  const m = (mime ?? '').toLowerCase();
+  if (m.startsWith('image/')) return 'image';
+  if (m.startsWith('audio/')) return 'audio';
+  if (m.startsWith('video/')) return 'video';
+  if (m) return 'document';
+  return fallback;
+}
+
+function archiveMedia(messageId: string): Promise<unknown> {
+  const url = Deno.env.get('SUPABASE_URL');
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) return Promise.resolve();
+  return fetch(`${url}/functions/v1/archive-media`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message_id: messageId }),
+  }).then((r) => r.text()).catch(() => undefined);
+}
+
+async function resolveMissingMedia(
+  admin: Admin,
+  ctx: UazapiContext,
+  orgId: string,
+  channelId: string,
+  started: number,
+): Promise<{ fixed: number; failed: number; remaining: number }> {
+  const { data } = await admin
+    .from('messages')
+    .select('id, zernio_message_id, content_type, conversations!inner(channel_id)')
+    .eq('org_id', orgId)
+    .eq('conversations.channel_id', channelId)
+    .in('content_type', ['image', 'audio', 'video', 'document'])
+    .is('media_url', null)
+    .not('zernio_message_id', 'is', null)
+    .gte('created_at', new Date(Date.now() - 60 * 86_400_000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(80);
+  const rows = (data ?? []) as Array<{ id: string; zernio_message_id: string; content_type: Row['content_type'] }>;
+  let fixed = 0;
+  let failed = 0;
+  const archives: Promise<unknown>[] = [];
+  for (const r of rows) {
+    if (Date.now() - started > TIME_BUDGET_MS) break;
+    try {
+      const dl = await uazapiDownloadMessageFile(ctx, { messageId: r.zernio_message_id });
+      if (!dl.fileUrl) { failed += 1; continue; }
+      await admin
+        .from('messages')
+        .update({ media_url: dl.fileUrl, content_type: mimeToType(dl.mimetype, r.content_type) })
+        .eq('id', r.id);
+      archives.push(archiveMedia(r.id));
+      fixed += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  await Promise.all(archives);
+  const { count } = await admin
+    .from('messages')
+    .select('id, conversations!inner(channel_id)', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('conversations.channel_id', channelId)
+    .in('content_type', ['image', 'audio', 'video', 'document'])
+    .is('media_url', null)
+    .not('zernio_message_id', 'is', null)
+    .gte('created_at', new Date(Date.now() - 60 * 86_400_000).toISOString());
+  return { fixed, failed, remaining: count ?? 0 };
+}
+
 Deno.serve(async (req) => {
   const pre = preflight(req);
   if (pre) return pre;
@@ -296,6 +371,11 @@ Deno.serve(async (req) => {
     ctx = await uazapiContextFromChannel(channel);
   } catch (err) {
     return jsonResponse({ ok: false, error: err instanceof Error ? err.message : 'Canal sem credenciais.' }, { status: 400 });
+  }
+
+  if (body.action === 'fetch_media') {
+    const r = await resolveMissingMedia(admin, ctx, caller.orgId, channel.id, Date.now());
+    return jsonResponse({ ok: true, ...r, done: r.fixed === 0 || r.remaining === 0 });
   }
 
   if (body.action === 'enable_groups') {

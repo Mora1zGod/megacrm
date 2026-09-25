@@ -20,6 +20,7 @@ interface Progress {
   imported: number;
   created: number;
   total: number | null;
+  media?: number;
 }
 
 export function ImportHistoryModal({
@@ -83,8 +84,18 @@ export function ImportHistoryModal({
           total: data.total_chats ?? p.total,
         }));
         offset = data.next_offset ?? offset;
-        if (data.done) { setDone(true); break; }
+        if (data.done) break;
       }
+      // Fotos, áudios e documentos antigos chegam sem arquivo: busca cada um.
+      for (let round = 0; round < 40 && !cancelRef.current; round++) {
+        const { data, error: err } = await getSupabase().functions.invoke('uazapi-import-history', {
+          body: { channel_id: channelId, action: 'fetch_media' },
+        });
+        if (err || !data?.ok) break;
+        setProgress((p) => ({ ...p, media: (p.media ?? 0) + (data.fixed ?? 0) }));
+        if (data.done) break;
+      }
+      setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -161,6 +172,7 @@ export function ImportHistoryModal({
             </div>
             <div className="text-[var(--color-text-secondary)]">
               {progress.chats} conversas lidas · {progress.imported} mensagens importadas · {progress.created} conversas novas
+              {progress.media ? ` · ${progress.media} mídias carregadas` : ''}
             </div>
           </div>
         )}
