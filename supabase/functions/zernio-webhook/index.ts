@@ -384,30 +384,92 @@ async function findOrCreateConversation(
 }
 
 // InboxWebhookMessage: { text, attachments:[{type: image|video|audio|file|
-// sticker|share, url}] }. O tipo vem do attachment; sem attachment é texto.
+// sticker|share, url, refreshUrl, originalType, mimeType}] }. O tipo vem do
+// attachment; sem attachment é texto.
+//
+// Instagram (docs Zernio): menção em story chega como attachment
+// type 'share' + originalType 'story_mention' (e isStoryMention=true);
+// resposta a story traz storyReply {storyId, storyUrl} e pode vir SEM texto;
+// noRenderableContent=true = a Meta não libera o conteúdo pela API. Antes
+// esses casos viravam balão vazio (só o horário) na conversa.
+const STORY_MENTION_LABEL = '📣 Mencionou o AMAI no story';
+const STORY_REPLY_LABEL = '↩️ Respondeu ao story do AMAI';
+const UNAVAILABLE_LABEL =
+  '[Conteúdo do Instagram que a Meta não libera pela API (story/post compartilhado). Abra a conversa no app do Instagram para ver.]';
+
 function decodeInbound(message: Record<string, unknown>): {
   contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
   content: string | null;
   mediaUrl: string | null;
 } {
-  const text = str(message, ['text', 'body', 'caption']);
+  const meta = asObject(message.metadata);
+  const text = str(message, ['text', 'body', 'caption', 'message']);
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const firstAttachment = asObject(attachments[0]);
-  const mediaUrl = str(firstAttachment, ['url', 'link', 'href']);
+  const attPayload = asObject(firstAttachment.payload);
+  // url é a do CDN (expira — o archive-media copia na hora); refreshUrl é do
+  // Zernio (exige Bearer, o archive-media já manda). payload.url cobre o
+  // formato cru da Meta.
+  const mediaUrl =
+    str(firstAttachment, ['url', 'link', 'href', 'refreshUrl', 'previewUrl']) ??
+    str(attPayload, ['url']);
   const attType = (str(firstAttachment, ['type']) ?? '').toLowerCase();
+  const originalType = (str(firstAttachment, ['originalType']) ?? '').toLowerCase();
+  const mime = (str(firstAttachment, ['mimeType', 'mime_type']) ?? '').toLowerCase();
 
-  if (!mediaUrl) return { contentType: 'text', content: text ?? '', mediaUrl: null };
+  const storyReply = asObject(message.storyReply ?? meta.storyReply);
+  const storyUrl = str(storyReply, ['storyUrl', 'url']);
+  const isStoryReply = Object.keys(storyReply).length > 0;
+  const isStoryMention =
+    message.isStoryMention === true || meta.isStoryMention === true || originalType === 'story_mention';
+  const withheld = message.noRenderableContent === true || meta.noRenderableContent === true;
+
+  const withLabel = (label: string) => (text ? `${label}: ${text}` : label);
+
+  if (isStoryMention) {
+    const url = mediaUrl ?? storyUrl;
+    if (url) {
+      // Story é foto ou vídeo; o archive-media corrige o tipo pelo arquivo.
+      return { contentType: mime.startsWith('video/') ? 'video' : 'image', content: withLabel(STORY_MENTION_LABEL), mediaUrl: url };
+    }
+    return { contentType: 'text', content: `${withLabel(STORY_MENTION_LABEL)}\n(o story não veio junto — abra no app do Instagram)`, mediaUrl: null };
+  }
+
+  if (!mediaUrl && isStoryReply) {
+    if (storyUrl) {
+      return { contentType: 'image', content: withLabel(STORY_REPLY_LABEL), mediaUrl: storyUrl };
+    }
+    return { contentType: 'text', content: withLabel(STORY_REPLY_LABEL), mediaUrl: null };
+  }
+
+  if (!mediaUrl) {
+    if (text) return { contentType: 'text', content: text, mediaUrl: null };
+    // Sem texto e sem arquivo: nunca gravar balão vazio.
+    if (withheld || attachments.length > 0 || attType === 'share') {
+      return { contentType: 'text', content: UNAVAILABLE_LABEL, mediaUrl: null };
+    }
+    return { contentType: 'text', content: '', mediaUrl: null };
+  }
+
+  const replyText = isStoryReply ? withLabel(STORY_REPLY_LABEL) : text;
+  if (mime.startsWith('image/')) return { contentType: 'image', content: replyText, mediaUrl };
+  if (mime.startsWith('video/')) return { contentType: 'video', content: replyText, mediaUrl };
+  if (mime.startsWith('audio/')) return { contentType: 'audio', content: null, mediaUrl };
   switch (attType) {
     case 'image':
     case 'sticker':
-      return { contentType: 'image', content: text, mediaUrl };
+      return { contentType: 'image', content: replyText, mediaUrl };
     case 'audio':
     case 'voice':
       return { contentType: 'audio', content: null, mediaUrl };
     case 'video':
-      return { contentType: 'video', content: text, mediaUrl };
-    default: // file, share, document
-      return { contentType: 'document', content: text, mediaUrl };
+      return { contentType: 'video', content: replyText, mediaUrl };
+    case 'share':
+      // Post/story/reel compartilhado: quase sempre imagem ou vídeo. O
+      // archive-media baixa e corrige o tipo pelo Content-Type real.
+      return { contentType: originalType.includes('reel') ? 'video' : 'image', content: replyText, mediaUrl };
+    default: // file, document, unsupported_type
+      return { contentType: 'document', content: replyText, mediaUrl };
   }
 }
 

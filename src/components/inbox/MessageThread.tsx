@@ -399,7 +399,17 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                 </div>
               )}
               {m.content_type === 'text' || m.content_type === 'note' ? (
-                <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                m.content?.trim() ? (
+                  <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                ) : (
+                  // Linha antiga sem texto nem arquivo (ex.: story do Instagram
+                  // compartilhado/mencionado antes da correção do webhook).
+                  <div className="italic opacity-75">
+                    {isInbound
+                      ? 'Conteúdo não disponível aqui (ex.: story compartilhado ou mencionado no Instagram). Abra no app para ver.'
+                      : 'Mensagem sem conteúdo visível.'}
+                  </div>
+                )
               ) : m.content_type === 'template' ? (
                 // Template é texto renderizado (body com variáveis já substituídas),
                 // não mídia — exibe o conteúdo com um rótulo discreto de template.
