@@ -318,8 +318,9 @@ export function MessageInput({
       ) : instagramHumanAgentWindow && !isPrivate ? (
         <div className="flex items-center gap-2 rounded-lg border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-[11px] text-[#FBBF24]">
           <Clock className="h-3.5 w-3.5 shrink-0" />
-          Fora da janela padrão de 24h do Instagram — sua resposta ainda é entregue
-          como atendimento humano, válida por até 7 dias desde a última mensagem do contato.
+          Passou de 24h desde a última mensagem do contato no Instagram. A entrega depende do
+          recurso “Human Agent” da Meta, que ainda não está liberado para a conta — a resposta
+          provavelmente não será entregue até o contato escrever de novo.
         </div>
       ) : null}
 

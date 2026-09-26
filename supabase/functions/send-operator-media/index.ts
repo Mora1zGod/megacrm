@@ -15,7 +15,7 @@ import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { ZernioError, uploadMediaDirect } from '../_shared/zernio.ts';
 import { loadOrgZernioContext } from '../_shared/channels.ts';
-import { sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
+import { friendlySendError, sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: err.message }, { status: err.status });
     }
     if (err instanceof ZernioError) {
-      return jsonResponse({ ok: false, error: err.message }, { status: err.status === 401 ? 401 : 502 });
+      return jsonResponse({ ok: false, error: friendlySendError(err) }, { status: err.status === 401 ? 401 : 502 });
     }
     console.error('send-operator-media error', err);
     return jsonResponse({ ok: false, error: err instanceof Error ? err.message : 'Erro interno' }, { status: 500 });

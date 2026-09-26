@@ -186,3 +186,19 @@ export async function sendInboxWithResolve(
     return await trySend(fresh);
   }
 }
+
+// Traduz o erro de envio para algo que o operador entenda. O caso mais comum:
+// Instagram depois de 24h exige a tag HUMAN_AGENT, e a Meta só aceita essa tag
+// quando o recurso "Human Agent" está APROVADO no app que faz o envio (o app do
+// Zernio). Sem essa aprovação a Meta recusa com "must be reviewed and approved
+// by Facebook" — não há o que o CRM faça; só dá para responder dentro de 24h.
+export const INSTAGRAM_HUMAN_AGENT_BLOCKED =
+  'Não entregue: passou de 24h desde a última mensagem do contato no Instagram, e a Meta ainda não liberou o recurso "Human Agent" (resposta até 7 dias) para a nossa conta. Só é possível responder quando o contato mandar uma nova mensagem.';
+
+export function friendlySendError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  if (/human agent/i.test(msg) || /reviewed and approved by facebook/i.test(msg)) {
+    return INSTAGRAM_HUMAN_AGENT_BLOCKED;
+  }
+  return msg || 'Erro ao enviar.';
+}

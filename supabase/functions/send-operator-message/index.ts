@@ -15,7 +15,7 @@
 import { requireOrgCaller, AuthError } from '../_shared/auth.ts';
 import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
-import { sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
+import { friendlySendError, sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
 
 interface Payload {
   conversation_id?: string;
@@ -195,12 +195,16 @@ Deno.serve(async (req) => {
         zernio_message_id: zernioMessageId,
       });
     } catch (err) {
-      await admin.from('messages').update({ meta_status: 'failed' }).eq('id', message.id);
+      const reason = friendlySendError(err);
+      await admin
+        .from('messages')
+        .update({ meta_status: 'failed', error_reason: reason })
+        .eq('id', message.id);
       return jsonResponse({
         ok: true,
         message_id: message.id,
         sent_to_zernio: false,
-        zernio_error: err instanceof Error ? err.message : 'Erro ao enviar via Zernio.',
+        zernio_error: reason,
       });
     }
   } catch (err) {
