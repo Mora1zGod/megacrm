@@ -4,7 +4,17 @@ import { cn } from '@/lib/utils';
 import type { ConversationWithContact } from '@/types/inbox';
 import type { InboxFilterState } from './inbox-filters';
 
-export type QuickChip = 'todas' | 'nao_lidas' | 'aguardando' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas' | 'grupos';
+export type QuickChip =
+  | 'todas' | 'minhas' | 'sem_dono' | 'nao_lidas' | 'aguardando' | 'aguardando_cliente'
+  | 'ia_pausada' | 'favoritas' | 'grupos';
+
+// "Sem dono" = conversa que precisa de gente e ninguém pegou: aberta, fora da
+// mão da IA e sem responsável. Conversa que a IA está atendendo não conta —
+// ela tem dono (a IA), e contá-la aqui faria o número inchar com atendimento
+// que não precisa de ninguém.
+export function isSemDono(c: ConversationWithContact): boolean {
+  return !c.assigned_to && c.status === 'human_active';
+}
 
 // Grupo do WhatsApp (UAZAPI): o contato do grupo tem como "telefone" o JID
 // do grupo (…@g.us). Grupos ficam só na aba Grupos — não misturam com os
@@ -24,6 +34,8 @@ interface Props {
   // base correta para os contadores refletirem o que o clique vai mostrar.
   base: ConversationWithContact[];
   filters: InboxFilterState;
+  // Operador logado — é quem define o que é "Minhas".
+  userId: string | null;
 }
 
 // Aguardando resposta = a última mensagem foi do contato.
@@ -31,10 +43,18 @@ export function isAguardando(c: ConversationWithContact): boolean {
   return c.lastMessageDirection === 'inbound';
 }
 
-export function matchesQuickChip(c: ConversationWithContact, chip: QuickChip): boolean {
+export function matchesQuickChip(
+  c: ConversationWithContact,
+  chip: QuickChip,
+  userId: string | null = null,
+): boolean {
   if (chip === 'grupos') return isGroupConversation(c);
   if (isGroupConversation(c)) return false;
   switch (chip) {
+    case 'minhas':
+      return Boolean(userId) && c.assigned_to === userId;
+    case 'sem_dono':
+      return isSemDono(c);
     case 'nao_lidas':
       return (c.unread_count ?? 0) > 0;
     case 'aguardando':
@@ -68,8 +88,10 @@ export function matchesBusca(c: ConversationWithContact, busca: string): boolean
   return ultima.includes(q);
 }
 
-export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }: Props) {
+export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, userId }: Props) {
   const contagem = useMemo(() => {
+    let minhas = 0;
+    let semDono = 0;
     let naoLidas = 0;
     let aguardando = 0;
     let aguardandoCliente = 0;
@@ -80,17 +102,21 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
     for (const c of base) {
       if (isGroupConversation(c)) { grupos++; continue; }
       todas++;
+      if (matchesQuickChip(c, 'minhas', userId)) minhas++;
+      if (isSemDono(c)) semDono++;
       if ((c.unread_count ?? 0) > 0) naoLidas++;
       if (isAguardando(c)) aguardando++;
       else if (c.status !== 'closed') aguardandoCliente++;
       if (c.ai_paused) iaPausada++;
       if (c.is_favorite) favoritas++;
     }
-    return { todas, naoLidas, aguardando, aguardandoCliente, iaPausada, favoritas, grupos };
-  }, [base]);
+    return { todas, minhas, semDono, naoLidas, aguardando, aguardandoCliente, iaPausada, favoritas, grupos };
+  }, [base, userId]);
 
   const chips: Array<{ id: QuickChip; label: string; count: number }> = [
     { id: 'todas', label: 'Tudo', count: contagem.todas },
+    { id: 'minhas', label: 'Minhas', count: contagem.minhas },
+    { id: 'sem_dono', label: 'Sem dono', count: contagem.semDono },
     { id: 'nao_lidas', label: 'Não lidas', count: contagem.naoLidas },
     { id: 'aguardando', label: 'Aguardando equipe', count: contagem.aguardando },
     { id: 'aguardando_cliente', label: 'Aguardando cliente', count: contagem.aguardandoCliente },
@@ -124,9 +150,12 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
       <div className="inbox-quick-filters">
         {chips.map((c) => {
           const ativo = chip === c.id;
-          // Chip sem nada para mostrar (fora "Tudo") fica oculto — não faz
-          // sentido oferecer um filtro que resultaria em lista vazia.
-          if (c.id !== 'todas' && c.id !== 'grupos' && c.count === 0 && !ativo) return null;
+          // Chip sem nada para mostrar fica oculto — não faz sentido oferecer
+          // um filtro que resultaria em lista vazia. "Minhas" e "Sem dono"
+          // ficam sempre: são as abas fixas de quem atende, e zero ali é
+          // informação ("não tem nada esperando"), não ruído.
+          const fixo = c.id === 'todas' || c.id === 'grupos' || c.id === 'minhas' || c.id === 'sem_dono';
+          if (!fixo && c.count === 0 && !ativo) return null;
           return (
             <button
               key={c.id}

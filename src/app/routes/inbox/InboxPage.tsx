@@ -145,10 +145,10 @@ export default function InboxPage() {
 
   const visibleConversations = useMemo(() => {
     const filtered = baseConversations.filter(
-      (c) => matchesQuickChip(c, quickChip) && matchesBusca(c, busca),
+      (c) => matchesQuickChip(c, quickChip, userId) && matchesBusca(c, busca),
     );
     return sortConversations(filtered, sort);
-  }, [baseConversations, quickChip, busca, sort]);
+  }, [baseConversations, quickChip, busca, sort, userId]);
 
   const { messages, loading: loadingMsgs, sendText, retry, dismissFailed } = useMessages(selectedId);
 
@@ -284,6 +284,7 @@ export default function InboxPage() {
               onChipChange={setQuickChip}
               base={baseConversations}
               filters={filters}
+              userId={userId}
             />
             <InboxFilters
               filters={filters}
