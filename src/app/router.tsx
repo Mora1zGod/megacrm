@@ -29,6 +29,7 @@ const IntegrationsPage = lazy(() => import('./routes/integrations/IntegrationsPa
 const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
 const FilesPage = lazy(() => import('./routes/files/FilesPage'));
 const ChatPage = lazy(() => import('./routes/chat/ChatPage'));
+const SalesTvPage = lazy(() => import('./routes/tv/SalesTvPage'));
 
 function PageFallback() {
   return (
@@ -155,6 +156,20 @@ export function AppRouter() {
           element={
             <RequireSetup>
               <InvitePage />
+            </RequireSetup>
+          }
+        />
+
+        {/* Painel TV: tela cheia, fora do layout (sem menu/topo). */}
+        <Route
+          path="/painel-tv"
+          element={
+            <RequireSetup>
+              <RequireSession>
+                <AdminOnly>
+                  <SalesTvPage />
+                </AdminOnly>
+              </RequireSession>
             </RequireSetup>
           }
         />

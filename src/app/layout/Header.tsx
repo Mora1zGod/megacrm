@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Menu, LogOut, Search, Plus, ChevronDown, User, Briefcase, CalendarDays, CheckSquare, Megaphone, Sun, Moon } from 'lucide-react';
+import { Menu, LogOut, Search, Plus, ChevronDown, User, Briefcase, CalendarDays, CheckSquare, Megaphone, Sun, Moon, BadgeDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationsDropdown } from '@/components/NotificationsDropdown';
 import { OrgSwitcher } from '@/app/layout/OrgSwitcher';
@@ -9,6 +9,9 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { Avatar } from '@/components/ui/Avatar';
+import { NewSaleDialog } from '@/components/sales/NewSaleDialog';
+import { GoalPill } from '@/components/sales/GoalPill';
+import { OPEN_NEW_SALE_EVENT } from '@/hooks/useSales';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -25,10 +28,23 @@ const CRIAR_ITEMS = [
 export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { displayName, avatarUrl, effectiveTheme, toggleTheme } = useAppUser();
+  const { displayName, avatarUrl, effectiveTheme, toggleTheme, role } = useAppUser();
   const themeLabel = effectiveTheme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro';
   const [searchOpen, setSearchOpen] = useState(false);
   const [criarOpen, setCriarOpen] = useState(false);
+  const [saleOpen, setSaleOpen] = useState(false);
+  const [saleContact, setSaleContact] = useState<{ id: string; name: string | null } | null>(null);
+
+  // Nova Venda pode ser aberta de qualquer tela (ex.: ficha do contato).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const d = (e as CustomEvent<{ contactId?: string; contactName?: string | null } | undefined>).detail;
+      setSaleContact(d?.contactId ? { id: d.contactId, name: d.contactName ?? null } : null);
+      setSaleOpen(true);
+    };
+    window.addEventListener(OPEN_NEW_SALE_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_NEW_SALE_EVENT, onOpen);
+  }, []);
 
   // Ctrl+K (ou Cmd+K no Mac) abre a busca global de qualquer tela.
   useEffect(() => {
@@ -75,6 +91,15 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex min-w-0 items-center gap-2 sm:gap-3 shrink-0">
+        {role === 'admin' && <GoalPill />}
+        <Button
+          variant="success"
+          onClick={() => { setSaleContact(null); setSaleOpen(true); }}
+          className="min-h-10"
+          aria-label="Nova venda"
+        >
+          <BadgeDollarSign className="h-4 w-4" /> <span className="hidden sm:inline">Nova venda</span>
+        </Button>
         <div className="relative">
           <Button onClick={() => setCriarOpen((v) => !v)} className="min-h-10">
             <Plus className="h-4 w-4" /> Criar <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${criarOpen ? 'rotate-180' : ''}`} />
@@ -132,6 +157,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <NewSaleDialog open={saleOpen} onClose={() => setSaleOpen(false)} initialContact={saleContact} />
     </header>
   );
 }

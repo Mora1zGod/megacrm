@@ -40,6 +40,7 @@ import {
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { CredentialsBanner } from '@/components/CredentialsBanner';
 import { cn } from '@/lib/utils';
+import { RevenueGoalCard } from '@/components/sales/RevenueGoalCard';
 
 const NO_UTM = 'Sem dados de rastreio ainda.';
 const NO_WON_UTM = 'Nenhuma venda ganha com rastreio no período.';
@@ -155,6 +156,9 @@ export default function DashboardPage() {
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
         </p>
       </div>
+
+      {/* Vendas do mês: meta, recebido, ranking (Nova Venda) */}
+      <RevenueGoalCard />
 
       {/* KPIs compactos — dado real, sem tendência % inventada */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
