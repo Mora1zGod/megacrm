@@ -16,7 +16,7 @@ const GROUP_ORDER: NavItem['group'][] = ['Operação', 'Engajamento', 'Gestão',
 // Drawer de navegação para telas < md (768px). Sem ele, a Sidebar
 // (`hidden md:flex`) deixava o app sem NENHUMA navegação no mobile.
 export function MobileNav({ open, onClose }: MobileNavProps) {
-  const { role, isSuperAdmin } = useAppUser();
+  const { isSuperAdmin } = useAppUser();
   const perms = usePermission();
   const visibleItems = NAV_ITEMS.filter((item) => navItemVisible(item, perms.can, isSuperAdmin));
   const groups = GROUP_ORDER.map((group) => ({
