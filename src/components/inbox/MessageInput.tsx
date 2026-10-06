@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
 import { Clock, FileText, Loader2, Mic, MoreHorizontal, Paperclip, Send, Smile, Sparkles, StickyNote, Undo2, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -133,16 +133,73 @@ export function MessageInput({
     }
   };
 
+  // Anexo vindo do botão, do Ctrl+V (print/arquivo copiado) ou de arrastar.
+  const acceptFile = (f: File | null): boolean => {
+    if (!f) return false;
+    if (f.size > MAX_BYTES) {
+      toast.error('Arquivo excede 25MB.');
+      return false;
+    }
+    // Print colado chega como "image.png": dá um nome com data/hora.
+    let named = f;
+    if (/^image\.(png|jpe?g|gif|webp)$/i.test(f.name) || !f.name) {
+      const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+      named = new File([f], `print-${stamp}.${ext}`, { type: f.type || 'image/png' });
+    }
+    setFile(named);
+    setIsPrivate(false); // mídia nunca é nota privada
+    return true;
+  };
+
   const onPickFile = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
-    if (f && f.size > MAX_BYTES) {
-      toast.error('Arquivo excede 25MB.');
-      e.target.value = '';
-      return;
-    }
-    setFile(f);
-    if (f) setIsPrivate(false); // mídia nunca é nota privada
+    if (!acceptFile(f)) e.target.value = '';
   };
+
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData?.files ?? []);
+    if (items.length === 0) return; // texto normal: cola como sempre
+    e.preventDefault();
+    if (items.length > 1) toast.info('Colei o primeiro arquivo — envie um por vez.');
+    acceptFile(items[0]);
+    // Texto que veio junto (ex.: legenda copiada) vira a legenda.
+    const text = e.clipboardData.getData('text/plain');
+    if (text && !content) setContent(text);
+  };
+
+  // Ctrl+V com o foco fora da caixa (ex.: logo depois de clicar na conversa)
+  // também anexa o print/arquivo — igual ao WhatsApp Web.
+  useEffect(() => {
+    const onWinPaste = (e: globalThis.ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (!files.length) return;
+      e.preventDefault();
+      if (acceptFile(files[0])) textareaRef.current?.focus();
+    };
+    window.addEventListener('paste', onWinPaste);
+    return () => window.removeEventListener('paste', onWinPaste);
+  });
+
+  const [dragOver, setDragOver] = useState(false);
+  const onDrop = (e: DragEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer?.files?.[0];
+    if (f) acceptFile(f);
+  };
+
+  // Miniatura do anexo de imagem (print colado, foto).
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file || !file.type.startsWith('image/')) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const sendMedia = async () => {
     if (!file) return;
@@ -286,7 +343,18 @@ export function MessageInput({
   const chipReplies = quickReplies.slice(0, 5);
 
   return (
-    <form onSubmit={handleSubmit} className="inbox-composer space-y-2">
+    <form
+      onSubmit={handleSubmit}
+      onDragOver={(e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
+      onDrop={onDrop}
+      className={`inbox-composer relative space-y-2 ${dragOver ? 'outline-2 outline-dashed outline-[var(--accent-primary)] -outline-offset-4' : ''}`}
+    >
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-xl bg-[var(--color-accent-subtle)] text-sm font-semibold text-[var(--accent-primary)]">
+          Solte o arquivo para anexar
+        </div>
+      )}
       {blocked ? (
         <div className="flex flex-col gap-2 rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.06)] p-3">
           <div className="flex items-center gap-2 text-sm font-medium text-[var(--inbox-warn-text,#FBBF24)]">
@@ -319,7 +387,9 @@ export function MessageInput({
 
       {!blocked && file && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
-          <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+          {previewUrl
+            ? <img src={previewUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
+            : <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />}
           <span className="truncate text-[var(--color-text-primary)]">{file.name}</span>
           <span className="text-[var(--color-text-secondary)]">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
           <button
@@ -437,6 +507,7 @@ export function MessageInput({
                 value={content}
                 onChange={(e) => { setContent(e.target.value); if (preImprove !== null) setPreImprove(null); }}
                 onKeyDown={handleKey}
+                onPaste={onPaste}
                 rows={1}
                 disabled={disabled || sending}
                 placeholder={
