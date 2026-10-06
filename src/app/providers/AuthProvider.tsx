@@ -90,12 +90,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback<AuthContextValue['signIn']>(async (email, password) => {
     const supabase = getSupabase();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
+    if (error) {
+      // Usuário desativado na tela "Usuários e acessos" fica banido no Auth.
+      if (/banned/i.test(error.message)) {
+        return { error: 'Seu acesso foi desativado. Fale com o administrador.' };
+      }
+      return { error: error.message };
+    }
+    // Auditoria de login (best-effort; banco sem a etapa 3 só ignora).
+    void supabase.rpc('log_access_event', { p_action: 'auth.login', p_user_agent: navigator.userAgent }).then(() => undefined, () => undefined);
     return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
     const supabase = getSupabase();
+    try {
+      await supabase.rpc('log_access_event', { p_action: 'auth.logout', p_user_agent: navigator.userAgent });
+    } catch {
+      // auditoria é best-effort
+    }
     await supabase.auth.signOut();
   }, []);
 

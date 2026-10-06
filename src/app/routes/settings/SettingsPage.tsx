@@ -8,6 +8,7 @@ import {
   Package,
   Palette,
   Settings as SettingsIcon,
+  ShieldCheck,
   Timer,
   UserCircle2,
   Users,
@@ -25,6 +26,7 @@ import { BrandingSettings } from './sections/BrandingSettings';
 import { QuickRepliesSettings } from './sections/QuickRepliesSettings';
 import { BirthdaySettings } from './sections/BirthdaySettings';
 import { AttendanceSettings } from './sections/AttendanceSettings';
+import { AccessSettings } from './sections/access/AccessSettings';
 
 type TabId =
   | 'account'
@@ -35,7 +37,8 @@ type TabId =
   | 'birthday'
   | 'api'
   | 'branding'
-  | 'attendance';
+  | 'attendance'
+  | 'access';
 
 interface TabDef {
   id: TabId;
@@ -68,9 +71,17 @@ export default function SettingsPage() {
             render: () => <AccountSettings />,
           },
           {
+            id: 'access',
+            label: 'Usuários e acessos',
+            hint: 'Equipe, perfis e permissões',
+            icon: ShieldCheck,
+            perm: 'users.view',
+            render: () => <AccessSettings />,
+          },
+          {
             id: 'team',
-            label: 'Equipe',
-            hint: 'Convites e roles',
+            label: 'Filas',
+            hint: 'Filas e rodízio de atendimento',
             icon: Users,
             perm: 'users.view',
             render: () => <TeamSettings />,
