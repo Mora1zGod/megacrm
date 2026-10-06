@@ -86,12 +86,15 @@ function toNumber(phone: string): string {
 
 export async function uazapiSendText(
   ctx: UazapiContext,
-  input: { phone: string; text: string },
+  input: { phone: string; text: string; replyId?: string },
 ): Promise<{ messageId: string | null }> {
-  const root = await ufetch(ctx, '/send/text', {
+  const body: Record<string, unknown> = {
     number: toNumber(input.phone),
     text: input.text,
-  });
+  };
+  // replyid: "ID da mensagem para responder" (docs.uazapi.com, /send/text).
+  if (input.replyId) body.replyid = input.replyId;
+  const root = await ufetch(ctx, '/send/text', body);
   return { messageId: messageIdOf(root) };
 }
 
@@ -103,6 +106,7 @@ export async function uazapiSendMedia(
     type: 'image' | 'video' | 'document' | 'audio' | 'ptt';
     fileUrl: string;
     caption?: string;
+    replyId?: string;
   },
 ): Promise<{ messageId: string | null }> {
   const body: Record<string, unknown> = {
@@ -111,6 +115,7 @@ export async function uazapiSendMedia(
     file: input.fileUrl,
   };
   if (input.caption) body.text = input.caption;
+  if (input.replyId) body.replyid = input.replyId;
   const root = await ufetch(ctx, '/send/media', body);
   return { messageId: messageIdOf(root) };
 }

@@ -576,6 +576,27 @@ Regras:
 - Raio: `--radius-card` 12px, `--radius-control` 10px. Fonte Inter; corpo 14–16px.
 - Atendimento (06/10/2026, visual "WhatsApp verde"): lista 340–360px | conversa com papel de parede | painel de cartões 360px (só ≥1440px; abaixo, overlay pelo menu ⋮ → Detalhes). O verde vale só dentro de `.inbox-workspace` (tokens redefinidos em `src/app/routes/inbox/inbox.css`); o resto do CRM segue o azul.
 
+## Controle de acesso (etapa 1 em 07/10/2026)
+
+- Perfis por org: `access_roles` (+ `role_permissions`), catálogo global `permissions`
+  (chaves `modulo.acao`, ex. `contacts.delete`), exceções `user_permission_overrides`
+  (allow/deny), `teams`. `app_users` ganhou `status`, `access_role_id`, `team_id`,
+  `job_title`, `phone`, `must_change_password`.
+- Regra: permissão = perfil + allow − deny; super admin e perfil `is_admin` = tudo.
+  Camada única no banco: `has_perm(key)`, `perm_scope(module)`, `is_full_admin()`,
+  `my_permissions()` (jsonb para o front). Usuário inativo = sem permissão.
+- Perfil define o papel legado (`is_admin` → `admin`, senão `operator`) e o trigger
+  `_app_users_sync_jwt` espelha no JWT. As policies antigas (`current_user_role()`)
+  ainda valem; a troca por `has_perm()` é tabela por tabela (etapa 4).
+
+## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
+
+- `messages.reply_to_id` / `platform_message_id` ("wamid", do webhook Zernio) /
+  `forwarded`. Citação nativa: Zernio `replyTo` (id da Meta), UAZAPI `replyid`.
+- Encaminhar mídia: `send-operator-media` com `forward_message_id` (servidor baixa e reenvia).
+- SLA: `app_settings.sla_warn_minutes/sla_late_minutes` (Configurações → Atendimento);
+  `ConversationWithContact.waitingSince`. Assinatura: `app_users.sign_messages`.
+
 ## Notas de migração e variáveis não-triviais
 
 - `tenant_members` foi renomeada para `app_users` na Fase 4 da migração SaaS

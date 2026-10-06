@@ -152,6 +152,10 @@ export function useConversations(): UseConversationsResult {
     const latestByConv = new Map<string, string>();
     const lastDirByConv = new Map<string, 'inbound' | 'outbound'>();
     const lastInboundByConv = new Map<string, string>();
+    // SLA: anda do mais novo para o mais antigo; enquanto só houver inbound,
+    // "esperando desde" recua; a 1ª outbound (não-nota) encerra a contagem.
+    const waitingByConv = new Map<string, string>();
+    const waitDone = new Set<string>();
     for (const m of (lastMsgsQ.data ?? []) as Array<{
       conversation_id: string;
       content: string | null;
@@ -167,6 +171,10 @@ export function useConversations(): UseConversationsResult {
       }
       if (m.direction === 'inbound' && !lastInboundByConv.has(m.conversation_id)) {
         lastInboundByConv.set(m.conversation_id, m.created_at);
+      }
+      if (!m.is_private_note && !waitDone.has(m.conversation_id)) {
+        if (m.direction === 'inbound') waitingByConv.set(m.conversation_id, m.created_at);
+        else waitDone.add(m.conversation_id);
       }
     }
 
@@ -189,6 +197,7 @@ export function useConversations(): UseConversationsResult {
         isCliente: clienteSet.has(c.contact_id),
         channelPhone: ch?.phone ?? null,
         channelLabel: ch?.label ?? null,
+        waitingSince: c.status === 'closed' ? null : (waitingByConv.get(c.id) ?? null),
       };
     });
 

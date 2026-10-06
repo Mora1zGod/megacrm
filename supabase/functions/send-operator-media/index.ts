@@ -26,6 +26,8 @@ function classify(mime: string): 'image' | 'audio' | 'video' | 'document' {
   return 'document';
 }
 
+type QuotedMsg = { id: string; zernio_message_id: string | null; platform_message_id: string | null };
+
 Deno.serve(async (req) => {
   const pre = preflight(req);
   if (pre) return pre;
@@ -47,14 +49,18 @@ Deno.serve(async (req) => {
     const caption = String(form.get('content') ?? '').trim();
     const voiceNote = String(form.get('voice_note') ?? '') === 'true';
     const file = form.get('file');
+    // Encaminhar: em vez de arquivo, o id de uma mensagem de mídia (de qualquer
+    // conversa da org). O servidor baixa a mídia e reenvia.
+    const forwardId = String(form.get('forward_message_id') ?? '').trim() || null;
+    const replyToId = String(form.get('reply_to_message_id') ?? '').trim() || null;
 
     if (!conversationId) {
       return jsonResponse({ ok: false, error: 'conversation_id ausente.' }, { status: 400 });
     }
-    if (!(file instanceof File)) {
+    if (!(file instanceof File) && !forwardId) {
       return jsonResponse({ ok: false, error: 'Arquivo ausente.' }, { status: 400 });
     }
-    if (file.size > MAX_BYTES) {
+    if (file instanceof File && file.size > MAX_BYTES) {
       return jsonResponse({ ok: false, error: 'Arquivo excede 25MB.' }, { status: 400 });
     }
 
@@ -115,14 +121,59 @@ Deno.serve(async (req) => {
       }
     }
 
-    const contentType = classify(file.type || '');
-    const mime = file.type || 'application/octet-stream';
-    const filename = voiceNote ? 'voice-note.ogg' : (file.name || `arquivo-${contentType}`);
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const zernio = await loadOrgZernioContext(admin, caller.orgId, convRow.zernio_account_id ?? null);
+
+    // Mensagem citada (mesma conversa).
+    let quoted: QuotedMsg | null = null;
+    if (replyToId) {
+      const { data: q } = await admin
+        .from('messages').select('*')
+        .eq('id', replyToId).eq('conversation_id', conversationId).eq('org_id', caller.orgId)
+        .maybeSingle();
+      if (!q) return jsonResponse({ ok: false, error: 'Mensagem citada não encontrada nesta conversa.' }, { status: 400 });
+      quoted = q as QuotedMsg;
+    }
+
+    let contentType: 'image' | 'audio' | 'video' | 'document';
+    let mime: string;
+    let filename: string;
+    let bytes: Uint8Array;
+    if (file instanceof File) {
+      contentType = classify(file.type || '');
+      mime = file.type || 'application/octet-stream';
+      filename = voiceNote ? 'voice-note.ogg' : (file.name || `arquivo-${contentType}`);
+      bytes = new Uint8Array(await file.arrayBuffer());
+    } else {
+      const { data: src } = await admin
+        .from('messages')
+        .select('id, org_id, content_type, media_url, is_private_note')
+        .eq('id', forwardId!)
+        .eq('org_id', caller.orgId)
+        .maybeSingle();
+      const srcRow = src as { content_type: string; media_url: string | null; is_private_note: boolean } | null;
+      if (!srcRow || srcRow.is_private_note || !srcRow.media_url || !/^https?:\/\//i.test(srcRow.media_url)) {
+        return jsonResponse({ ok: false, error: 'Mídia original não encontrada para encaminhar.' }, { status: 404 });
+      }
+      // Mídia recebida pelo Zernio exige a API key; as demais são públicas.
+      const needsKey = /^https:\/\/zernio\.com\/api\/v1\//i.test(srcRow.media_url);
+      const upstream = await fetch(srcRow.media_url, needsKey ? { headers: { Authorization: `Bearer ${zernio.apiKey}` } } : undefined);
+      if (!upstream.ok) {
+        return jsonResponse({ ok: false, error: `Não consegui baixar a mídia original (${upstream.status}). Ela pode ter expirado.` }, { status: 502 });
+      }
+      bytes = new Uint8Array(await upstream.arrayBuffer());
+      if (bytes.byteLength > MAX_BYTES) {
+        return jsonResponse({ ok: false, error: 'Arquivo excede 25MB.' }, { status: 400 });
+      }
+      mime = upstream.headers.get('content-type')?.split(';')[0] || 'application/octet-stream';
+      contentType = (['image', 'audio', 'video', 'document'] as const).includes(srcRow.content_type as never)
+        ? (srcRow.content_type as 'image' | 'audio' | 'video' | 'document')
+        : classify(mime);
+      const ext = (mime.split('/')[1] || 'bin').replace('jpeg', 'jpg').replace('quicktime', 'mov');
+      filename = `encaminhado-${contentType}.${ext}`;
+    }
 
     // 1. Sobe a mídia ao Zernio (host da URL usada no attachmentUrl, inclusive
     //    para conversas UAZAPI que enviam a URL direto pela instância).
-    const zernio = await loadOrgZernioContext(admin, caller.orgId, convRow.zernio_account_id ?? null);
     const mediaUrl = await uploadMediaDirect({ apiKey: zernio.apiKey, bytes, filename, contentType: mime });
 
     // 2. Resolve a conversa 1:1 no Zernio (por canal) e envia a mídia, curando
@@ -147,7 +198,14 @@ Deno.serve(async (req) => {
         zernioAccountId: convRow.zernio_account_id ?? null,
         provider: convRow.provider ?? null,
       },
-      { attachmentUrl: mediaUrl, voiceNote, text: caption || undefined, humanAgentTag },
+      {
+        attachmentUrl: mediaUrl,
+        voiceNote,
+        text: caption || undefined,
+        humanAgentTag,
+        ...(quoted?.platform_message_id ? { replyTo: quoted.platform_message_id } : {}),
+        ...(quoted?.zernio_message_id ? { replyIdUazapi: quoted.zernio_message_id } : {}),
+      },
     );
 
     // 4. Persiste a linha (media_url = url do Zernio, baixável pelo thread).
@@ -165,6 +223,8 @@ Deno.serve(async (req) => {
         zernio_message_id: zernioMessageId,
         meta_status: 'sent',
         is_private_note: false,
+        ...(quoted ? { reply_to_id: quoted.id } : {}),
+        ...(forwardId ? { forwarded: true } : {}),
       })
       .select('id')
       .single();

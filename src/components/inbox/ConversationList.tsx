@@ -1,9 +1,11 @@
-import { Bot, Inbox, Instagram, Lock, MessageCircle, PauseCircle, User, Users } from 'lucide-react';
+import { Bot, Inbox, Instagram, Lock, MessageCircle, PauseCircle, Timer, User, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { WhatsappProvider } from '@/hooks/useWhatsappProvider';
 import type { ConversationChannel, ConversationWithContact } from '@/types/inbox';
+import { DEFAULT_SLA, type SlaConfig } from '@/hooks/useSlaConfig';
+import { formatWait, slaState } from '@/lib/sla';
 
 // Badge de canal/provedor: WhatsApp Meta (oficial), UAZAPI (não oficial, sem
 // janela de 24h) ou Instagram. Quando o número do canal é conhecido, mostra o
@@ -42,6 +44,9 @@ interface ConversationListProps {
   operatorName?: (userId: string | null) => string | null;
   isLocked?: (conv: ConversationWithContact) => boolean;
   providerOf?: (conv: ConversationWithContact) => WhatsappProvider;
+  // SLA de resposta (minutos) + relógio — mostra "esperando há X min".
+  sla?: SlaConfig;
+  now?: number;
 }
 
 function statusChip(c: ConversationWithContact, aiEnabled: boolean, assignedName: string | null) {
@@ -76,6 +81,8 @@ export function ConversationList({
   operatorName,
   isLocked,
   providerOf,
+  sla = DEFAULT_SLA,
+  now = Date.now(),
 }: ConversationListProps) {
   if (loading) {
     return (
@@ -125,6 +132,7 @@ export function ConversationList({
 
         const unread = c.unread_count > 0;
         const isInstagram = c.channel === 'instagram';
+        const wait = !isGroup && !locked ? slaState(c.waitingSince, sla, now) : null;
 
         return (
           <button
@@ -171,6 +179,21 @@ export function ConversationList({
                       : <MessageCircle className="h-3 w-3 text-[var(--inbox-wa,#25D366)]" />}
                     {isInstagram ? 'Instagram' : chan.label}
                   </span>
+                  {wait && (
+                    <span
+                      title={`Esperando resposta há ${formatWait(wait.minutes)} (SLA: amarelo ${sla.warn} min, vermelho ${sla.late} min)`}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold',
+                        wait.level === 'late'
+                          ? 'bg-[var(--color-error)] text-white'
+                          : wait.level === 'warn'
+                            ? 'bg-[rgba(245,158,11,0.16)] text-[var(--inbox-warn-text)]'
+                            : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]',
+                      )}
+                    >
+                      <Timer className="h-3 w-3" /> {formatWait(wait.minutes)}
+                    </span>
+                  )}
                   {isGroup && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
                       <Users className="h-3 w-3" /> Grupo

@@ -50,6 +50,10 @@ export interface InboxSendPayload {
   // Só Instagram, só chamado a partir de send-operator-message/send-operator-media
   // (nunca da IA) — ver comentário em zernio.ts::sendInboxMessage.
   humanAgentTag?: boolean;
+  // Responder citando. replyTo = id da mensagem NA PLATAFORMA (WhatsApp
+  // "wamid…") para o Zernio; replyIdUazapi = id da mensagem na instância UAZAPI.
+  replyTo?: string;
+  replyIdUazapi?: string;
 }
 
 interface Resolved {
@@ -91,10 +95,11 @@ export async function sendInboxWithResolve(
         type,
         fileUrl: payload.attachmentUrl,
         caption: payload.text,
+        replyId: payload.replyIdUazapi,
       });
       return sent.messageId;
     }
-    const sent = await uazapiSendText(uctx, { phone: target.phone, text: payload.text ?? '' });
+    const sent = await uazapiSendText(uctx, { phone: target.phone, text: payload.text ?? '', replyId: payload.replyIdUazapi });
     return sent.messageId;
   }
 
@@ -156,11 +161,12 @@ export async function sendInboxWithResolve(
   }
 
   const trySend = async (r: Resolved): Promise<string | null> => {
+    const { replyIdUazapi: _ignored, ...zernioPayload } = payload;
     const sent = await sendInboxMessage({
       apiKey: ctx.apiKey,
       accountId: r.accountId,
       conversationId: r.conversationId,
-      ...payload,
+      ...zernioPayload,
     });
     return sent.messageId;
   };

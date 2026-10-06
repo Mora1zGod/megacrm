@@ -577,7 +577,7 @@ async function handleMessageReceived(
   }
 
   const { contentType, content, mediaUrl } = decodeInbound(message);
-  const { error: insErr } = await admin.from('messages').insert({
+  const { error: insErr } = await insertMessageRow(admin, {
     org_id: orgId,
     conversation_id: conversationId,
     direction: 'inbound',
@@ -586,6 +586,8 @@ async function handleMessageReceived(
     content,
     media_url: mediaUrl,
     zernio_message_id: zernioMessageId,
+    // id na Meta ("wamid…") — necessário para responder citando (replyTo).
+    platform_message_id: str(message, ['platformMessageId']),
     is_private_note: false,
   });
   if (insErr) {
@@ -701,17 +703,20 @@ async function insertOutboundFromCompanionDevice(
     .limit(1)
     .maybeSingle();
   const existing = dupe as { id: string; zernio_message_id: string | null } | null;
+  const platformMessageId = str(message, ['platformMessageId']);
   if (existing) {
     if (!existing.zernio_message_id) {
       await admin
         .from('messages')
-        .update({ zernio_message_id: zernioMessageId, meta_status: 'sent' })
+        .update({ zernio_message_id: zernioMessageId, meta_status: 'sent', ...(platformMessageId ? { platform_message_id: platformMessageId } : {}) })
         .eq('id', existing.id);
+    } else if (platformMessageId) {
+      await admin.from('messages').update({ platform_message_id: platformMessageId }).eq('id', existing.id);
     }
     return;
   }
 
-  const { error: insErr } = await admin.from('messages').insert({
+  const { error: insErr } = await insertMessageRow(admin, {
     org_id: orgId,
     conversation_id: conversationId,
     direction: 'outbound',
@@ -720,12 +725,28 @@ async function insertOutboundFromCompanionDevice(
     content,
     media_url: mediaUrl,
     zernio_message_id: zernioMessageId,
+    platform_message_id: platformMessageId,
     is_private_note: false,
     meta_status: 'sent',
   });
   if (insErr && (insErr as { code?: string }).code !== '23505') {
     console.error(JSON.stringify({ event: 'zernio_companion_insert_failed', message: insErr.message }));
   }
+}
+
+// Insere em messages tolerando o banco ainda sem a coluna platform_message_id
+// (SQL do painel de atendimento não rodado): sem isso, um deploy antes do SQL
+// faria o webhook PERDER mensagens recebidas.
+async function insertMessageRow(
+  admin: ReturnType<typeof getAdminClient>,
+  row: Record<string, unknown>,
+): Promise<{ error: { message: string; code?: string } | null }> {
+  const first = await admin.from('messages').insert(row);
+  if (first.error && /platform_message_id/.test(first.error.message) && 'platform_message_id' in row) {
+    const { platform_message_id: _drop, ...rest } = row;
+    return await admin.from('messages').insert(rest);
+  }
+  return first;
 }
 
 async function handleStatus(
@@ -746,7 +767,7 @@ async function handleStatus(
 
   const { data: msg } = await admin
     .from('messages')
-    .select('id, meta_status')
+    .select('*')
     .eq('org_id', orgId)
     .eq('zernio_message_id', zernioMessageId)
     .maybeSingle();
@@ -756,7 +777,13 @@ async function handleStatus(
     }
     return;
   }
-  const m = msg as { id: string; meta_status: string | null };
+  const m = msg as { id: string; meta_status: string | null; platform_message_id: string | null };
+  // Guarda o id da Meta ("wamid…") da mensagem enviada — permite que ela seja
+  // citada depois (responder citando).
+  const platformId = str(message, ['platformMessageId']);
+  if (platformId && !m.platform_message_id) {
+    await admin.from('messages').update({ platform_message_id: platformId }).eq('id', m.id);
+  }
   if (status === 'failed') {
     // Motivo da falha: `error` pode vir como string ou objeto ({ message, ... }).
     const rawError = data.error;

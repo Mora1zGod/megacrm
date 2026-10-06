@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AlertCircle, Bot, Check, CheckCheck, Clock, FileText, Loader2, Smartphone, StickyNote, User } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, Clock, CornerUpRight, FileText, Loader2, Reply, Smartphone, StickyNote, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
@@ -23,6 +23,54 @@ interface MessageThreadProps {
   loading: boolean;
   onRetry?: (tempId: string) => void;
   onDismiss?: (tempId: string) => void;
+  // Ações por mensagem (passar o mouse no balão).
+  onReply?: (m: Message) => void;
+  onForward?: (m: Message) => void;
+  contactName?: string | null;
+}
+
+// Texto curto de uma mensagem para a citação ("em resposta a…").
+export function messageSnippet(m: Pick<Message, 'content' | 'content_type'>): string {
+  const label: Record<string, string> = { image: '📷 Imagem', audio: '🎤 Áudio', video: '🎬 Vídeo', document: '📄 Documento' };
+  if (m.content_type in label) return m.content?.trim() ? `${label[m.content_type]} · ${m.content.trim()}` : label[m.content_type];
+  return m.content?.trim() || '…';
+}
+
+export function senderLabel(m: Pick<Message, 'direction' | 'sender_type' | 'sender_name'>, contactName?: string | null): string {
+  if (m.direction === 'inbound') return m.sender_name || contactName || 'Contato';
+  if (m.sender_type === 'ai') return 'AMAIA';
+  if (m.sender_type === 'owner') return 'WhatsApp';
+  return 'Você / equipe';
+}
+
+// Texto com a assinatura do atendente ("*Nome:*" na 1ª linha, formato do
+// WhatsApp) mostra o nome em negrito, como aparece no celular do cliente.
+function TextWithSignature({ text }: { text: string }) {
+  const m = /^\*([^*\n]{1,60}):\*\n([\s\S]*)$/.exec(text);
+  if (!m) return <div className="whitespace-pre-wrap break-words">{text}</div>;
+  return (
+    <div className="whitespace-pre-wrap break-words">
+      <span className="font-bold">{m[1]}:</span>
+      {'\n'}
+      {m[2]}
+    </div>
+  );
+}
+
+function QuotedBlock({ quoted, onJump, contactName }: { quoted: Message | undefined; onJump: () => void; contactName?: string | null }) {
+  return (
+    <button type="button" onClick={onJump}
+      className="mb-1.5 block w-full rounded-md border-l-4 border-[var(--accent-primary)] bg-black/[0.06] px-2 py-1 text-left text-[12.5px] leading-snug hover:bg-black/10">
+      {quoted ? (
+        <>
+          <span className="block font-semibold text-[var(--accent-primary)]">{senderLabel(quoted, contactName)}</span>
+          <span className="line-clamp-2 opacity-80">{messageSnippet(quoted)}</span>
+        </>
+      ) : (
+        <span className="italic opacity-70">Mensagem original não carregada</span>
+      )}
+    </button>
+  );
 }
 
 function StatusTicks({ status }: { status: Message['meta_status'] }) {
@@ -284,10 +332,19 @@ function FailedActions({
   );
 }
 
-export function MessageThread({ messages, loading, onRetry, onDismiss }: MessageThreadProps) {
+export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, onForward, contactName }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const conversationKey = messages[0]?.conversation_id ?? null;
+  const byId = new Map(messages.map((m) => [m.id, m] as const));
+  const jumpTo = (id: string | null | undefined) => {
+    if (!id) return;
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('inbox-msg-flash');
+    window.setTimeout(() => el.classList.remove('inbox-msg-flash'), 1400);
+  };
   const lastConversationRef = useRef<string | null>(null);
 
   useLayoutEffect(() => {
@@ -362,12 +419,33 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
           );
         }
 
+        const canAct = !m._state || m._state === 'sent';
+        const realId = m._realId ?? (m._tempId ? null : m.id);
+        const actionable = canAct && realId && (onReply || onForward);
+        const actions = actionable ? (
+          <div className="flex shrink-0 items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            {onReply && (
+              <button type="button" onClick={() => onReply({ ...m, id: realId! })} aria-label="Responder citando" title="Responder"
+                className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
+                <Reply className="h-4 w-4" />
+              </button>
+            )}
+            {onForward && (
+              <button type="button" onClick={() => onForward({ ...m, id: realId! })} aria-label="Encaminhar" title="Encaminhar"
+                className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
+                <CornerUpRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ) : null;
+
         return (
-          <div key={m._key ?? m.id}>
+          <div key={m._key ?? m.id} id={realId ? `msg-${realId}` : undefined} className="rounded-xl transition-colors">
             {separator}
           <div
-            className={cn('flex', isInbound ? 'justify-start' : 'justify-end', isFresh && 'message-in')}
+            className={cn('group flex items-end gap-1', isInbound ? 'justify-start' : 'justify-end', isFresh && 'message-in')}
           >
+            {!isInbound && actions}
             <div
               className={cn(
                 'inbox-message-bubble max-w-[85%] sm:max-w-[65%] rounded-2xl px-3.5 py-2 transition-opacity',
@@ -379,6 +457,12 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                   'ring-1 ring-[var(--color-error)]',
               )}
             >
+              {m.forwarded && (
+                <div className="mb-0.5 flex items-center gap-1 text-[11px] italic opacity-70">
+                  <CornerUpRight className="h-3 w-3" /> Encaminhada
+                </div>
+              )}
+              {m.reply_to_id && <QuotedBlock quoted={byId.get(m.reply_to_id)} onJump={() => jumpTo(m.reply_to_id)} contactName={contactName} />}
               {/* Grupo: cada mensagem recebida mostra quem escreveu. */}
               {isInbound && m.sender_name && (
                 <div className="mb-0.5 text-xs font-semibold text-[var(--accent-primary)]">{m.sender_name}</div>
@@ -391,7 +475,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
               )}
               {m.content_type === 'text' || m.content_type === 'note' ? (
                 m.content?.trim() ? (
-                  <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                  <TextWithSignature text={m.content} />
                 ) : (
                   // Linha antiga sem texto nem arquivo (ex.: story do Instagram
                   // compartilhado/mencionado antes da correção do webhook).
@@ -440,6 +524,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                 <FailedActions tempId={m._tempId} onRetry={onRetry} onDismiss={onDismiss} inverse />
               )}
             </div>
+            {isInbound && actions}
           </div>
           </div>
         );

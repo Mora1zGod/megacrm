@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
 import { useWhatsappProvider } from '@/hooks/useWhatsappProvider';
 import { useConversations } from '@/hooks/useConversations';
-import type { ConversationWithContact } from '@/types/inbox';
+import type { ConversationWithContact, Message } from '@/types/inbox';
 import { useMessages } from '@/hooks/useMessages';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { useQueues } from '@/hooks/useQueues';
@@ -36,6 +36,9 @@ import { ForwardToChatDialog } from '@/components/chat/ForwardToChatDialog';
 import { ContactTagsEditor } from '@/components/inbox/ContactTagsEditor';
 import { TransferMenu } from '@/components/inbox/TransferMenu';
 import { formatPhoneDisplay } from '@/lib/phone';
+import { ForwardMessageDialog } from '@/components/inbox/ForwardMessageDialog';
+import { useSlaConfig } from '@/hooks/useSlaConfig';
+import { useNow } from '@/lib/sla';
 
 function copyText(text: string, okMsg: string) {
   void navigator.clipboard?.writeText(text).then(
@@ -76,6 +79,13 @@ export default function InboxPage() {
     searchParams.get('conversation'),
   );
   const [sort, setSort] = useState<InboxSort>('recente');
+  // Responder citando / encaminhar (ações do balão).
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
+  useEffect(() => { setReplyTo(null); }, [selectedId]);
+  // SLA: limites da org + relógio de 30s para os contadores de espera.
+  const { sla } = useSlaConfig();
+  const now = useNow(30_000);
   // No mobile (<lg) mostramos uma coluna por vez: lista quando nada está
   // selecionado, senão a thread. O painel de contato vira um overlay.
   const [showPanelMobile, setShowPanelMobile] = useState(false);
@@ -174,10 +184,12 @@ export default function InboxPage() {
 
   const visibleConversations = useMemo(() => {
     const filtered = baseConversations.filter(
-      (c) => matchesQuickChip(c, quickChip) && matchesBusca(c, busca),
+      (c) => matchesQuickChip(c, quickChip, sla.late) && matchesBusca(c, busca),
     );
     return sortConversations(filtered, sort);
-  }, [baseConversations, quickChip, busca, sort]);
+    // `now` entra para a aba "Atrasadas" acompanhar o relógio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseConversations, quickChip, busca, sort, sla.late, now]);
 
   const { messages, loading: loadingMsgs, sendText, retry, dismissFailed } = useMessages(selectedId);
 
@@ -319,6 +331,8 @@ export default function InboxPage() {
               onChipChange={setQuickChip}
               base={baseConversations}
               filters={filters}
+              slaLateMinutes={sla.late}
+              now={now}
               trailing={
                 <InboxFilters
                   compact
@@ -346,6 +360,8 @@ export default function InboxPage() {
               operatorName={operatorName}
               isLocked={isLocked}
               providerOf={providerOf}
+              sla={sla}
+              now={now}
             />
           </div>
         </div>
@@ -500,6 +516,9 @@ export default function InboxPage() {
                 loading={loadingMsgs}
                 onRetry={retry}
                 onDismiss={dismissFailed}
+                onReply={selected.status !== 'closed' ? setReplyTo : undefined}
+                onForward={setForwardMsg}
+                contactName={selected.contact?.name?.trim() || null}
               />
               {selected.status !== 'closed' && (
                 <MessageInput
@@ -508,6 +527,10 @@ export default function InboxPage() {
                   requiresTemplateRestart={requiresTemplateRestart}
                   instagramHumanAgentWindow={instagramHumanAgentWindow}
                   onSendText={sendText}
+                  replyTo={replyTo}
+                  onCancelReply={() => setReplyTo(null)}
+                  channel={selected.channel}
+                  contactName={selected.contact?.name?.trim() || null}
                 />
               )}
             </>
@@ -623,6 +646,15 @@ export default function InboxPage() {
           onClose={() => setShowForward(false)}
           conversationId={selected.id}
           contactLabel={selected.contact?.name?.trim() || selected.contact?.phone || 'contato'}
+        />
+      )}
+
+      {forwardMsg && (
+        <ForwardMessageDialog
+          message={forwardMsg}
+          conversations={conversations}
+          currentConversationId={selectedId}
+          onClose={() => { setForwardMsg(null); void reloadConvs(); }}
         />
       )}
     </div>

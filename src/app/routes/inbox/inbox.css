@@ -123,3 +123,19 @@
   .inbox-composer { padding: 8px 10px; }
   .inbox-message-history { padding: 14px 10px; }
 }
+
+/* Responder citando: destaque rápido na mensagem original ao clicar na citação. */
+.inbox-workspace .inbox-msg-flash {
+  background: var(--color-accent-subtle);
+}
+
+/* Barra "Respondendo a…" acima do campo de mensagem. */
+.inbox-workspace .inbox-reply-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-left: 4px solid var(--accent-primary);
+  border-radius: 0.5rem;
+  background: var(--color-fill-subtle);
+  padding: 0.4rem 0.6rem;
+}

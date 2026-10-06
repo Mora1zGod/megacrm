@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
-import { Clock, FileText, Loader2, Mic, MoreHorizontal, Paperclip, Send, Smile, Sparkles, StickyNote, Undo2, X, Zap } from 'lucide-react';
+import { Clock, FileText, Loader2, Mic, MoreHorizontal, Paperclip, PenLine, Reply, Send, Smile, Sparkles, StickyNote, Undo2, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSupabase } from '@/lib/supabase';
 import { extractFunctionErrorMessage } from '@/lib/functionError';
 import type { SendResult } from '@/hooks/useMessages';
 import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { TemplateRestartDialog } from './TemplateRestartDialog';
+import { messageSnippet, senderLabel } from './MessageThread';
+import { useSignaturePref } from '@/hooks/useSignaturePref';
+import type { Message } from '@/types/inbox';
 
 interface MessageInputProps {
   conversationId: string;
@@ -22,7 +25,13 @@ interface MessageInputProps {
   instagramHumanAgentWindow?: boolean;
   // Envio OTIMISTA de texto/nota: o balão aparece na hora e a requisição roda
   // em segundo plano (dono do estado é o useMessages).
-  onSendText: (text: string, isPrivate: boolean) => Promise<SendResult>;
+  onSendText: (text: string, isPrivate: boolean, opts?: { replyToId?: string | null }) => Promise<SendResult>;
+  // Responder citando: mensagem escolhida no balão (↩).
+  replyTo?: Message | null;
+  onCancelReply?: () => void;
+  // Canal da conversa (formato da assinatura).
+  channel?: 'whatsapp' | 'instagram' | null;
+  contactName?: string | null;
 }
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -35,7 +44,12 @@ export function MessageInput({
   requiresTemplateRestart = false,
   instagramHumanAgentWindow = false,
   onSendText,
+  replyTo = null,
+  onCancelReply,
+  channel = 'whatsapp',
+  contactName,
 }: MessageInputProps) {
+  const signature = useSignaturePref();
   const [content, setContent] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [showTemplate, setShowTemplate] = useState(false);
@@ -208,6 +222,7 @@ export function MessageInput({
     form.append('conversation_id', conversationId);
     form.append('file', file);
     if (content.trim()) form.append('content', content.trim());
+    if (replyTo) form.append('reply_to_message_id', replyTo.id);
     const { data, error } = await supabase.functions.invoke('send-operator-media', { body: form });
     if (error || !data?.ok) {
       toast.error('Falha ao enviar mídia', {
@@ -217,6 +232,7 @@ export function MessageInput({
     }
     setFile(null);
     setContent('');
+    onCancelReply?.();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -227,8 +243,11 @@ export function MessageInput({
     const text = content.trim();
     if (!text) return;
     const wasPrivate = isPrivate;
+    const replyToId = wasPrivate ? null : (replyTo?.id ?? null);
     setContent('');
-    const res = await onSendText(text, wasPrivate);
+    onCancelReply?.();
+    const finalText = wasPrivate ? text : signature.sign(text, channel);
+    const res = await onSendText(finalText, wasPrivate, { replyToId });
     if (res.ok && res.zernioError) {
       // Balão salvo, mas o canal recusou o envio (ex.: fora da janela de 24h).
       toast.warning('Salvo, mas não entregue ao contato', { description: res.zernioError });
@@ -312,11 +331,21 @@ export function MessageInput({
       }
       if (e.key === 'Escape') { e.preventDefault(); setContent(''); return; }
     }
+    if (e.key === 'Escape' && replyTo) {
+      e.preventDefault();
+      onCancelReply?.();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void submit();
     }
   };
+
+  // Ao escolher "Responder", o foco vai para a caixa de texto.
+  useEffect(() => {
+    if (replyTo) textareaRef.current?.focus();
+  }, [replyTo]);
 
   const blocked = requiresTemplateRestart && !isPrivate;
   const insertEmoji = (emoji: string) => {
@@ -384,6 +413,20 @@ export function MessageInput({
           provavelmente não será entregue até o contato escrever de novo.
         </div>
       ) : null}
+
+      {!blocked && !isPrivate && replyTo && (
+        <div className="inbox-reply-bar">
+          <Reply className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
+          <div className="min-w-0 flex-1 text-xs">
+            <div className="font-semibold text-[var(--accent-primary)]">Respondendo a {senderLabel(replyTo, contactName)}</div>
+            <div className="truncate text-[var(--color-text-secondary)]">{messageSnippet(replyTo)}</div>
+          </div>
+          <button type="button" onClick={() => onCancelReply?.()} aria-label="Cancelar resposta" title="Cancelar (Esc)"
+            className="rounded p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-error)]">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {!blocked && file && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
@@ -478,6 +521,25 @@ export function MessageInput({
             >
               <StickyNote className="h-5 w-5" />
             </button>
+            {!isPrivate && (
+              <button
+                type="button"
+                className={`inbox-icon-btn ${signature.enabled ? '!text-[var(--accent-primary)] !bg-[var(--color-accent-subtle)]' : ''}`}
+                onClick={() => {
+                  if (!signature.enabled && !signature.name) {
+                    toast.info('Defina seu nome em Configurações → Conta para usar a assinatura.');
+                    return;
+                  }
+                  void signature.toggle();
+                }}
+                disabled={disabled || sending}
+                aria-pressed={signature.enabled}
+                aria-label="Assinatura do atendente"
+                title={signature.enabled ? `Assinando como "${signature.name}" — clique para desligar` : 'Assinar mensagens com o seu nome'}
+              >
+                <PenLine className="h-5 w-5" />
+              </button>
+            )}
 
             <div className="relative flex min-w-0 flex-1">
               {qrOpen && (

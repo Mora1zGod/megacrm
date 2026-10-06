@@ -7,6 +7,7 @@ import {
   Package,
   Palette,
   Settings as SettingsIcon,
+  Timer,
   UserCircle2,
   Users,
   Zap,
@@ -22,6 +23,7 @@ import { ApiKeysSettings } from './sections/ApiKeysSettings';
 import { BrandingSettings } from './sections/BrandingSettings';
 import { QuickRepliesSettings } from './sections/QuickRepliesSettings';
 import { BirthdaySettings } from './sections/BirthdaySettings';
+import { AttendanceSettings } from './sections/AttendanceSettings';
 
 type TabId =
   | 'account'
@@ -31,7 +33,8 @@ type TabId =
   | 'quick_replies'
   | 'birthday'
   | 'api'
-  | 'branding';
+  | 'branding'
+  | 'attendance';
 
 interface TabDef {
   id: TabId;
@@ -83,6 +86,14 @@ export default function SettingsPage() {
             icon: Package,
             adminOnly: true,
             render: () => <ProductsSettings />,
+          },
+          {
+            id: 'attendance',
+            label: 'Atendimento',
+            hint: 'Tempo de resposta (SLA)',
+            icon: Timer,
+            adminOnly: true,
+            render: () => <AttendanceSettings />,
           },
           {
             id: 'quick_replies',

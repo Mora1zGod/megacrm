@@ -21,7 +21,13 @@ interface Payload {
   conversation_id?: string;
   content?: string;
   is_private_note?: boolean;
+  // Responder citando uma mensagem desta conversa.
+  reply_to_message_id?: string;
+  // Mensagem encaminhada de outra conversa (só marca a linha).
+  forwarded?: boolean;
 }
+
+type QuotedMsg = { id: string; zernio_message_id: string | null; platform_message_id: string | null };
 
 Deno.serve(async (req) => {
   const pre = preflight(req);
@@ -43,6 +49,8 @@ Deno.serve(async (req) => {
     const conversationId = body.conversation_id?.trim();
     const content = (body.content ?? '').trim();
     const isPrivate = Boolean(body.is_private_note);
+    const replyToId = body.reply_to_message_id?.trim() || null;
+    const forwarded = Boolean(body.forwarded) && !isPrivate;
 
     if (!conversationId) return jsonResponse({ ok: false, error: 'conversation_id ausente.' }, { status: 400 });
     if (!content) return jsonResponse({ ok: false, error: 'Conteúdo vazio.' }, { status: 400 });
@@ -72,6 +80,20 @@ Deno.serve(async (req) => {
     // Cross-check de org: a conversa deve pertencer à org do caller.
     if ((conv as { org_id: string }).org_id !== caller.orgId) {
       return jsonResponse({ ok: false, error: 'Conversa não encontrada.' }, { status: 404 });
+    }
+
+    // Mensagem citada: precisa ser desta mesma conversa (e org).
+    let quoted: QuotedMsg | null = null;
+    if (replyToId) {
+      const { data: q } = await admin
+        .from('messages')
+        .select('*')
+        .eq('id', replyToId)
+        .eq('conversation_id', conversationId)
+        .eq('org_id', caller.orgId)
+        .maybeSingle();
+      if (!q) return jsonResponse({ ok: false, error: 'Mensagem citada não encontrada nesta conversa.' }, { status: 400 });
+      quoted = q as QuotedMsg;
     }
 
     const convRow0 = conv as { channel: 'whatsapp' | 'instagram' | null };
@@ -124,6 +146,8 @@ Deno.serve(async (req) => {
         content_type: isPrivate ? 'note' : 'text',
         content,
         is_private_note: isPrivate,
+        ...(quoted ? { reply_to_id: quoted.id } : {}),
+        ...(forwarded ? { forwarded: true } : {}),
       })
       .select()
       .single();
@@ -180,7 +204,14 @@ Deno.serve(async (req) => {
           zernioAccountId: convRow.zernio_account_id ?? null,
           provider: convRow.provider ?? null,
         },
-        { text: content, humanAgentTag },
+        {
+          text: content,
+          humanAgentTag,
+          // Citação nativa no WhatsApp/Instagram: Zernio pede o id da Meta;
+          // UAZAPI o id da mensagem na instância. Sem id, vai sem citação.
+          ...(quoted?.platform_message_id ? { replyTo: quoted.platform_message_id } : {}),
+          ...(quoted?.zernio_message_id ? { replyIdUazapi: quoted.zernio_message_id } : {}),
+        },
       );
 
       await admin

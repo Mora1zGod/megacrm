@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import type { ConversationWithContact } from '@/types/inbox';
 import type { InboxFilterState } from './inbox-filters';
 
-export type QuickChip = 'todas' | 'nao_lidas' | 'aguardando' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas' | 'grupos';
+export type QuickChip = 'todas' | 'nao_lidas' | 'aguardando' | 'atrasadas' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas' | 'grupos';
 
 // Grupo do WhatsApp (UAZAPI): o contato do grupo tem como "telefone" o JID
 // do grupo (…@g.us). Grupos ficam só na aba Grupos — não misturam com os
@@ -31,7 +31,12 @@ export function isAguardando(c: ConversationWithContact): boolean {
   return c.lastMessageDirection === 'inbound';
 }
 
-export function matchesQuickChip(c: ConversationWithContact, chip: QuickChip): boolean {
+// SLA estourado: contato esperando há mais que o limite vermelho.
+export function isAtrasada(c: ConversationWithContact, slaLateMinutes: number, now = Date.now()): boolean {
+  return Boolean(c.waitingSince) && now - new Date(c.waitingSince!).getTime() >= slaLateMinutes * 60_000;
+}
+
+export function matchesQuickChip(c: ConversationWithContact, chip: QuickChip, slaLateMinutes = 15): boolean {
   if (chip === 'grupos') return isGroupConversation(c);
   if (isGroupConversation(c)) return false;
   switch (chip) {
@@ -39,6 +44,8 @@ export function matchesQuickChip(c: ConversationWithContact, chip: QuickChip): b
       return (c.unread_count ?? 0) > 0;
     case 'aguardando':
       return isAguardando(c);
+    case 'atrasadas':
+      return isAtrasada(c, slaLateMinutes);
     // Aguardando cliente = a equipe/IA já respondeu e espera o contato voltar
     // (oposto de "aguardando" — que é a equipe devendo resposta ao contato).
     case 'aguardando_cliente':
@@ -68,10 +75,11 @@ export function matchesBusca(c: ConversationWithContact, busca: string): boolean
   return ultima.includes(q);
 }
 
-export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, trailing }: Props & { trailing?: ReactNode }) {
+export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, trailing, slaLateMinutes = 15, now }: Props & { trailing?: ReactNode; slaLateMinutes?: number; now?: number }) {
   const contagem = useMemo(() => {
     let naoLidas = 0;
     let aguardando = 0;
+    let atrasadas = 0;
     let aguardandoCliente = 0;
     let iaPausada = 0;
     let favoritas = 0;
@@ -82,17 +90,19 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, 
       todas++;
       if ((c.unread_count ?? 0) > 0) naoLidas++;
       if (isAguardando(c)) aguardando++;
+      if (isAtrasada(c, slaLateMinutes, now)) atrasadas++;
       else if (c.status !== 'closed') aguardandoCliente++;
       if (c.ai_paused) iaPausada++;
       if (c.is_favorite) favoritas++;
     }
-    return { todas, naoLidas, aguardando, aguardandoCliente, iaPausada, favoritas, grupos };
-  }, [base]);
+    return { todas, naoLidas, aguardando, atrasadas, aguardandoCliente, iaPausada, favoritas, grupos };
+  }, [base, slaLateMinutes, now]);
 
   const chips: Array<{ id: QuickChip; label: string; count: number; title?: string }> = [
     { id: 'todas', label: 'Tudo', count: contagem.todas },
     { id: 'nao_lidas', label: 'Não lidas', count: contagem.naoLidas },
     { id: 'aguardando', label: 'Aguardando', count: contagem.aguardando, title: 'Aguardando resposta da equipe' },
+    { id: 'atrasadas', label: 'Atrasadas', count: contagem.atrasadas, title: `Esperando resposta há ${slaLateMinutes} min ou mais (SLA)` },
     { id: 'aguardando_cliente', label: 'Aguardando cliente', count: contagem.aguardandoCliente },
     { id: 'ia_pausada', label: 'AMAIA pausada', count: contagem.iaPausada },
     { id: 'favoritas', label: 'Favoritas', count: contagem.favoritas },

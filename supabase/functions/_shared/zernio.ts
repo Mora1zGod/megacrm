@@ -183,6 +183,10 @@ export async function sendInboxMessage(input: {
   attachmentType?: 'image' | 'video' | 'audio' | 'file';
   voiceNote?: boolean;
   humanAgentTag?: boolean;
+  // Citar mensagem: id da mensagem na plataforma (WhatsApp context.message_id,
+  // "wamid…"). Campo `replyTo` — confirmado no adapter oficial do Zernio
+  // (github.com/zernio-dev/chat-sdk-adapter, api-client.ts::reply).
+  replyTo?: string;
 }): Promise<InboxSendResult> {
   const body: Record<string, unknown> = { accountId: input.accountId };
   if (input.attachmentUrl) {
@@ -197,6 +201,7 @@ export async function sendInboxMessage(input: {
     body.messageTag = 'HUMAN_AGENT';
     body.messagingType = 'MESSAGE_TAG';
   }
+  if (input.replyTo) body.replyTo = input.replyTo;
   const res = await zfetch(
     input.apiKey,
     `/inbox/conversations/${encodeURIComponent(input.conversationId)}/messages`,

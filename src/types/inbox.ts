@@ -58,6 +58,12 @@ export interface Message {
   created_at: string;
   // Autor da mensagem em GRUPO do WhatsApp (UAZAPI). null fora de grupo.
   sender_name?: string | null;
+  // Responder citando: mensagem citada (mesma conversa).
+  reply_to_id?: string | null;
+  // id da mensagem na Meta ("wamid…") — usado para citar no Zernio.
+  platform_message_id?: string | null;
+  // Mensagem encaminhada de outra conversa.
+  forwarded?: boolean;
 }
 
 export interface ConversationWithContact extends Conversation {
@@ -92,4 +98,7 @@ export interface ConversationWithContact extends Conversation {
   // lista pra diferenciar entre múltiplos números UAZAPI/WhatsApp conectados.
   channelPhone: string | null;
   channelLabel: string | null;
+  // SLA: desde quando o contato espera resposta (1ª mensagem dele depois da
+  // última resposta da equipe/IA). null = não está aguardando.
+  waitingSince: string | null;
 }
