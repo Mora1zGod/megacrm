@@ -1,0 +1,11 @@
+-- ============================================================================
+-- Visitas: status "pending" (Aguardando confirmação) — 06/10/2026
+-- ----------------------------------------------------------------------------
+-- O app (tela de Visitas, reagendar, alertas do dashboard e a API pública)
+-- usa 'pending' para visita ainda não confirmada, mas o enum em produção só
+-- tinha confirmed/cancelled/completed/no_show — reagendar falhava com
+-- "invalid input value for enum visit_status: pending". Só ACRESCENTA o
+-- valor; o padrão da coluna continua 'confirmed' e nada muda nas visitas
+-- existentes. Lembretes automáticos seguem só para 'confirmed'.
+-- ============================================================================
+ALTER TYPE whatsapp_hub.visit_status ADD VALUE IF NOT EXISTS 'pending' BEFORE 'confirmed';
