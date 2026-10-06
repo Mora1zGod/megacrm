@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Archive, ArchiveRestore, Bot, Briefcase, CalendarPlus, CheckSquare, CircleX, Clock, Compass, Filter, Pause, Pin, Play, Mail, Phone, RotateCcw, ShoppingBag, User } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowRightLeft, User, BadgeDollarSign, BarChart3, Bot, Briefcase, CalendarDays, CalendarPlus, CheckCircle2, CheckSquare, ChevronDown, CircleX, Clock, Copy, IdCard, Instagram, LayoutGrid, MessageCircle, MoreHorizontal, Pause, PauseCircle, Pin, Play, Plus, RotateCcw, ShoppingBag, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/Avatar';
@@ -10,7 +10,9 @@ import { useAppUser } from '@/app/providers/AppUserProvider';
 import type { ConversationWithContact } from '@/types/inbox';
 import { operatorLabel, type Operator } from '@/hooks/useOperators';
 import type { Queue } from '@/hooks/useQueues';
-import { useTasks } from '@/hooks/useTasks';
+import { TransferMenu } from './TransferMenu';
+import { formatPhoneDisplay } from '@/lib/phone';
+import { openNewSale } from '@/hooks/useSales';
 import { ContactTagsEditor } from './ContactTagsEditor';
 import { CustomFieldsEditor } from './CustomFieldsEditor';
 import { AddToPipelineModal } from '@/components/funil/AddToPipelineModal';
@@ -53,15 +55,23 @@ interface ContactPanelProps {
   onPinNote: (note: string | null) => Promise<void>;
   onArchive: (archived: boolean) => Promise<void>;
   onContactRefresh?: () => void;
+  // Transferir/Concluir no topo do painel (coluna fixa ≥1440px).
+  showTopActions?: boolean;
 }
 
 export function ContactPanel({
   conversation, withinWindow, operators, queues = [], aiEnabled = true, assignedName = null, provider = 'meta',
   onPauseAI, onResumeAI, onClose, onReopen, onAssign, onSetQueue, onSetActiveDeal, onPinNote, onArchive, onContactRefresh,
+  showTopActions = false,
 }: ContactPanelProps) {
   const { userId } = useAppUser();
-  const { createTask } = useTasks();
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [tarefas, setTarefas] = useState<TaskLite[]>([]);
+  const [tarefasVersion, setTarefasVersion] = useState(0);
+  const [contactSince, setContactSince] = useState<string | null>(null);
+  const [dealStages, setDealStages] = useState<{ id: string; name: string; color: string | null; is_won: boolean; is_lost: boolean }[]>([]);
+  const [movingStage, setMovingStage] = useState(false);
   const [novaTarefaTexto, setNovaTarefaTexto] = useState('');
   const [criandoTarefa, setCriandoTarefa] = useState(false);
 
@@ -69,7 +79,15 @@ export function ContactPanel({
     if (!novaTarefaTexto.trim()) return;
     setCriandoTarefa(true);
     try {
-      await createTask({ title: novaTarefaTexto.trim(), contact_id: contact?.id ?? null, conversation_id: conversation.id });
+      const { error: tErr } = await getSupabase().from('tasks').insert({
+        title: novaTarefaTexto.trim(),
+        contact_id: contact?.id ?? null,
+        conversation_id: conversation.id,
+        created_by: userId,
+        assigned_to: userId,
+      });
+      if (tErr) throw new Error(tErr.message);
+      setTarefasVersion((v) => v + 1);
       toast.success('Tarefa criada.');
       setNovaTarefaTexto('');
       setNovaTarefaOpen(false);
@@ -119,6 +137,47 @@ export function ContactPanel({
     })();
     return () => { alive = false; };
   }, [contact?.id]);
+
+  // Desde quando o contato existe ("Cliente desde").
+  useEffect(() => {
+    if (!contact?.id) { setContactSince(null); return; }
+    let alive = true;
+    void getSupabase().from('contacts').select('created_at').eq('id', contact.id).maybeSingle().then(({ data }) => {
+      if (!alive) return;
+      const iso = (data as { created_at?: string } | null)?.created_at;
+      setContactSince(iso ? new Date(iso).toLocaleDateString('pt-BR') : null);
+    });
+    return () => { alive = false; };
+  }, [contact?.id]);
+
+  // Tarefas pendentes do contato (ou desta conversa).
+  useEffect(() => {
+    if (!contact?.id) { setTarefas([]); return; }
+    let alive = true;
+    void getSupabase()
+      .from('tasks')
+      .select('id, title, due_at, assigned_to')
+      .eq('status', 'pending')
+      .or(`contact_id.eq.${contact.id},conversation_id.eq.${conversation.id}`)
+      .order('due_at', { ascending: true, nullsFirst: false })
+      .limit(5)
+      .then(({ data }) => { if (alive) setTarefas((data ?? []) as TaskLite[]); });
+    return () => { alive = false; };
+  }, [contact?.id, conversation.id, tarefasVersion]);
+
+  const concluirTarefa = async (id: string) => {
+    setTarefas((cur) => cur.filter((t) => t.id !== id));
+    const { error: err } = await getSupabase()
+      .from('tasks')
+      .update({ status: 'done', completed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (err) {
+      toast.error('Falha ao concluir tarefa', { description: err.message });
+      setTarefasVersion((v) => v + 1);
+    } else {
+      toast.success('Tarefa concluída.');
+    }
+  };
 
   // Negócios abertos OU ganhos do contato — alimentam o seletor de "Negócio
   // ativo" (cliente que já comprou tem deal 'won', e a próxima ação ancora
@@ -225,10 +284,68 @@ export function ContactPanel({
 
   const isClosed = conversation.status === 'closed';
 
+  const handleConclude = async () => {
+    try {
+      await onClose();
+      toast.success('Conversa concluída.');
+    } catch (err) {
+      toast.error('Falha ao concluir', { description: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  const copyPhone = (phone: string) => {
+    void navigator.clipboard?.writeText(phone).then(() => toast.success('Telefone copiado.'), () => toast.error('Não foi possível copiar.'));
+  };
+
   // Deal alvo dos botões Ganho/Perdido: o negócio ativo da conversa (se ainda
   // aberto), senão o negócio aberto mais recente do contato.
   const activeDeal = openDeals.find((d) => d.id === conversation.active_deal_id);
   const targetDeal = activeDeal?.status === 'open' ? activeDeal : openDeals.find((d) => d.status === 'open');
+  const pipelineDeal = activeDeal ?? targetDeal ?? openDeals[0] ?? null;
+  const pipelineDealPipeline = pipelineDeal?.pipeline_id ?? null;
+
+  useEffect(() => {
+    if (!pipelineDealPipeline) { setDealStages([]); return; }
+    let alive = true;
+    void getSupabase()
+      .from('stages')
+      .select('id, name, color, is_won, is_lost')
+      .eq('pipeline_id', pipelineDealPipeline)
+      .order('position')
+      .then(({ data }) => { if (alive) setDealStages((data ?? []) as typeof dealStages); });
+    return () => { alive = false; };
+  }, [pipelineDealPipeline]);
+  const stageColor = dealStages.find((st) => st.id === pipelineDeal?.stage_id)?.color ?? null;
+
+  // Mesmas regras do arrastar no funil (usePipeline.moveDeal).
+  const moveStage = async (deal: OpenDeal, stageId: string) => {
+    if (!stageId || stageId === deal.stage_id) return;
+    const stage = dealStages.find((st) => st.id === stageId);
+    const patch: Record<string, unknown> = { stage_id: stageId };
+    if (stage?.is_won) { patch.status = 'won'; patch.temperature = 'Morno'; }
+    else if (stage?.is_lost) { patch.status = 'lost'; patch.temperature = 'Frio'; patch.lead_type = 'Lead'; }
+    else patch.status = 'open';
+    setMovingStage(true);
+    try {
+      const supabase = getSupabase();
+      const { error: err } = await supabase.from('deals').update(patch).eq('id', deal.id);
+      if (err) throw new Error(err.message);
+      await supabase.from('lead_stage_history').insert({
+        deal_id: deal.id,
+        from_stage_id: deal.stage_id,
+        to_stage_id: stageId,
+        moved_by: 'humano',
+        actor_id: userId,
+      });
+      setDealsVersion((v) => v + 1);
+      onContactRefresh?.();
+      toast.success(`Etapa: ${stage?.name ?? 'atualizada'}`);
+    } catch (err) {
+      toast.error('Falha ao mudar a etapa', { description: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setMovingStage(false);
+    }
+  };
 
   // Mesma semântica do arrastar para a coluna Ganho/Perdido no funil
   // (usePipeline.moveDeal): muda status + temperatura, move para a etapa
@@ -297,55 +414,220 @@ export function ContactPanel({
     }
   };
 
+  const channelIsInstagram = conversation.channel === 'instagram';
+  const stageDeal = activeDeal ?? targetDeal ?? openDeals[0] ?? null;
+
   return (
-    <div className="h-full p-5 space-y-5 overflow-y-auto">
-      <div className="text-center">
-        <Avatar
-          src={contact?.profile_pic_url}
-          name={displayName}
-          size="lg"
-          className="mx-auto shadow-[var(--shadow-lg)]"
-        />
-        <div className="mt-3 text-lg font-bold text-display text-[var(--color-text-primary)]">
-          {displayName}
+    <div className="h-full space-y-3 overflow-y-auto p-3">
+      {/* Transferir / Concluir */}
+      {showTopActions && (
+        <div className="flex items-center gap-2">
+          <TransferMenu
+            operators={operators}
+            assignedTo={conversation.assigned_to}
+            userId={userId}
+            onAssign={onAssign}
+            align="left"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface)] px-4 text-[15px] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
+          >
+            <ArrowRightLeft className="h-4.5 w-4.5" /> Transferir
+          </TransferMenu>
+          <button
+            type="button"
+            onClick={() => void (isClosed ? handleReopen() : handleConclude())}
+            className={isClosed
+              ? 'inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface)] px-4 text-[15px] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
+              : 'inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent-fill)] px-4 text-[15px] font-semibold text-white hover:bg-[var(--accent-fill-hover)]'}
+          >
+            {isClosed ? <RotateCcw className="h-4.5 w-4.5" /> : <CheckCircle2 className="h-4.5 w-4.5" />}
+            {isClosed ? 'Reabrir' : 'Concluir'}
+          </button>
         </div>
-        {contact?.phone && (
-          <div className="text-xs font-mono text-[var(--color-text-secondary)] mt-0.5">
-            {contact.phone}
+      )}
+
+      {/* Dados do contato */}
+      <section className="inbox-card space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="inbox-card-title"><IdCard className="h-4.5 w-4.5 text-[var(--color-text-secondary)]" /> Dados do contato</div>
+          {contact?.id && (
+            <Link to={`/contacts/${contact.id}`} className="text-sm font-medium text-[var(--accent-primary)] hover:underline">Editar</Link>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Avatar src={contact?.profile_pic_url} name={displayName} size="lg" />
+          <div className="min-w-0">
+            <div className="truncate text-lg font-bold text-[var(--color-text-primary)]">{displayName}</div>
+            {contact?.phone && (
+              <div className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)]">
+                <span className="truncate">{formatPhoneDisplay(contact.phone)}</span>
+                <button type="button" onClick={() => copyPhone(contact.phone ?? '')} aria-label="Copiar telefone" title="Copiar telefone" className="rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            {contactSince && (
+              <div className="text-xs text-[var(--color-text-muted)]">{isCliente ? 'Cliente' : 'Contato'} desde {contactSince}</div>
+            )}
+          </div>
+        </div>
+        <dl className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-x-2 gap-y-2.5 text-sm">
+          <dt className="inbox-field-label">Nome</dt>
+          <dd className="truncate text-[var(--color-text-primary)]">{contact?.name?.trim() || '—'}</dd>
+          <dt className="inbox-field-label">Telefone</dt>
+          <dd className="flex min-w-0 items-center gap-1.5 text-[var(--color-text-primary)]">
+            <span className="truncate">{contact?.phone ? formatPhoneDisplay(contact.phone) : '—'}</span>
+            {contact?.phone && !channelIsInstagram && <MessageCircle className="h-4 w-4 shrink-0 text-[var(--inbox-wa,#25D366)]" />}
+          </dd>
+          {contact?.email && (
+            <>
+              <dt className="inbox-field-label">E-mail</dt>
+              <dd className="truncate text-[var(--color-text-primary)]">{contact.email}</dd>
+            </>
+          )}
+          <dt className="inbox-field-label">Origem</dt>
+          <dd className="flex items-center gap-1.5 text-[var(--color-text-primary)]">
+            {channelIsInstagram ? <Instagram className="h-4 w-4 text-[#E1306C]" /> : <MessageCircle className="h-4 w-4 text-[var(--inbox-wa,#25D366)]" />}
+            {sourceLabel(contact?.source, channelIsInstagram)}
+          </dd>
+          <dt className="inbox-field-label self-start pt-1">Etiquetas</dt>
+          <dd>{contact?.id ? <ContactTagsEditor contactId={contact.id} variant="inline" /> : '—'}</dd>
+        </dl>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {provider === 'uazapi' ? (
+            <Badge tone="success"><Clock className="h-3 w-3" /> Sem janela (UAZAPI)</Badge>
+          ) : (
+            <Badge tone={withinWindow ? 'success' : 'warning'}><Clock className="h-3 w-3" /> {withinWindow ? 'Janela 24h aberta' : 'Janela 24h fechada'}</Badge>
+          )}
+        </div>
+      </section>
+
+      {/* Pipeline / Etapa */}
+      <section className="inbox-card space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="inbox-card-title"><BarChart3 className="h-4.5 w-4.5 text-[var(--color-text-secondary)]" /> Pipeline / Etapa</div>
+          {contact?.id && (
+            <button type="button" onClick={() => setShowPipelineModal(true)} className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]" aria-label="Novo negócio no pipeline" title="Novo negócio no pipeline">
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        {stageDeal ? (
+          <>
+            {openDeals.length > 1 && <div className="truncate text-xs text-[var(--color-text-muted)]">{stageDeal.title}</div>}
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full" style={{ background: stageColor ?? 'var(--accent-fill)' }} />
+              <select
+                value={stageDeal.stage_id ?? ''}
+                onChange={(e) => void moveStage(stageDeal, e.target.value)}
+                disabled={movingStage}
+                className="h-11 w-full appearance-none rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface)] pl-9 pr-9 text-[15px] text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
+              >
+                {!stageDeal.stage_id && <option value="">Sem etapa</option>}
+                {dealStages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+            </div>
+          </>
+        ) : (
+          <button type="button" onClick={() => setShowPipelineModal(true)} disabled={!contact?.id} className="w-full rounded-xl border border-dashed border-[var(--color-border-card)] py-2.5 text-sm font-medium text-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)]">
+            + Adicionar no pipeline
+          </button>
+        )}
+      </section>
+
+      {/* Tarefas */}
+      <section className="inbox-card space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="inbox-card-title"><CalendarDays className="h-4.5 w-4.5 text-[var(--color-text-secondary)]" /> Tarefas</div>
+          <button type="button" onClick={() => setNovaTarefaOpen((v) => !v)} className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)] hover:underline">
+            <Plus className="h-4 w-4" /> Criar tarefa
+          </button>
+        </div>
+        {novaTarefaOpen && (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={novaTarefaTexto}
+              onChange={(e) => setNovaTarefaTexto(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void criarTarefaRapida(); }}
+              placeholder="O que precisa ser feito?"
+              className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
+            />
+            <Button size="sm" className="h-auto" onClick={() => void criarTarefaRapida()} disabled={criandoTarefa || !novaTarefaTexto.trim()}>
+              {criandoTarefa ? '…' : 'Criar'}
+            </Button>
           </div>
         )}
-        <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-          {/* Atendente: Fechada > nome do operador atribuído > IA ativa (canal
-              com IA ligada e sem pausa) > IA pausada > Humano (IA do canal
-              desligada nas configurações). */}
-          {isClosed ? (
-            <Badge tone="default"><CircleX className="h-3 w-3" /> Fechada</Badge>
-          ) : assignedName ? (
-            <Badge tone="success"><User className="h-3 w-3" /> {assignedName}</Badge>
-          ) : !aiEnabled ? (
-            <Badge tone="success"><User className="h-3 w-3" /> Humano</Badge>
-          ) : conversation.ai_paused ? (
-            <Badge tone="warning"><Bot className="h-3 w-3" /> IA pausada</Badge>
-          ) : (
-            <Badge tone="success"><Bot className="h-3 w-3" /> IA ativa</Badge>
-          )}
-          <Badge tone={isCliente ? 'success' : 'default'}>
-            <User className="h-3 w-3" />
-            {isCliente ? 'Cliente' : 'Lead'}
-          </Badge>
-          {provider === 'uazapi' ? (
-            <Badge tone="success">
-              <Clock className="h-3 w-3" /> Sem janela (UAZAPI)
-            </Badge>
-          ) : (
-            <Badge tone={withinWindow ? 'success' : 'warning'}>
-              <Clock className="h-3 w-3" />
-              {withinWindow ? 'Janela 24h aberta' : 'Janela 24h fechada'}
-            </Badge>
+        {tarefas.length === 0 && !novaTarefaOpen ? (
+          <div className="text-sm text-[var(--color-text-muted)]">Nenhuma tarefa pendente.</div>
+        ) : (
+          <ul className="space-y-1.5">
+            {tarefas.map((t) => (
+              <li key={t.id} className="flex items-start gap-2.5 rounded-lg border border-[var(--color-border-soft)] px-2.5 py-2">
+                <input type="checkbox" checked={false} onChange={() => void concluirTarefa(t.id)} aria-label={`Concluir: ${t.title}`} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-[var(--color-text-primary)]">{t.title}</div>
+                  {t.due_at && <div className={`text-xs ${new Date(t.due_at) < new Date() ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'}`}>{formatDue(t.due_at)}</div>}
+                </div>
+                {t.assigned_to && (
+                  <Avatar src={operators.find((o) => o.user_id === t.assigned_to)?.avatar_url ?? null} name={operatorLabel(operators.find((o) => o.user_id === t.assigned_to))} size="sm" className="!h-7 !w-7" />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* IA AMAIA */}
+      <section className="inbox-card">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inbox-card-title whitespace-nowrap"><Zap className="h-4.5 w-4.5 text-[var(--accent-primary)]" /> IA AMAIA</div>
+              {!isClosed && aiEnabled && (
+                conversation.ai_paused
+                  ? <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(245,158,11,0.14)] px-2 py-0.5 text-xs font-semibold text-[var(--inbox-warn-text,#FBBF24)]"><PauseCircle className="h-3.5 w-3.5" /> Pausada</span>
+                  : <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-primary)]"><Bot className="h-3.5 w-3.5" /> Ativa</span>
+              )}
+            </div>
+            <div className="mt-1 text-[13px] text-[var(--color-text-secondary)]">
+              {isClosed
+                ? 'Conversa concluída'
+                : !aiEnabled
+                  ? 'Desligada para este canal'
+                  : conversation.ai_paused
+                    ? `Atendimento humano${assignedName ? ` (${assignedName})` : ''}`
+                    : 'Respondendo o cliente'}
+            </div>
+          </div>
+          {!isClosed && aiEnabled && (
+            conversation.ai_paused ? (
+              <button type="button" onClick={() => void handleResume()} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--color-border-card)] px-3 text-sm font-semibold text-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)]">
+                <Play className="h-4 w-4" /> Retomar IA
+              </button>
+            ) : (
+              <button type="button" onClick={() => void handlePause()} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--color-border-card)] px-3 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
+                <Pause className="h-4 w-4" /> Pausar IA
+              </button>
+            )
           )}
         </div>
-      </div>
+        <Link to="/ai-agent" className="mt-2 inline-block text-xs font-medium text-[var(--accent-primary)] hover:underline">Configurar AMAIA</Link>
+      </section>
 
+      {/* Ações rápidas */}
+      <section className="inbox-card space-y-2.5">
+        <div className="inbox-card-title"><LayoutGrid className="h-4.5 w-4.5 text-[var(--color-text-secondary)]" /> Ações rápidas</div>
+        <div className="grid grid-cols-4 gap-2">
+          <QuickAction icon={<BadgeDollarSign className="h-5 w-5" />} label="Nova venda" onClick={() => openNewSale({ contactId: contact?.id, contactName: contact?.name ?? null })} disabled={!contact?.id} />
+          <QuickAction icon={<CalendarPlus className="h-5 w-5" />} label="Agendar visita" onClick={() => setShowVisitModal(true)} disabled={!contact?.id} />
+          <QuickAction icon={<CheckSquare className="h-5 w-5" />} label="Criar tarefa" onClick={() => setNovaTarefaOpen(true)} />
+          <QuickAction icon={<MoreHorizontal className="h-5 w-5" />} label={moreOpen ? 'Menos' : 'Mais ações'} onClick={() => setMoreOpen((v) => !v)} active={moreOpen} />
+        </div>
+      </section>
+
+      {moreOpen && (
+        <section className="inbox-card space-y-5">
       {/* Nota fixa da conversa */}
       <div className="space-y-2">
         <div className="text-label flex items-center gap-1.5"><Pin className="h-3 w-3" /> Nota fixa</div>
@@ -539,31 +821,6 @@ export function ContactPanel({
         </div>
       )}
 
-      {/* Tags rápidas */}
-      {contact?.id && <ContactTagsEditor contactId={contact.id} />}
-
-      <div className="space-y-2">
-        <div className="text-label">Contato</div>
-        <div className="space-y-2 text-sm">
-          {contact?.email ? (
-            <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
-              <Mail className="h-3.5 w-3.5" />
-              <span className="truncate">{contact.email}</span>
-            </div>
-          ) : null}
-          <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
-            <Phone className="h-3.5 w-3.5" />
-            <span className="font-mono">{contact?.phone ?? '—'}</span>
-          </div>
-          {contact?.source && (
-            <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
-              <Compass className="h-3.5 w-3.5" />
-              <span className="capitalize">Origem: {contact.source}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Histórico rápido — contagens reais, não estimativa */}
       {historico && (
         <div className="space-y-2">
@@ -598,106 +855,23 @@ export function ContactPanel({
         />
       )}
 
-      <div className="space-y-2">
-        <div className="text-label">Ações</div>
-        {contact?.id && (
-          <Button variant="outline" className="w-full justify-start" onClick={() => setShowVisitModal(true)}>
-            <CalendarPlus className="h-4 w-4" />
-            Agendar visita
-          </Button>
-        )}
-        {contact?.id && (
-          <Button variant="outline" className="w-full justify-start" onClick={() => setShowPipelineModal(true)}>
-            <Filter className="h-4 w-4" />
-            Adicionar no pipeline
-          </Button>
-        )}
-        <Button variant="outline" className="w-full justify-start" onClick={() => setNovaTarefaOpen((v) => !v)}>
-          <CheckSquare className="h-4 w-4" />
-          Criar tarefa
-        </Button>
-        {novaTarefaOpen && (
-          <div className="space-y-1.5 pl-1">
-            <input
-              autoFocus
-              value={novaTarefaTexto}
-              onChange={(e) => setNovaTarefaTexto(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void criarTarefaRapida(); }}
-              placeholder="O que precisa ser feito?"
-              className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
-            />
-            <Button size="sm" onClick={() => void criarTarefaRapida()} disabled={criandoTarefa || !novaTarefaTexto.trim()}>
-              {criandoTarefa ? 'Criando...' : 'Criar'}
+          <div className="space-y-2">
+            <div className="text-label">Conversa</div>
+            <Button variant="ghost" className="w-full justify-start" onClick={handleArchive}>
+              {conversation.archived ? (<><ArchiveRestore className="h-4 w-4" /> Desarquivar conversa</>) : (<><Archive className="h-4 w-4" /> Arquivar conversa</>)}
             </Button>
-          </div>
-        )}
-        {isClosed ? (
-          <Button variant="outline" className="w-full justify-start" onClick={handleReopen}>
-            <RotateCcw className="h-4 w-4" />
-            Reabrir conversa
-          </Button>
-        ) : (
-          <>
-            {conversation.ai_paused ? (
-              <Button variant="outline" className="w-full justify-start" onClick={handleResume}>
-                <Play className="h-4 w-4" />
-                Retomar IA
-              </Button>
-            ) : (
-              <Button variant="outline" className="w-full justify-start" onClick={handlePause}>
-                <Pause className="h-4 w-4" />
-                Pausar IA
+            {!isClosed && (
+              <Button variant="ghost" className="w-full justify-start" onClick={handleClose}>
+                <CircleX className="h-4 w-4 text-[var(--color-error)]" /> Fechar conversa
               </Button>
             )}
-            <Button variant="ghost" className="w-full justify-start" onClick={handleClose}>
-              <CircleX className="h-4 w-4 text-[var(--color-error)]" />
-              Fechar conversa
-            </Button>
-          </>
-        )}
-        <Button variant="ghost" className="w-full justify-start" onClick={handleArchive}>
-          {conversation.archived ? (
-            <>
-              <ArchiveRestore className="h-4 w-4" />
-              Desarquivar conversa
-            </>
-          ) : (
-            <>
-              <Archive className="h-4 w-4" />
-              Arquivar conversa
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Atendimento com IA — status + link pro módulo de configuração */}
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border-card)] px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-[var(--accent-primary)]" />
-          <div>
-            <div className="text-xs font-semibold text-[var(--color-text-primary)]">AMAIA</div>
-            <div className="text-[10px] text-[var(--color-text-secondary)]">
-              {/* Antes mostrava "Humano assumiu (X)" só por haver responsável,
-                  mesmo com a IA respondendo — o responsável vem do número
-                  (channels.assigned_member) e não significa IA pausada. */}
-              {isClosed
-                ? 'Conversa fechada'
-                : conversation.ai_paused
-                  ? `Pausada — atendimento humano${assignedName ? ` (${assignedName})` : ''}`
-                  : 'Ativa — respondendo o cliente'}
-            </div>
           </div>
-        </div>
-        <Link to="/ai-agent" className="text-xs font-semibold text-[var(--accent-primary)] hover:opacity-80">
-          Configurar
-        </Link>
-      </div>
-
-      <div className="pt-3 border-t border-[var(--color-border-card)] text-[10px] text-[var(--color-text-secondary)] opacity-70 space-y-0.5">
-        <div>Status: {conversation.status}</div>
-        <div>IA: {conversation.ai_paused ? 'pausada' : 'ativa'}</div>
-        <div>Criada: {new Date(conversation.created_at).toLocaleString('pt-BR')}</div>
-      </div>
+          <div className="border-t border-[var(--color-border-soft)] pt-3 text-[10px] text-[var(--color-text-secondary)] opacity-70 space-y-0.5">
+            <div>Status: {conversation.status}</div>
+            <div>Criada: {new Date(conversation.created_at).toLocaleString('pt-BR')}</div>
+          </div>
+        </section>
+      )}
 
       {showPipelineModal && contact?.id && (
         <AddToPipelineModal
@@ -716,4 +890,43 @@ export function ContactPanel({
       )}
     </div>
   );
+}
+
+interface TaskLite {
+  id: string;
+  title: string;
+  due_at: string | null;
+  assigned_to: string | null;
+}
+
+function formatDue(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1);
+  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === today.toDateString()) return `Hoje, ${hm}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `Amanhã, ${hm}`;
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}, ${hm}`;
+}
+
+function QuickAction({ icon, label, onClick, disabled, active }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; active?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border px-1 py-2.5 text-[11.5px] font-medium leading-tight transition-colors disabled:opacity-40 ${active ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-soft)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'}`}
+    >
+      <span className={active ? '' : 'text-[var(--color-text-secondary)]'}>{icon}</span>
+      <span className="text-center">{label}</span>
+    </button>
+  );
+}
+
+function sourceLabel(source: string | null | undefined, isInstagram: boolean): string {
+  const s = (source ?? '').toLowerCase();
+  if (s === 'whatsapp' || s === 'whatsapp_group') return 'WhatsApp';
+  if (s === 'instagram') return 'Instagram';
+  if (!s) return isInstagram ? 'Instagram' : 'WhatsApp';
+  return source!.charAt(0).toUpperCase() + source!.slice(1);
 }

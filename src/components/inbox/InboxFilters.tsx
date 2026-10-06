@@ -11,7 +11,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpDown, ChevronDown, Filter, X } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Filter, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { operatorLabel, type Operator } from '@/hooks/useOperators';
 import type { Queue } from '@/hooks/useQueues';
@@ -37,6 +37,8 @@ interface Props {
   operators: Operator[];
   tags: Tag[];
   queues: Queue[];
+  // Só o ícone de filtro (layout do Atendimento); a ordenação vai para dentro do painel.
+  compact?: boolean;
 }
 
 const inputCls =
@@ -191,7 +193,7 @@ const JANELA_OPTS: { v: JanelaFilter; label: string }[] = [
   { v: 'fora', label: 'Fora de 24h' },
 ];
 
-export function InboxFilters({ filters, onChange, sort, onSortChange, operators, tags, queues }: Props) {
+export function InboxFilters({ filters, onChange, sort, onSortChange, operators, tags, queues, compact = false }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -248,6 +250,18 @@ export function InboxFilters({ filters, onChange, sort, onSortChange, operators,
           <X className="h-4.5 w-4.5" />
         </button>
       </div>
+
+      {compact && (
+        <div className="mb-3">
+          <Field label="Ordenar por">
+            <select value={sort} onChange={(e) => onSortChange(e.target.value as InboxSort)} className={inputCls}>
+              {(Object.keys(INBOX_SORT_LABEL) as InboxSort[]).map((s) => (
+                <option key={s} value={s}>{INBOX_SORT_LABEL[s]}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Nome">
@@ -384,6 +398,28 @@ export function InboxFilters({ filters, onChange, sort, onSortChange, operators,
 
   return (
     <div className="flex items-center gap-2" ref={rootRef}>
+      {compact ? (
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Filtros e ordenação"
+        title="Filtros e ordenação"
+        className={cn(
+          'relative flex h-[42px] w-[42px] items-center justify-center rounded-xl border transition-colors',
+          count > 0
+            ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
+            : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+        )}
+      >
+        <SlidersHorizontal className="h-4 w-4" />
+        {count > 0 && (
+          <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent-fill)] px-1 text-[10px] font-bold text-white">
+            {count}
+          </span>
+        )}
+      </button>
+      ) : (
       <button
         ref={triggerRef}
         type="button"
@@ -403,8 +439,10 @@ export function InboxFilters({ filters, onChange, sort, onSortChange, operators,
           </span>
         )}
       </button>
+      )}
 
       {/* Ordenação da lista (mesmo padrão do funil). */}
+      {!compact && (
       <label className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border-card)] px-2.5 py-2 text-xs text-[var(--color-text-secondary)] transition hover:border-[var(--accent-primary)]">
         <ArrowUpDown className="h-3.5 w-3.5 opacity-70" />
         <select
@@ -417,6 +455,7 @@ export function InboxFilters({ filters, onChange, sort, onSortChange, operators,
           ))}
         </select>
       </label>
+      )}
 
       {open &&
         createPortal(

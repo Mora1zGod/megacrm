@@ -3,7 +3,7 @@ import './inbox.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRightLeft, CheckCircle2, Inbox as InboxIcon, Info, MessageSquarePlus, PanelRightClose, PanelRightOpen, Pin, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, CheckCircle2, Copy, Info, Instagram, MessageCircle, MoreVertical, PanelRightClose, PanelRightOpen, Pin, Plus, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
@@ -17,7 +17,6 @@ import { useTags } from '@/hooks/useTags';
 import { ConversationList } from '@/components/inbox/ConversationList';
 import { StartWhatsappChat } from '@/components/inbox/StartWhatsappChat';
 import { ConversationDealBar } from '@/components/inbox/ConversationDealBar';
-import { Button } from '@/components/ui/button';
 import { MessageThread } from '@/components/inbox/MessageThread';
 import { MessageInput } from '@/components/inbox/MessageInput';
 import { ContactPanel } from '@/components/inbox/ContactPanel';
@@ -34,6 +33,36 @@ import {
 } from '@/components/inbox/inbox-filters';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { ForwardToChatDialog } from '@/components/chat/ForwardToChatDialog';
+import { ContactTagsEditor } from '@/components/inbox/ContactTagsEditor';
+import { TransferMenu } from '@/components/inbox/TransferMenu';
+import { formatPhoneDisplay } from '@/lib/phone';
+
+function copyText(text: string, okMsg: string) {
+  void navigator.clipboard?.writeText(text).then(
+    () => toast.success(okMsg),
+    () => toast.error('Não foi possível copiar.'),
+  );
+}
+
+function lastActivityLabel(iso: string | null): string {
+  if (!iso) return 'Sem atividade';
+  const d = new Date(iso);
+  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return `Última atividade hoje às ${hm}`;
+  if (d.toDateString() === yest.toDateString()) return `Última atividade ontem às ${hm}`;
+  return `Última atividade em ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${hm}`;
+}
+
+function MenuItem({ icon, onClick, children }: { icon: React.ReactNode; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" role="menuitem" onClick={onClick} className="flex w-full min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
+      <span className="text-[var(--color-text-secondary)]">{icon}</span>
+      {children}
+    </button>
+  );
+}
 
 export default function InboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,8 +81,8 @@ export default function InboxPage() {
   const [showPanelMobile, setShowPanelMobile] = useState(false);
   // "Compartilhar com a equipe": joga a conversa no Chat Interno.
   const [showForward, setShowForward] = useState(false);
-  const [transferOpen, setTransferOpen] = useState(false);
-  useEffect(() => { setTransferOpen(false); }, [selectedId]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => { setMoreOpen(false); }, [selectedId]);
   // Painel de contato (coluna direita, xl+) recolhível; preferência persiste.
   const [panelCollapsed, setPanelCollapsed] = useState(
     () => localStorage.getItem('inbox_panel_collapsed') === '1',
@@ -218,6 +247,17 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleConversations, selectedId]);
 
+  const toggleClosed = async () => {
+    if (!selected) return;
+    const closing = selected.status !== 'closed';
+    try {
+      await setStatus(selected.id, closing ? 'closed' : 'human_active');
+      toast.success(closing ? 'Conversa concluída.' : 'Conversa reaberta.');
+    } catch (err) {
+      toast.error(closing ? 'Falha ao concluir' : 'Falha ao reabrir', { description: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   // Clear unread count when a conversation is open AND visible.
   useEffect(() => {
     if (selected && selected.unread_count > 0) {
@@ -228,22 +268,6 @@ export default function InboxPage() {
 
   return (
     <div className="inbox-workspace h-full flex flex-col min-h-0">
-      {/* Cabeçalho compacto: no Inbox cada pixel vertical é conversa visível.
-          O ícone grande + rótulo "Seção" das outras telas custava ~40px de
-          lista sem acrescentar informação. */}
-      <div className="inbox-page-heading flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg glass-card flex items-center justify-center">
-            <InboxIcon className="h-4 w-4 text-[var(--accent-primary)]" />
-          </div>
-          <div><h1 className="text-xl font-bold text-display">Atendimento</h1><p className="text-xs text-[var(--color-text-secondary)]">Suas conversas, em um só lugar</p></div>
-        </div>
-        <Button variant="outline" onClick={() => setShowStartChat(true)}>
-          <MessageSquarePlus className="h-4 w-4" />
-          <span className="hidden sm:inline">Iniciar conversa</span>
-        </Button>
-      </div>
-
       {showStartChat && (
         <StartWhatsappChat
           onClose={() => setShowStartChat(false)}
@@ -274,9 +298,20 @@ export default function InboxPage() {
             selectedId ? 'hidden lg:flex' : 'flex'
           }`}
         >
-          <div className="inbox-list-tools space-y-3">
-            {/* Busca sempre visível + chips rápidos. Os filtros avançados
-                continuam no popover abaixo, para casos específicos. */}
+          <div className="inbox-list-header flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Conversas</h2>
+            <button
+              type="button"
+              onClick={() => setShowStartChat(true)}
+              aria-label="Iniciar conversa"
+              title="Iniciar conversa"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-fill)] text-white shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--accent-fill-hover)]"
+            >
+              <Plus className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="inbox-list-tools space-y-2.5">
+            {/* Abas com contador + busca; filtros avançados/ordenação no ícone. */}
             <InboxQuickBar
               busca={busca}
               onBuscaChange={setBusca}
@@ -284,24 +319,22 @@ export default function InboxPage() {
               onChipChange={setQuickChip}
               base={baseConversations}
               filters={filters}
-            />
-            <InboxFilters
-              filters={filters}
-              onChange={updateFilters}
-              sort={sort}
-              onSortChange={setSort}
-              operators={operators}
-              tags={tags}
-              queues={queues}
+              trailing={
+                <InboxFilters
+                  compact
+                  filters={filters}
+                  onChange={updateFilters}
+                  sort={sort}
+                  onSortChange={setSort}
+                  operators={operators}
+                  tags={tags}
+                  queues={queues}
+                />
+              }
             />
             {quickChip === 'grupos' && (
               <GroupsBar isAdmin={role === 'admin'} onDone={() => void reloadConvs()} />
             )}
-            <div className="flex justify-end">
-              <span className="text-[11px] text-[var(--color-text-secondary)] whitespace-nowrap">
-                {visibleConversations.length} conversa{visibleConversations.length !== 1 ? 's' : ''}
-              </span>
-            </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             <ConversationList
@@ -325,145 +358,137 @@ export default function InboxPage() {
         >
           {selected ? (
             <>
-              <div className="inbox-conversation-heading flex items-center gap-3">
+              <div className="inbox-conversation-heading flex items-center gap-3 sm:gap-4">
                 <button
                   onClick={() => setSelectedId(null)}
                   aria-label="Voltar à lista"
-                  className="lg:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  className="lg:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
                 >
                   <ArrowLeft className="h-4.5 w-4.5" />
                 </button>
-                <Avatar src={selected.contact?.profile_pic_url} name={selected.contact?.name || selected.contact?.phone} size="md" /><div className="min-w-0 flex-1">
-                  <div className="font-semibold text-[var(--color-text-primary)] text-sm truncate">
+                <Avatar src={selected.contact?.profile_pic_url} name={selected.contact?.name || selected.contact?.phone} size="lg" className="!h-12 !w-12 sm:!h-16 sm:!w-16" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-lg font-bold text-[var(--color-text-primary)]">
                     {selected.contact?.name?.trim() || selected.contact?.phone || '—'}
                   </div>
-                  <div className="text-[13px] text-[var(--color-text-muted)] truncate mt-0.5">
-                    {selectedIsGroup ? 'Grupo do WhatsApp' : selected.contact?.phone}
-                    {selectedIsGroup || selected.contact?.phone ? ' · ' : ''}
-                    Responsável: <span className="text-[var(--color-text-secondary)]">{operatorName(selected.assigned_to) ?? 'ninguém'}</span>
-                    {selected.status !== 'closed' && !selectedIsGroup && (
-                      <>
-                        {' · '}
-                        <span className={selected.ai_paused ? 'font-medium text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}>
-                          {selected.ai_paused ? 'AMAIA pausada' : 'AMAIA ativa'}
-                        </span>
-                      </>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[15px] text-[var(--color-text-secondary)]">
+                    <span className="truncate">{selectedIsGroup ? 'Grupo do WhatsApp' : formatPhoneDisplay(selected.contact?.phone)}</span>
+                    {!selectedIsGroup && selected.contact?.phone && (
+                      <button
+                        type="button"
+                        onClick={() => copyText(selected.contact?.phone ?? '', 'Telefone copiado.')}
+                        aria-label="Copiar telefone"
+                        title="Copiar telefone"
+                        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
+                  <div className="mt-0.5 truncate text-[13px] text-[var(--color-text-muted)]">
+                    {lastActivityLabel(selected.last_message_at)}
+                    {' · '}Responsável: {operatorName(selected.assigned_to) ?? 'ninguém'}
+                  </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    try {
-                      await setFavorite(selected.id, !selected.is_favorite);
-                    } catch (err) {
-                      toast.error('Falha ao favoritar', { description: err instanceof Error ? err.message : String(err) });
-                    }
-                  }}
-                  aria-label={selected.is_favorite ? 'Remover dos favoritos' : 'Favoritar conversa'}
-                  title={selected.is_favorite ? 'Remover dos favoritos' : 'Favoritar conversa'}
-                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
-                >
-                  <Star className={cn('h-4 w-4', selected.is_favorite && 'fill-[#FBBF24] text-[#FBBF24]')} />
-                </button>
-                {selected.status !== 'closed' && selected.assigned_to !== userId && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await setAssigned(selected.id, userId);
-                        toast.success('Conversa assumida.');
-                      } catch (err) {
-                        toast.error('Falha ao assumir', { description: err instanceof Error ? err.message : String(err) });
-                      }
-                    }}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-primary)] hover:bg-[var(--color-accent-subtle)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-                  >
-                    <UserCheck className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Assumir</span>
-                  </button>
-                )}
-                <div className="relative shrink-0">
-                  <button
-                    onClick={() => setTransferOpen((v) => !v)}
-                    aria-haspopup="menu"
-                    aria-expanded={transferOpen}
-                    title="Transferir conversa"
-                    className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors duration-150 hover:bg-[var(--color-surface-hover)]"
+
+                <div className="hidden min-[1440px]:flex min-w-0 flex-col items-end gap-2">
+                  <span className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold',
+                    selected.channel === 'instagram'
+                      ? 'bg-[rgba(225,48,108,0.1)] text-[#C13584]'
+                      : 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]',
+                  )}>
+                    {selected.channel === 'instagram' ? <Instagram className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
+                    {selected.channel === 'instagram' ? 'Instagram' : 'WhatsApp'}
+                  </span>
+                  {selected.contact?.id && !selectedIsGroup && (
+                    <ContactTagsEditor contactId={selected.contact.id} variant="inline" align="right" />
+                  )}
+                </div>
+
+                {/* Abaixo de 1440px o painel some: Transferir/Concluir ficam aqui. */}
+                <div className="flex items-center gap-2 min-[1440px]:hidden">
+                  <TransferMenu
+                    operators={operators}
+                    assignedTo={selected.assigned_to}
+                    userId={userId}
+                    onAssign={(uid) => setAssigned(selected.id, uid)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                   >
                     <ArrowRightLeft className="h-4 w-4" />
-                    <span className="hidden md:inline">Transferir</span>
+                    <span className="hidden xl:inline">Transferir</span>
+                  </TransferMenu>
+                  <button
+                    onClick={() => void toggleClosed()}
+                    title={selected.status !== 'closed' ? 'Concluir atendimento' : 'Reabrir atendimento'}
+                    className={cn(
+                      'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition-colors',
+                      selected.status !== 'closed'
+                        ? 'bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]'
+                        : 'border border-[var(--color-border-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]',
+                    )}
+                  >
+                    {selected.status !== 'closed' ? <CheckCircle2 className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                    <span className="hidden xl:inline">{selected.status !== 'closed' ? 'Concluir' : 'Reabrir'}</span>
                   </button>
-                  {transferOpen && (
+                </div>
+
+                {/* Menu ⋮: favoritar, assumir, compartilhar, detalhes */}
+                <div className="relative shrink-0">
+                  <button
+                    onClick={() => setMoreOpen((v) => !v)}
+                    aria-label="Mais opções"
+                    aria-haspopup="menu"
+                    aria-expanded={moreOpen}
+                    className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                  {moreOpen && (
                     <>
-                      <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setTransferOpen(false)} />
-                      <div role="menu" className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-64 max-h-80 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
-                        <div className="px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]">Transferir para</div>
-                        {operators.filter((o) => o.user_id !== selected.assigned_to).map((o) => (
-                          <button
-                            key={o.user_id}
-                            role="menuitem"
-                            onClick={async () => {
-                              setTransferOpen(false);
-                              try {
-                                await setAssigned(selected.id, o.user_id);
-                                toast.success(`Conversa transferida para ${operatorLabel(o)}.`);
-                              } catch (err) {
-                                toast.error('Falha ao transferir', { description: err instanceof Error ? err.message : String(err) });
-                              }
-                            }}
-                            className="flex w-full min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-                          >
-                            <Avatar src={o.avatar_url} name={operatorLabel(o)} size="sm" />
-                            <span className="truncate">{operatorLabel(o)}{o.user_id === userId ? ' (você)' : ''}</span>
-                          </button>
-                        ))}
-                        {operators.filter((o) => o.user_id !== selected.assigned_to).length === 0 && (
-                          <div className="px-2.5 py-2 text-sm text-[var(--color-text-muted)]">Nenhum outro membro na equipe.</div>
+                      <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setMoreOpen(false)} />
+                      <div role="menu" className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-60 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
+                        <MenuItem icon={<Star className={cn('h-4 w-4', selected.is_favorite && 'fill-[#FBBF24] text-[#FBBF24]')} />} onClick={async () => {
+                          setMoreOpen(false);
+                          try { await setFavorite(selected.id, !selected.is_favorite); }
+                          catch (err) { toast.error('Falha ao favoritar', { description: err instanceof Error ? err.message : String(err) }); }
+                        }}>
+                          {selected.is_favorite ? 'Remover dos favoritos' : 'Favoritar conversa'}
+                        </MenuItem>
+                        {selected.status !== 'closed' && selected.assigned_to !== userId && (
+                          <MenuItem icon={<UserCheck className="h-4 w-4" />} onClick={async () => {
+                            setMoreOpen(false);
+                            try { await setAssigned(selected.id, userId); toast.success('Conversa assumida.'); }
+                            catch (err) { toast.error('Falha ao assumir', { description: err instanceof Error ? err.message : String(err) }); }
+                          }}>
+                            Assumir conversa
+                          </MenuItem>
                         )}
+                        <MenuItem icon={<Share2 className="h-4 w-4" />} onClick={() => { setMoreOpen(false); setShowForward(true); }}>
+                          Compartilhar com a equipe
+                        </MenuItem>
+                        <div className="min-[1440px]:hidden">
+                          <MenuItem icon={<Info className="h-4 w-4" />} onClick={() => { setMoreOpen(false); setShowPanelMobile(true); }}>
+                            Detalhes do contato
+                          </MenuItem>
+                        </div>
+                        <div className="hidden min-[1440px]:block">
+                          <MenuItem icon={panelCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />} onClick={() => { setMoreOpen(false); togglePanel(); }}>
+                            {panelCollapsed ? 'Mostrar painel do contato' : 'Ocultar painel do contato'}
+                          </MenuItem>
+                        </div>
                       </div>
                     </>
                   )}
                 </div>
-                <button
-                  onClick={async () => {
-                    const closing = selected.status !== 'closed';
-                    try {
-                      await setStatus(selected.id, closing ? 'closed' : 'human_active');
-                      toast.success(closing ? 'Conversa concluída.' : 'Conversa reaberta.');
-                    } catch (err) {
-                      toast.error(closing ? 'Falha ao concluir' : 'Falha ao reabrir', { description: err instanceof Error ? err.message : String(err) });
-                    }
-                  }}
-                  title={selected.status !== 'closed' ? 'Concluir atendimento' : 'Reabrir atendimento'}
-                  className={cn(
-                    'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition-colors duration-150',
-                    selected.status !== 'closed'
-                      ? 'bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]'
-                      : 'border border-[var(--color-border-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]',
-                  )}
-                >
-                  {selected.status !== 'closed' ? <CheckCircle2 className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
-                  <span className="hidden md:inline">{selected.status !== 'closed' ? 'Concluir' : 'Reabrir'}</span>
-                </button>
-                <button
-                  onClick={() => setShowForward(true)}
-                  aria-label="Compartilhar com a equipe"
-                  title="Compartilhar esta conversa no Chat Interno"
-                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
-                >
-                  <Share2 className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setShowPanelMobile(true)}
-                  aria-label="Detalhes da conversa"
-                  className="min-[1440px]:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-                >
-                  <Info className="h-4.5 w-4.5" />
-                </button>
               </div>
+              {/* Barra do negócio: o painel direito já mostra Pipeline/Etapa. */}
+              <div className="min-[1440px]:hidden">
               <ConversationDealBar
                 contactId={selected.contact?.id ?? null}
                 activeDealId={selected.active_deal_id ?? null}
               />
+              </div>
               {selected.pinned_note && (
                 <div className="flex items-start gap-2 border-b border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.06)] px-4 py-2 text-sm text-[#FBBF24]">
                   <Pin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -509,19 +534,9 @@ export default function InboxPage() {
             </button>
           ) : selected ? (
             <>
-              <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--color-border-card)]">
-                <span className="text-label">Detalhes</span>
-                <button
-                  onClick={togglePanel}
-                  aria-label="Recolher painel de detalhes"
-                  title="Recolher painel"
-                  className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-all duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-                >
-                  <PanelRightClose className="h-4 w-4" />
-                </button>
-              </div>
               <div className="flex-1 min-h-0">
                 <ContactPanel
+                  showTopActions
                   conversation={selected}
                   withinWindow={effectiveWithinWindow}
                   provider={selectedProvider}

@@ -11,6 +11,7 @@ import { useAppUser } from '@/app/providers/AppUserProvider';
 import { Avatar } from '@/components/ui/Avatar';
 import { NewSaleDialog } from '@/components/sales/NewSaleDialog';
 import { GoalPill } from '@/components/sales/GoalPill';
+import { AmaiaStatusPill } from '@/components/ai/AmaiaStatusPill';
 import { OPEN_NEW_SALE_EVENT } from '@/hooks/useSales';
 
 interface HeaderProps {
@@ -80,17 +81,18 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <button
           onClick={() => setSearchOpen(true)}
-          className="hidden sm:flex min-h-10 items-center gap-2 flex-1 max-w-md rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-muted)] transition-colors duration-[var(--motion-base)] hover:border-[var(--accent-primary)]"
+          className="hidden sm:flex min-w-0 min-h-10 items-center gap-2 flex-1 max-w-md rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-muted)] transition-colors duration-[var(--motion-base)] hover:border-[var(--accent-primary)]"
         >
           <Search className="h-4 w-4 shrink-0" />
-          <span className="flex-1 text-left truncate">Buscar contatos, negócios, visitas...</span>
-          <kbd className="shrink-0 rounded border border-[var(--color-border-card)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
+          <span className="flex-1 text-left truncate">Buscar contatos, conversas, leads...</span>
+          <kbd className="hidden 2xl:inline shrink-0 rounded border border-[var(--color-border-card)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
             Ctrl+K
           </kbd>
         </button>
       </div>
 
       <div className="flex min-w-0 items-center gap-2 sm:gap-3 shrink-0">
+        <AmaiaStatusPill />
         {role === 'admin' && <GoalPill />}
         <Button
           variant="success"
@@ -98,7 +100,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           className="min-h-10"
           aria-label="Nova venda"
         >
-          <BadgeDollarSign className="h-4 w-4" /> <span className="hidden sm:inline">Nova venda</span>
+          <BadgeDollarSign className="h-4 w-4" /> <span className="hidden xl:inline">Nova venda</span>
         </Button>
         <div className="relative">
           <Button onClick={() => setCriarOpen((v) => !v)} className="min-h-10">

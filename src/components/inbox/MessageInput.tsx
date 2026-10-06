@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
-import { Clock, FileText, Loader2, Mic, Paperclip, Send, Sparkles, Square, StickyNote, Undo2, X, Zap } from 'lucide-react';
+import { Clock, FileText, Loader2, Mic, MoreHorizontal, Paperclip, Send, Smile, Sparkles, StickyNote, Undo2, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSupabase } from '@/lib/supabase';
 import { extractFunctionErrorMessage } from '@/lib/functionError';
@@ -27,6 +27,8 @@ interface MessageInputProps {
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
+const EMOJIS = ['😊', '😁', '😂', '🥰', '😍', '😉', '🙏', '👍', '👏', '🙌', '💚', '💙', '❤️', '🎉', '✨', '🔥', '💦', '🌊', '☀️', '🏖️', '🎟️', '📅', '⏰', '📍', '✅', '❌', '⚠️', '👉', '👋', '🤗', '😅', '🤔'];
+
 export function MessageInput({
   conversationId,
   disabled,
@@ -45,6 +47,9 @@ export function MessageInput({
   const [improving, setImproving] = useState(false);
   const [preImprove, setPreImprove] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [narrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
 
   // Respostas rápidas: digitar "/algo" no início da caixa abre a lista de
   // atalhos (Configurações → Respostas rápidas). Enter/Tab aplica o
@@ -256,47 +261,35 @@ export function MessageInput({
     }
   };
 
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="inbox-composer border-t border-[var(--color-border-card)] p-4 space-y-3 glass-surface"
-    >
-      <div className="flex items-center gap-1 border-b border-[var(--color-border-card)] pb-1.5">
-        <button
-          type="button"
-          onClick={() => setIsPrivate(false)}
-          disabled={disabled || sending || Boolean(file)}
-          className={
-            !isPrivate
-              ? 'rounded-md px-3 py-1 text-xs font-semibold bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
-              : 'rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-          }
-        >
-          Mensagem
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsPrivate(true)}
-          disabled={disabled || sending || Boolean(file)}
-          className={
-            isPrivate
-              ? 'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold bg-[rgba(245,158,11,0.12)] text-[#FBBF24]'
-              : 'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
-          }
-        >
-          <StickyNote className="h-3.5 w-3.5" />
-          Anotação interna
-        </button>
-        {isPrivate && (
-          <span className="text-[10px] text-[var(--color-text-secondary)] opacity-70">
-            Visível só para operadores — não vai pro contato
-          </span>
-        )}
-      </div>
+  const blocked = requiresTemplateRestart && !isPrivate;
+  const insertEmoji = (emoji: string) => {
+    const el = textareaRef.current;
+    if (!el) { setContent((c) => c + emoji); return; }
+    const start = el.selectionStart ?? content.length;
+    const end = el.selectionEnd ?? content.length;
+    const next = content.slice(0, start) + emoji + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + emoji.length;
+    });
+  };
 
-      {requiresTemplateRestart && !isPrivate ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.05)] p-3">
-          <div className="flex items-center gap-2 text-sm text-[#FBBF24]">
+  // Caixa de texto cresce com o conteúdo (até ~6 linhas).
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [content]);
+
+  const chipReplies = quickReplies.slice(0, 5);
+
+  return (
+    <form onSubmit={handleSubmit} className="inbox-composer space-y-2">
+      {blocked ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.06)] p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--inbox-warn-text,#FBBF24)]">
             <Clock className="h-4 w-4" />
             Fora da janela de 24h — só é possível reiniciar com um template aprovado.
           </div>
@@ -305,18 +298,18 @@ export function MessageInput({
             contato responder. Enquanto ele não responder, o envio de mensagens
             livres continua bloqueado.
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={() => setShowTemplate(true)} disabled={disabled || sending}>
               <FileText className="h-4 w-4" />
               Reiniciar com template
             </Button>
-            <span className="text-[11px] text-[var(--color-text-secondary)] opacity-70">
-              Ou use “Nota privada” para um registro interno.
-            </span>
+            <button type="button" onClick={() => setIsPrivate(true)} className="text-xs font-medium text-[var(--accent-primary)] hover:underline">
+              Escrever anotação interna
+            </button>
           </div>
         </div>
       ) : instagramHumanAgentWindow && !isPrivate ? (
-        <div className="flex items-center gap-2 rounded-lg border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-[11px] text-[#FBBF24]">
+        <div className="flex items-center gap-2 rounded-lg border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.05)] px-3 py-2 text-[11px] text-[var(--inbox-warn-text,#FBBF24)]">
           <Clock className="h-3.5 w-3.5 shrink-0" />
           Passou de 24h desde a última mensagem do contato no Instagram. A entrega depende do
           recurso “Human Agent” da Meta, que ainda não está liberado para a conta — a resposta
@@ -324,19 +317,14 @@ export function MessageInput({
         </div>
       ) : null}
 
-      {(!requiresTemplateRestart || isPrivate) && file && (
+      {!blocked && file && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs">
           <Paperclip className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
           <span className="truncate text-[var(--color-text-primary)]">{file.name}</span>
-          <span className="text-[var(--color-text-secondary)]">
-            {(file.size / 1024 / 1024).toFixed(1)} MB
-          </span>
+          <span className="text-[var(--color-text-secondary)]">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
           <button
             type="button"
-            onClick={() => {
-              setFile(null);
-              if (fileInputRef.current) fileInputRef.current.value = '';
-            }}
+            onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
             className="ml-auto text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
             aria-label="Remover arquivo"
           >
@@ -345,141 +333,182 @@ export function MessageInput({
         </div>
       )}
 
-      <div className={`flex items-end gap-2 ${requiresTemplateRestart && !isPrivate ? 'hidden' : ''}`}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept="image/*,audio/*,video/*,application/pdf"
-          onChange={onPickFile}
-          disabled={disabled || sending}
-        />
-        {!isPrivate && !recording && (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || sending}
-              aria-label="Anexar arquivo"
-              title="Anexar imagem, áudio, vídeo ou documento (máx 25MB)"
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => void startRecording()}
-              disabled={disabled || sending || Boolean(file)}
-              aria-label="Gravar áudio"
-              title="Gravar mensagem de voz"
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-          </>
-        )}
-        {recording && (
-          <div className="flex flex-1 items-center gap-3 rounded-lg border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.06)] px-3 py-2">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--color-error)]" />
-            <span className="text-sm font-mono text-[var(--color-text-primary)]">
-              {String(Math.floor(recordSecs / 60)).padStart(2, '0')}:{String(recordSecs % 60).padStart(2, '0')}
-            </span>
-            <span className="text-xs text-[var(--color-text-secondary)]">Gravando…</span>
-            <div className="ml-auto flex items-center gap-1">
-              <Button type="button" variant="ghost" size="icon" onClick={() => stopRecording(false)} aria-label="Cancelar gravação" title="Cancelar">
-                <X className="h-4 w-4 text-[var(--color-error)]" />
-              </Button>
-              <Button type="button" size="icon" onClick={() => stopRecording(true)} aria-label="Enviar áudio" title="Parar e enviar">
-                <Square className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*,audio/*,video/*,application/pdf"
+        onChange={onPickFile}
+        disabled={disabled || sending}
+      />
+
+      {!blocked && (recording ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.06)] px-3 py-2">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--color-error)]" />
+          <span className="text-sm font-mono text-[var(--color-text-primary)]">
+            {String(Math.floor(recordSecs / 60)).padStart(2, '0')}:{String(recordSecs % 60).padStart(2, '0')}
+          </span>
+          <span className="text-xs text-[var(--color-text-secondary)]">Gravando…</span>
+          <div className="ml-auto flex items-center gap-1">
+            <button type="button" className="inbox-icon-btn" onClick={() => stopRecording(false)} aria-label="Cancelar gravação" title="Cancelar">
+              <X className="h-5 w-5 text-[var(--color-error)]" />
+            </button>
+            <button type="button" className="inbox-send-btn" onClick={() => stopRecording(true)} aria-label="Enviar áudio" title="Parar e enviar">
+              <Send className="h-5 w-5" />
+            </button>
           </div>
-        )}
-        {!recording && (
-        <div className="relative flex-1">
-          {qrOpen && (
-            <div className="absolute bottom-[calc(100%+6px)] left-0 z-20 w-full max-w-sm rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg">
-              {qrMatches.map((q, i) => (
-                <button
-                  key={q.id}
-                  type="button"
-                  onMouseDown={(e) => { e.preventDefault(); applyQuickReply(q); }}
-                  className={
-                    i === qrIndex
-                      ? 'flex w-full items-start gap-2 rounded-md bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-left'
-                      : 'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-[var(--color-surface-hover)]'
-                  }
-                >
-                  <Zap className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--accent-primary)]" />
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold text-[var(--color-text-primary)]">/{q.shortcut}</span>
-                    <span className="block truncate text-[11px] text-[var(--color-text-secondary)]">{q.content}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea
-            value={content}
-            onChange={(e) => { setContent(e.target.value); if (preImprove !== null) setPreImprove(null); }}
-            onKeyDown={handleKey}
-            rows={2}
-            disabled={disabled || sending}
-            placeholder={
-              file
-                ? 'Legenda (opcional)…'
-                : isPrivate
-                  ? 'Escreva uma nota interna…'
-                  : 'Digite uma mensagem… ("/" para respostas rápidas)'
-            }
-            className={
-              isPrivate
-                ? 'w-full rounded-lg border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.04)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[#FBBF24] resize-none'
-                : 'w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-none'
-            }
-          />
         </div>
-        )}
-        {/* "Melhorar": só aparece quando há texto digitado. Reescreve com o tom
-            da marca sem enviar — o operador revisa antes. */}
-        {!recording && content.trim() && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => void improveDraft()}
-            disabled={disabled || sending || improving}
-            aria-label="Melhorar mensagem"
-            title={isPrivate ? 'Melhorar nota interna' : 'Melhorar mensagem com o tom da marca'}
+      ) : (
+        <div className="flex items-end gap-2">
+          <div className={`inbox-composer-box flex-1 ${isPrivate ? 'is-note' : ''}`}>
+            <div className="relative">
+              <button
+                type="button"
+                className="inbox-icon-btn"
+                onClick={() => setEmojiOpen((v) => !v)}
+                disabled={disabled || sending}
+                aria-label="Emojis"
+                title="Emojis"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+              {emojiOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setEmojiOpen(false)} />
+                  <div className="absolute bottom-[calc(100%+8px)] left-0 z-30 grid w-72 grid-cols-8 gap-0.5 rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-2 shadow-[var(--shadow-lg)]">
+                    {EMOJIS.map((e) => (
+                      <button key={e} type="button" onClick={() => insertEmoji(e)} className="h-8 w-8 rounded-md text-lg hover:bg-[var(--color-surface-hover)]">
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {!isPrivate && (
+              <button
+                type="button"
+                className="inbox-icon-btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || sending}
+                aria-label="Anexar arquivo"
+                title="Anexar imagem, áudio, vídeo ou documento (máx 25MB)"
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`inbox-icon-btn ${isPrivate ? '!text-[var(--color-note-text)] !bg-[var(--color-note-bg)]' : ''}`}
+              onClick={() => setIsPrivate((v) => !v)}
+              disabled={disabled || sending || Boolean(file)}
+              aria-pressed={isPrivate}
+              aria-label="Anotação interna"
+              title={isPrivate ? 'Voltar para mensagem ao cliente' : 'Anotação interna (só a equipe vê)'}
+            >
+              <StickyNote className="h-5 w-5" />
+            </button>
+
+            <div className="relative flex min-w-0 flex-1">
+              {qrOpen && (
+                <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-sm rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-lg">
+                  {qrMatches.map((q, i) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applyQuickReply(q); }}
+                      className={
+                        i === qrIndex
+                          ? 'flex w-full items-start gap-2 rounded-md bg-[var(--color-accent-subtle)] px-2.5 py-1.5 text-left'
+                          : 'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-[var(--color-surface-hover)]'
+                      }
+                    >
+                      <Zap className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--accent-primary)]" />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold text-[var(--color-text-primary)]">/{q.shortcut}</span>
+                        <span className="block truncate text-[11px] text-[var(--color-text-secondary)]">{q.content}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => { setContent(e.target.value); if (preImprove !== null) setPreImprove(null); }}
+                onKeyDown={handleKey}
+                rows={1}
+                disabled={disabled || sending}
+                placeholder={
+                  file
+                    ? 'Legenda (opcional)…'
+                    : isPrivate
+                      ? 'Anotação interna — só a equipe vê…'
+                      : narrow ? 'Digite uma mensagem...' : 'Digite uma mensagem... ("/" para respostas rápidas)'
+                }
+              />
+            </div>
+
+            {content.trim() && (
+              <button
+                type="button"
+                className="inbox-icon-btn"
+                onClick={() => void improveDraft()}
+                disabled={disabled || sending || improving}
+                aria-label="Melhorar mensagem"
+                title={isPrivate ? 'Melhorar nota interna' : 'Melhorar mensagem com o tom da marca'}
+              >
+                {improving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5 text-[var(--accent-primary)]" />}
+              </button>
+            )}
+            {preImprove !== null && (
+              <button type="button" className="inbox-icon-btn" onClick={undoImprove} disabled={disabled || sending} aria-label="Desfazer melhoria" title="Voltar ao texto original">
+                <Undo2 className="h-5 w-5" />
+              </button>
+            )}
+            {!isPrivate && !content.trim() && !file && (
+              <button
+                type="button"
+                className="inbox-icon-btn"
+                onClick={() => void startRecording()}
+                disabled={disabled || sending}
+                aria-label="Gravar áudio"
+                title="Gravar mensagem de voz"
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+          <button
+            type="submit"
+            className="inbox-send-btn"
+            disabled={(!content.trim() && !file) || sending || disabled}
+            aria-label={isPrivate ? 'Salvar anotação' : 'Enviar'}
+            title={isPrivate ? 'Salvar anotação interna' : 'Enviar'}
           >
-            {improving
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <Sparkles className="h-4 w-4 text-[var(--accent-primary)]" />}
-          </Button>
-        )}
-        {!recording && preImprove !== null && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={undoImprove}
-            disabled={disabled || sending}
-            aria-label="Desfazer melhoria"
-            title="Voltar ao texto original"
-          >
-            <Undo2 className="h-4 w-4" />
-          </Button>
-        )}
-        {!recording && (
-        <Button type="submit" disabled={(!content.trim() && !file) || sending || disabled} aria-label="Enviar" title="Enviar">
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {/* No mobile some o texto pra sobrar espaço p/ a caixa de texto. */}
-          <span className="hidden sm:inline">Enviar</span>
-        </Button>
-        )}
-      </div>
+            {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+          </button>
+        </div>
+      ))}
+
+      {!blocked && !recording && !isPrivate && chipReplies.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+          <span className="shrink-0 text-[13px] font-medium text-[var(--color-text-secondary)]">Respostas rápidas:</span>
+          {chipReplies.map((q) => (
+            <button key={q.id} type="button" className="inbox-qr-chip" title={q.content} onClick={() => { applyQuickReply(q); textareaRef.current?.focus(); }}>
+              {q.shortcut}
+            </button>
+          ))}
+          {quickReplies.length > chipReplies.length && (
+            <button type="button" className="inbox-qr-chip" aria-label="Mais respostas rápidas" title="Mais respostas rápidas" onClick={() => { setContent('/'); textareaRef.current?.focus(); }}>
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+      {isPrivate && (
+        <div className="text-[11px] text-[var(--color-note-text)]">Anotação interna — fica só na equipe, não vai para o contato.</div>
+      )}
 
       <TemplateRestartDialog
         open={showTemplate}

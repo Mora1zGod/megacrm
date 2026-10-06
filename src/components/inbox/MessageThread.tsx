@@ -29,13 +29,13 @@ function StatusTicks({ status }: { status: Message['meta_status'] }) {
   if (!status) return null;
   if (status === 'failed') {
     return (
-      <span className="inline-flex items-center gap-1 font-semibold text-[#FCA5A5] text-[10px]">
+      <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-error)] text-[10px]">
         <AlertCircle className="h-3 w-3" />
         não entregue
       </span>
     );
   }
-  if (status === 'read') return <CheckCheck className="h-3 w-3 text-[var(--accent-primary)]" />;
+  if (status === 'read') return <CheckCheck className="h-3.5 w-3.5 text-[#53BDEB]" />;
   if (status === 'delivered') return <CheckCheck className="h-3 w-3 opacity-60" />;
   return <Check className="h-3 w-3 opacity-60" />;
 }
@@ -70,12 +70,8 @@ function formatDayLabel(iso: string): string {
 
 function DateSeparator({ iso }: { iso: string }) {
   return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="h-px flex-1 bg-[var(--color-border-card)]" />
-      <span className="rounded-full border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-text-muted)]">
-        {formatDayLabel(iso)}
-      </span>
-      <div className="h-px flex-1 bg-[var(--color-border-card)]" />
+    <div className="flex justify-center py-2">
+      <span className="inbox-date-pill">{formatDayLabel(iso)}</span>
     </div>
   );
 }
@@ -274,7 +270,7 @@ function FailedActions({
   inverse?: boolean;
 }) {
   // inverse=true → dentro do balão azul (texto claro); senão card claro.
-  const base = inverse ? 'text-white/90' : 'text-[var(--color-error)]';
+  const base = inverse ? 'text-[var(--color-error)]' : 'text-[var(--color-error)]';
   return (
     <div className={cn('mt-1 flex items-center gap-2 text-[10px]', base)}>
       <span className="font-semibold">Não enviou.</span>
@@ -308,22 +304,22 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-label opacity-60">Carregando mensagens...</div>
+      <div className="inbox-message-history flex-1 flex items-center justify-center">
+        <div className="inbox-date-pill">Carregando mensagens...</div>
       </div>
     );
   }
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-label opacity-60">Nenhuma mensagem nesta conversa.</div>
+      <div className="inbox-message-history flex-1 flex items-center justify-center">
+        <div className="inbox-date-pill">Nenhuma mensagem nesta conversa.</div>
       </div>
     );
   }
 
   return (
-    <div className="inbox-message-history flex-1 min-h-0 overflow-y-auto p-6 space-y-3">
+    <div className="inbox-message-history flex-1 min-h-0 overflow-y-auto space-y-2.5">
       {messages.map((m, i) => {
         const showDate = i === 0 || dayKey(m.created_at) !== dayKey(messages[i - 1].created_at);
         const separator = showDate ? <DateSeparator iso={m.created_at} /> : null;
@@ -374,15 +370,10 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
           >
             <div
               className={cn(
-                'inbox-message-bubble max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 transition-opacity',
-                isInbound
-                  ? 'border border-[var(--color-border-soft)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] rounded-bl-md'
-                  : m.sender_type === 'ai'
-                    // AMAIA: contorno na cor de marca, fundo transparente —
-                    // identidade própria sem virar mais uma caixa teal sólida
-                    // igual ao operador humano (era a mesma cor pros dois).
-                    ? 'border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] rounded-br-md'
-                    : 'bg-[var(--color-bubble-out)] text-[var(--color-bubble-out-text)] rounded-br-md',
+                'inbox-message-bubble max-w-[85%] sm:max-w-[65%] rounded-2xl px-3.5 py-2 transition-opacity',
+                // Estilo WhatsApp: recebida branca, enviada verde (IA e equipe
+                // com a mesma cor; o rótulo acima do texto diz quem enviou).
+                isInbound ? 'inbox-bubble-in rounded-tl-md' : 'inbox-bubble-out rounded-tr-md',
                 m._state === 'pending' && 'opacity-70',
                 (m._state === 'failed' || m.meta_status === 'failed') &&
                   'ring-1 ring-[var(--color-error)]',
@@ -393,7 +384,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                 <div className="mb-0.5 text-xs font-semibold text-[var(--accent-primary)]">{m.sender_name}</div>
               )}
               {!isInbound && m.sender_type !== 'contact' && (
-                <div className="flex items-center gap-1 text-xs font-semibold opacity-75 mb-1">
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-primary)] mb-0.5">
                   <SenderIcon sender={m.sender_type} />
                   {m.sender_type === 'ai' ? 'AMAIA' : m.sender_type === 'owner' ? 'WhatsApp' : 'Operador'}
                 </div>
@@ -424,7 +415,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss }: Message
                 <MediaContent message={m} />
               )}
               {!isInbound && m.meta_status === 'failed' && m.error_reason && (
-                <div className="mt-1.5 rounded-md bg-black/25 px-2 py-1.5 text-[11px] leading-snug text-[#FCA5A5]">
+                <div className="mt-1.5 rounded-md bg-[rgba(239,68,68,0.12)] px-2 py-1.5 text-[11px] leading-snug text-[var(--color-error)]">
                   <span className="font-semibold">Motivo: </span>
                   {m.error_reason}
                 </div>

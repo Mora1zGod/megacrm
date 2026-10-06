@@ -574,7 +574,7 @@ Regras:
 - Nunca `bg-[var(--accent-primary)]` com texto branco (contraste reprovado): use `--accent-fill`.
 - Nunca cor fixa de tema (hex escuro, `bg-white/5`, `rgba(14,154,160,…)` do tema verde-água antigo) — sempre token. Exceção: `/setup`.
 - Raio: `--radius-card` 12px, `--radius-control` 10px. Fonte Inter; corpo 14–16px.
-- Atendimento: lista 300px | conversa | detalhes 288px (só ≥1440px; abaixo, overlay pelo botão ⓘ) — a conversa não pode ficar espremida.
+- Atendimento (06/10/2026, visual "WhatsApp verde"): lista 340–360px | conversa com papel de parede | painel de cartões 360px (só ≥1440px; abaixo, overlay pelo menu ⋮ → Detalhes). O verde vale só dentro de `.inbox-workspace` (tokens redefinidos em `src/app/routes/inbox/inbox.css`); o resto do CRM segue o azul.
 
 ## Notas de migração e variáveis não-triviais
 

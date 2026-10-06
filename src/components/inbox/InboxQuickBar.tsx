@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ConversationWithContact } from '@/types/inbox';
@@ -68,7 +68,7 @@ export function matchesBusca(c: ConversationWithContact, busca: string): boolean
   return ultima.includes(q);
 }
 
-export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }: Props) {
+export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, trailing }: Props & { trailing?: ReactNode }) {
   const contagem = useMemo(() => {
     let naoLidas = 0;
     let aguardando = 0;
@@ -89,63 +89,62 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base }
     return { todas, naoLidas, aguardando, aguardandoCliente, iaPausada, favoritas, grupos };
   }, [base]);
 
-  const chips: Array<{ id: QuickChip; label: string; count: number }> = [
+  const chips: Array<{ id: QuickChip; label: string; count: number; title?: string }> = [
     { id: 'todas', label: 'Tudo', count: contagem.todas },
     { id: 'nao_lidas', label: 'Não lidas', count: contagem.naoLidas },
-    { id: 'aguardando', label: 'Aguardando equipe', count: contagem.aguardando },
+    { id: 'aguardando', label: 'Aguardando', count: contagem.aguardando, title: 'Aguardando resposta da equipe' },
     { id: 'aguardando_cliente', label: 'Aguardando cliente', count: contagem.aguardandoCliente },
-    { id: 'ia_pausada', label: 'IA pausada', count: contagem.iaPausada },
+    { id: 'ia_pausada', label: 'AMAIA pausada', count: contagem.iaPausada },
     { id: 'favoritas', label: 'Favoritas', count: contagem.favoritas },
     { id: 'grupos', label: 'Grupos', count: contagem.grupos },
   ];
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" />
-        <input
-          value={busca}
-          onChange={(e) => onBuscaChange(e.target.value)}
-          aria-label="Buscar por nome, telefone ou mensagem" placeholder="Buscar conversa..."
-          className="w-full rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] py-1.5 pl-8 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] focus:border-[var(--accent-primary)]"
-        />
-        {busca && (
-          <button
-            type="button"
-            onClick={() => onBuscaChange('')}
-            aria-label="Limpar busca"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-
-      <div className="inbox-quick-filters">
+    <div className="space-y-2.5">
+      <div className="inbox-quick-filters" role="tablist" aria-label="Filtrar conversas">
         {chips.map((c) => {
           const ativo = chip === c.id;
-          // Chip sem nada para mostrar (fora "Tudo") fica oculto — não faz
-          // sentido oferecer um filtro que resultaria em lista vazia.
+          // Aba sem nada para mostrar (fora Tudo/Grupos) fica oculta.
           if (c.id !== 'todas' && c.id !== 'grupos' && c.count === 0 && !ativo) return null;
           return (
             <button
               key={c.id}
               type="button"
-              aria-pressed={ativo} onClick={() => onChipChange(ativo && c.id !== 'todas' ? 'todas' : c.id)}
-              className={cn(
-                'rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold transition-colors',
-                ativo
-                  ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
-                  : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
-              )}
+              title={c.title}
+              aria-pressed={ativo}
+              onClick={() => onChipChange(ativo && c.id !== 'todas' ? 'todas' : c.id)}
             >
               {c.label}
-              {c.count > 0 && c.id !== 'todas' && (
-                <span className="ml-1 opacity-80">{c.count}</span>
-              )}
+              {c.count > 0 && <span className="count">{c.count}</span>}
             </button>
           );
         })}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
+          <input
+            value={busca}
+            onChange={(e) => onBuscaChange(e.target.value)}
+            aria-label="Buscar por nome, telefone ou mensagem"
+            placeholder="Pesquisar conversas..."
+            className={cn(
+              'w-full rounded-xl border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] py-2 pl-9 pr-8 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--accent-primary)]',
+            )}
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => onBuscaChange('')}
+              aria-label="Limpar busca"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {trailing}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Bot, Inbox, Instagram, Lock, MessageCircle, User, Users } from 'lucide-react';
+import { Bot, Inbox, Instagram, Lock, MessageCircle, PauseCircle, User, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -105,7 +105,7 @@ export function ConversationList({
   }
 
   return (
-    <div className="space-y-1 px-2 py-2">
+    <div className="space-y-0.5 px-2 pb-2">
       {conversations.map((c) => {
         const locked = isLocked?.(c) ?? false;
         const assignedName = operatorName?.(c.assigned_to) ?? null;
@@ -123,6 +123,9 @@ export function ConversationList({
         const contact = c.contact;
         const displayName = contact?.name?.trim() || (isGroup ? 'Grupo' : contact?.phone) || '—';
 
+        const unread = c.unread_count > 0;
+        const isInstagram = c.channel === 'instagram';
+
         return (
           <button
             key={c.id}
@@ -130,61 +133,56 @@ export function ConversationList({
             onClick={() => { if (!locked) onSelect(c.id); }}
             title={locked ? `Conversa atribuída a ${assignedName ?? 'outro operador'}` : undefined}
             className={cn(
-              'inbox-conversation-row w-full text-left rounded-[var(--radius-card)] px-3 py-2.5 transition-colors duration-150 border',
-              locked
-                ? 'opacity-50 cursor-not-allowed border-transparent'
-                : isActive
-                  ? 'bg-[var(--color-accent-subtle)] border-[var(--accent-primary)]'
-                  : 'border-transparent hover:bg-[var(--color-surface-hover)]',
+              'inbox-conversation-row w-full text-left transition-colors duration-150',
+              locked && 'opacity-50 cursor-not-allowed',
             )}
           >
-            <div className="flex items-start gap-2.5">
+            <div className="flex items-start gap-3">
               <div className="relative shrink-0">
-                <Avatar src={contact?.profile_pic_url} name={displayName} size="md" />
+                <Avatar src={contact?.profile_pic_url} name={displayName} size="md" className="!h-12 !w-12" />
                 {c.is_favorite && (
                   <span className="absolute -top-1 -right-1 text-[10px]">⭐</span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+                  <span className="text-[15px] font-semibold text-[var(--color-text-primary)] truncate">
                     {displayName}
                   </span>
-                  <span className="text-[11px] text-[var(--color-text-secondary)] shrink-0 inline-flex items-center gap-1">
+                  <span className={cn('text-xs shrink-0 inline-flex items-center gap-1', unread ? 'font-semibold text-[var(--accent-primary)]' : 'text-[var(--color-text-muted)]')}>
                     {locked && <Lock className="h-3 w-3" />}
                     {formatTimestamp(c.last_message_at)}
                   </span>
                 </div>
-                <p className="text-sm text-[var(--color-text-secondary)] truncate mt-1">
-                  {locked ? <span className="italic opacity-70">Conversa em atendimento</span> : (c.lastMessagePreview ?? '—')}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                  <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', chan.chip)}>
-                    <chan.Icon className="h-2.5 w-2.5" /> {chan.label}
-                  </span>
-                  <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', status.className)}>
-                    <StatusIcon className="h-2.5 w-2.5" /> {status.label}
-                  </span>
-                  {/* Com responsável o chip acima mostra o nome dele e escondia
-                      que a IA continua respondendo. */}
-                  {isGroup && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                      <Users className="h-2.5 w-2.5" /> Grupo
-                    </span>
-                  )}
-                  {!isGroup && !c.ai_paused && aiEnabled && c.status !== 'closed' && c.assigned_to && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)]">
-                      <Bot className="h-2.5 w-2.5" /> AMAIA ativa
-                    </span>
-                  )}
-                  {!isGroup && c.ai_paused && aiEnabled && (
-                    <span className="inline-flex items-center rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                      AMAIA pausada
-                    </span>
-                  )}
-                  {c.unread_count > 0 && (
-                    <span className="ml-auto shrink-0 rounded-full bg-[var(--accent-fill)] px-2 py-0.5 text-[10px] font-bold text-white">
+                <div className="mt-0.5 flex items-center gap-2">
+                  <p className={cn('flex-1 truncate text-[13.5px]', unread ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]')}>
+                    {locked ? <span className="italic opacity-70">Conversa em atendimento</span> : (c.lastMessagePreview ?? '—')}
+                  </p>
+                  {unread && (
+                    <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] px-1.5 text-[11px] font-bold text-white">
                       {c.unread_count}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
+                    {isInstagram
+                      ? <Instagram className="h-3 w-3 text-[#E1306C]" />
+                      : <MessageCircle className="h-3 w-3 text-[var(--inbox-wa,#25D366)]" />}
+                    {isInstagram ? 'Instagram' : chan.label}
+                  </span>
+                  {isGroup && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-[var(--color-fill-subtle)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
+                      <Users className="h-3 w-3" /> Grupo
+                    </span>
+                  )}
+                  {!isGroup && c.ai_paused && aiEnabled && c.status !== 'closed' ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-[rgba(245,158,11,0.14)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--inbox-warn-text)]">
+                      <PauseCircle className="h-3 w-3" /> AMAIA pausada
+                    </span>
+                  ) : !isGroup && (
+                    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium', status.className)}>
+                      <StatusIcon className="h-3 w-3" /> {status.label}
                     </span>
                   )}
                 </div>

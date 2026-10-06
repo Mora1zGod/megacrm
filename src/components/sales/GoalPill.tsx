@@ -35,7 +35,7 @@ export function GoalPill() {
   };
 
   return (
-    <div className="relative hidden lg:block">
+    <div className="relative hidden 2xl:block">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

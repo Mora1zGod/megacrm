@@ -397,3 +397,7 @@ select option {
     animation: none;
   }
 }
+
+/* Pill "AMAIA ativa" do topo — verde legível nos dois temas. */
+.amaia-on { color: #4ADE80; }
+:root[data-theme='light'] .amaia-on { color: #15803D; }
