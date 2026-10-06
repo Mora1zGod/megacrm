@@ -588,6 +588,11 @@ Regras:
 - Perfil define o papel legado (`is_admin` → `admin`, senão `operator`) e o trigger
   `_app_users_sync_jwt` espelha no JWT. As policies antigas (`current_user_role()`)
   ainda valem; a troca por `has_perm()` é tabela por tabela (etapa 4).
+- Etapa 4 (`20261007160000_access_control_rls.sql`): fim das policies `authenticated_all`
+  (USING true — vazavam entre orgs: tasks, api_keys, audit_log, quadros…); escrita das
+  áreas de admin por `has_perm()`; leads (`owner_id`), tarefas (`assigned_to`) e agenda
+  (`created_by`) com escopo via `owner_in_scope(perm_scope(m), dono)`. Nunca criar policy
+  `USING (true)` em tabela de domínio — sempre `in_org(org_id)`.
 
 ## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
 
