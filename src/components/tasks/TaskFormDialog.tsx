@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { toast } from 'sonner';
 import { Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,8 @@ export function TaskFormDialog({ initial, defaultDate, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const { userId } = useAppUser();
+  const perms = usePermission();
+  const canAssign = perms.can('tasks.assign');
   const { operators } = useOperators();
   const editing = Boolean(initial?.id);
   const due = initial?.due_at ? new Date(initial.due_at) : null;
@@ -114,7 +117,8 @@ export function TaskFormDialog({ initial, defaultDate, onClose, onSaved }: {
         </div>
         <div>
           <Label htmlFor="tf-who">Responsável</Label>
-          <select id="tf-who" value={assignee} onChange={(e) => setAssignee(e.target.value)} className={cn(inputCls, 'h-10 py-0')}>
+          <select id="tf-who" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!canAssign}
+            title={canAssign ? undefined : 'Seu perfil não permite atribuir tarefas para outra pessoa'} className={cn(inputCls, 'h-10 py-0')}>
             <option value="">Sem responsável</option>
             {operators.map((o) => (
               <option key={o.user_id} value={o.user_id}>{operatorLabel(o)}{o.user_id === userId ? ' (eu)' : ''}</option>

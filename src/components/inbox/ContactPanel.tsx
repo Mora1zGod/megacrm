@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Archive, ArchiveRestore, ArrowRightLeft, User, BadgeDollarSign, BarChart3, Bot, Briefcase, CalendarDays, CalendarPlus, CheckCircle2, CheckSquare, ChevronDown, CircleX, Clock, Copy, IdCard, Instagram, LayoutGrid, MessageCircle, MoreHorizontal, Pause, PauseCircle, Pin, Play, Plus, RotateCcw, ShoppingBag, Zap } from 'lucide-react';
@@ -66,6 +67,7 @@ export function ContactPanel({
   showTopActions = false,
 }: ContactPanelProps) {
   const { userId } = useAppUser();
+  const perms = usePermission();
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [tarefas, setTarefas] = useState<TaskLite[]>([]);
@@ -419,9 +421,9 @@ export function ContactPanel({
   return (
     <div className="h-full space-y-3 overflow-y-auto p-3">
       {/* Transferir / Concluir */}
-      {showTopActions && (
+      {showTopActions && (perms.can('inbox.transfer') || perms.can('inbox.close')) && (
         <div className="flex items-center gap-2">
-          <TransferMenu
+          {perms.can('inbox.transfer') && <TransferMenu
             operators={operators}
             assignedTo={conversation.assigned_to}
             userId={userId}
@@ -430,8 +432,8 @@ export function ContactPanel({
             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface)] px-4 text-[15px] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
           >
             <ArrowRightLeft className="h-4.5 w-4.5" /> Transferir
-          </TransferMenu>
-          <button
+          </TransferMenu>}
+          {perms.can('inbox.close') && <button
             type="button"
             onClick={() => void (isClosed ? handleReopen() : handleConclude())}
             className={isClosed
@@ -440,7 +442,7 @@ export function ContactPanel({
           >
             {isClosed ? <RotateCcw className="h-4.5 w-4.5" /> : <CheckCircle2 className="h-4.5 w-4.5" />}
             {isClosed ? 'Reabrir' : 'Concluir'}
-          </button>
+          </button>}
         </div>
       )}
 

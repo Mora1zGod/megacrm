@@ -127,7 +127,7 @@ export default function AdminPage() {
         throw new Error(body.message ?? 'Falha ao entrar na organização.');
       }
       await getSupabase().auth.refreshSession();
-      window.location.href = '/dashboard';
+      window.location.href = '/';
     } catch (err) {
       setBusyId(null);
       toast.error('Falha ao entrar como suporte', {

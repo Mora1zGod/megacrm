@@ -73,7 +73,7 @@ export function OrgSwitcher() {
       const body = await res.json();
       if (!res.ok || !body.success) throw new Error(body.message ?? 'Falha ao trocar de organização.');
       await getSupabase().auth.refreshSession();
-      window.location.href = '/dashboard';
+      window.location.href = '/';
     } catch (err) {
       toast.error('Falha ao trocar de organização', {
         description: err instanceof Error ? err.message : 'Erro interno',

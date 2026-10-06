@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -69,6 +70,7 @@ function downloadCsv(csv: string, filename: string) {
 }
 
 export default function ContactsPage() {
+  const perms = usePermission();
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
@@ -199,19 +201,19 @@ export default function ContactsPage() {
             <TagIcon className="h-4 w-4" />
             Tags
           </Button>
-          <Button variant="outline" onClick={() => setShowImport(true)}>
+          {perms.can('contacts.create') && <Button variant="outline" onClick={() => setShowImport(true)}>
             <Upload className="h-4 w-4" />
             Importar
-          </Button>
-          <Button variant="outline" onClick={handleExport} disabled={exporting || loading}>
+          </Button>}
+          {perms.can('contacts.export') && <Button variant="outline" onClick={handleExport} disabled={exporting || loading}>
             <Download className="h-4 w-4" />
             {exporting
               ? 'Exportando…'
               : selected.size > 0
                 ? `Exportar CSV (${selected.size})`
                 : 'Exportar CSV'}
-          </Button>
-          <Button
+          </Button>}
+          {perms.can('contacts.create') && <Button
             onClick={() => {
               setEditing(null);
               setShowForm(true);
@@ -219,7 +221,7 @@ export default function ContactsPage() {
           >
             <Plus className="h-4 w-4" />
             Novo contato
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -311,10 +313,10 @@ export default function ContactsPage() {
                   + {t.name}
                 </button>
               ))}
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkBusy}>
+              {perms.can('contacts.delete') && <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={bulkBusy}>
                 <Trash2 className="h-3.5 w-3.5" />
                 Remover
-              </Button>
+              </Button>}
             </div>
           </div>
         )}

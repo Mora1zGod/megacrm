@@ -27,7 +27,7 @@ export default function LoginPage() {
       toast.error('Não foi possível entrar', { description: error });
       return;
     }
-    navigate('/dashboard', { replace: true });
+    navigate('/', { replace: true });
   };
 
   // Esqueci minha senha: dispara o e-mail de recuperação do Supabase. O link

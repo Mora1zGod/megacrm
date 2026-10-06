@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ChevronRight, ClipboardList, Plus, Repeat, X } from 'lucide-react';
@@ -28,6 +29,7 @@ function dayBounds() {
 // responsável), contador feitas/total, marcar como feita e criar rápido.
 export function DailyTasksPopover() {
   const { userId } = useAppUser();
+  const perms = usePermission();
   const { operators } = useOperators();
   const [tasks, setTasks] = useState<DayTask[]>([]);
   const [open, setOpen] = useState(false);
@@ -96,7 +98,7 @@ export function DailyTasksPopover() {
                 <span className="rounded-full bg-[rgba(239,68,68,0.12)] px-2 py-0.5 text-xs font-bold text-[var(--color-error)]">{done}/{tasks.length}</span>
               </div>
               <div className="flex items-center gap-1">
-                <button type="button" onClick={() => { setOpen(false); setFormOpen(true); }} aria-label="Nova tarefa para hoje" title="Nova tarefa para hoje" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>
+                {perms.can('tasks.create') && <button type="button" onClick={() => { setOpen(false); setFormOpen(true); }} aria-label="Nova tarefa para hoje" title="Nova tarefa para hoje" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>}
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"><X className="h-4 w-4" /></button>
               </div>
             </div>
@@ -110,7 +112,7 @@ export function DailyTasksPopover() {
                   const isDone = t.status === 'done';
                   return (
                     <li key={t.id} className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-[var(--color-surface-hover)]">
-                      <input type="checkbox" checked={isDone} onChange={() => void toggle(t)} aria-label={`Concluir: ${t.title}`} className="h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
+                      <input type="checkbox" checked={isDone} disabled={!perms.can('tasks.complete')} onChange={() => void toggle(t)} aria-label={`Concluir: ${t.title}`} className="h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
                       <div className="min-w-0 flex-1">
                         <div className={`truncate text-sm ${isDone ? 'text-[var(--color-text-muted)] line-through' : 'text-[var(--color-text-primary)]'}`}>{t.title}</div>
                         <div className={`flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] ${isDone ? 'line-through' : ''}`}>

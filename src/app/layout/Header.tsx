@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Menu, LogOut, Search, Plus, ChevronDown, User, Briefcase, CalendarDays, CheckSquare, Megaphone, Sun, Moon, BadgeDollarSign } from 'lucide-react';
@@ -21,17 +22,19 @@ interface HeaderProps {
 }
 
 const CRIAR_ITEMS = [
-  { label: 'Contato', icon: User, href: '/contacts' },
-  { label: 'Negócio', icon: Briefcase, href: '/funil' },
-  { label: 'Visita', icon: CalendarDays, href: '/agenda' },
-  { label: 'Tarefa', icon: CheckSquare, href: '/tasks' },
-  { label: 'Campanha', icon: Megaphone, href: '/campaigns' },
+  { label: 'Contato', icon: User, href: '/contacts', perm: 'contacts.create' },
+  { label: 'Negócio', icon: Briefcase, href: '/funil', perm: 'deals.view' },
+  { label: 'Visita', icon: CalendarDays, href: '/agenda', perm: 'visits.create' },
+  { label: 'Tarefa', icon: CheckSquare, href: '/tasks', perm: 'tasks.create' },
+  { label: 'Campanha', icon: Megaphone, href: '/campaigns', perm: 'campaigns.manage' },
 ] as const;
 
 export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { displayName, avatarUrl, effectiveTheme, toggleTheme, role } = useAppUser();
+  const { displayName, avatarUrl, effectiveTheme, toggleTheme } = useAppUser();
+  const perms = usePermission();
+  const criarItems = CRIAR_ITEMS.filter((i) => perms.can(i.perm));
   const themeLabel = effectiveTheme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro';
   const [searchOpen, setSearchOpen] = useState(false);
   const [criarOpen, setCriarOpen] = useState(false);
@@ -94,19 +97,19 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex min-w-0 items-center gap-2 sm:gap-3 shrink-0">
-        <DailyTasksPopover />
-        <RemindersPopover />
+        {perms.can('tasks.view') && <DailyTasksPopover />}
+        {perms.can('reminders.view') && <RemindersPopover />}
         <AmaiaStatusPill />
-        {role === 'admin' && <GoalPill />}
-        <Button
+        {perms.can('financial.view') && <GoalPill />}
+        {perms.can('financial.create') && <Button
           variant="success"
           onClick={() => { setSaleContact(null); setSaleOpen(true); }}
           className="min-h-10"
           aria-label="Nova venda"
         >
           <BadgeDollarSign className="h-4 w-4" /> <span className="hidden xl:inline">Nova venda</span>
-        </Button>
-        <div className="relative">
+        </Button>}
+        {criarItems.length > 0 && <div className="relative">
           <Button onClick={() => setCriarOpen((v) => !v)} className="min-h-10">
             <Plus className="h-4 w-4" /> Criar <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${criarOpen ? 'rotate-180' : ''}`} />
           </Button>
@@ -114,7 +117,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <>
               <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setCriarOpen(false)} />
               <div className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-48 origin-top-right rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
-                {CRIAR_ITEMS.map((item) => {
+                {criarItems.map((item) => {
                   const Icon = item.icon;
                   return (
                     <button
@@ -130,7 +133,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               </div>
             </>
           )}
-        </div>
+        </div>}
 
         <OrgSwitcher />
 

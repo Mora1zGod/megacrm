@@ -4,6 +4,8 @@ import { AppLayout } from './layout/AppLayout';
 import { useSupabaseConfig } from '@/hooks/useSupabase';
 import { useAuth } from './providers/AuthProvider';
 import { useAppUser } from './providers/AppUserProvider';
+import { usePermission } from './providers/PermissionsProvider';
+import { firstAllowedPath } from './layout/nav-config';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Lazy loading the page chunks keeps the initial bundle lean.
@@ -30,6 +32,7 @@ const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
 const FilesPage = lazy(() => import('./routes/files/FilesPage'));
 const ChatPage = lazy(() => import('./routes/chat/ChatPage'));
 const SalesTvPage = lazy(() => import('./routes/tv/SalesTvPage'));
+const AccessDeniedPage = lazy(() => import('./routes/errors/AccessDeniedPage'));
 
 function PageFallback() {
   return (
@@ -70,14 +73,23 @@ function RequireSession({ children }: { children: ReactElement }) {
   return children;
 }
 
-// Rotas restritas a admin (Dashboard, Funil): operador é levado para a Inbox.
-function AdminOnly({ children }: { children: ReactElement }) {
-  const { role, loading } = useAppUser();
-  if (loading) return <PageFallback />;
-  if (role !== 'admin') {
-    return <Navigate to="/inbox" replace />;
-  }
+// Rota liberada por permissão (perfil + exceções). Sem permissão: tela
+// "Acesso restrito" — a página nem monta, então nada daquela área é carregado.
+// O bloqueio real dos dados é do banco (RLS); isto é a camada da interface.
+function RequirePermission({ perm, area, children }: { perm: string; area?: string; children: ReactElement }) {
+  const { loading: userLoading } = useAppUser();
+  const { can, loading } = usePermission();
+  if (userLoading || loading) return <PageFallback />;
+  if (!can(perm)) return <AccessDeniedPage area={area} />;
   return children;
+}
+
+// "/" e rotas desconhecidas: vai para a 1ª área liberada do usuário.
+function HomeRedirect() {
+  const { loading: userLoading } = useAppUser();
+  const { can, loading } = usePermission();
+  if (userLoading || loading) return <PageFallback />;
+  return <Navigate to={firstAllowedPath(can)} replace />;
 }
 
 // Console /admin: restrito ao super admin. Demais usuários vão pro dashboard.
@@ -85,7 +97,7 @@ function RequireSuperAdmin({ children }: { children: ReactElement }) {
   const { isSuperAdmin, loading } = useAppUser();
   if (loading) return <PageFallback />;
   if (!isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -101,7 +113,7 @@ function RedirectIfConfigured({ children }: { children: ReactElement }) {
     }
     // Already configured → move the user forward. If they also have a
     // session, jump straight to dashboard; otherwise to login.
-    return <Navigate to={session ? '/dashboard' : '/auth/login'} replace />;
+    return <Navigate to={session ? '/' : '/auth/login'} replace />;
   }
   return children;
 }
@@ -110,7 +122,7 @@ function RedirectIfAuthenticated({ children }: { children: ReactElement }) {
   const { session, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (session) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -166,9 +178,9 @@ export function AppRouter() {
           element={
             <RequireSetup>
               <RequireSession>
-                <AdminOnly>
+                <RequirePermission perm="financial.tv" area="Painel TV">
                   <SalesTvPage />
-                </AdminOnly>
+                </RequirePermission>
               </RequireSession>
             </RequireSetup>
           }
@@ -183,44 +195,44 @@ export function AppRouter() {
             </RequireSetup>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<AdminOnly><DashboardPage /></AdminOnly>} />
-          <Route path="/inbox" element={<InboxPage />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route index element={<HomeRedirect />} />
+          <Route path="/dashboard" element={<RequirePermission perm="dashboard.view" area="Visão geral"><DashboardPage /></RequirePermission>} />
+          <Route path="/inbox" element={<RequirePermission perm="inbox.view" area="Atendimento"><InboxPage /></RequirePermission>} />
+          <Route path="/campaigns" element={<RequirePermission perm="campaigns.view" area="Campanhas"><CampaignsPage /></RequirePermission>} />
           {/* Templates virou aba dentro de Campanhas (Módulo 1) — preserva links salvos. */}
           <Route path="/templates" element={<Navigate to="/campaigns?tab=templates" replace />} />
-          <Route path="/contacts" element={<ContactsPage />} />
-          <Route path="/contacts/:id" element={<ContactDetailPage />} />
-          <Route path="/arquivos" element={<FilesPage />} />
+          <Route path="/contacts" element={<RequirePermission perm="contacts.view" area="Contatos"><ContactsPage /></RequirePermission>} />
+          <Route path="/contacts/:id" element={<RequirePermission perm="contacts.view" area="Contatos"><ContactDetailPage /></RequirePermission>} />
+          <Route path="/arquivos" element={<RequirePermission perm="files.view" area="Arquivos"><FilesPage /></RequirePermission>} />
           {/* Chat Interno: aberto a toda a equipe (sem AdminOnly). */}
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/funil" element={<AdminOnly><FunilPage /></AdminOnly>} />
-          <Route path="/agenda" element={<VisitsPage />} />
+          <Route path="/chat" element={<RequirePermission perm="chat.view" area="Chat da equipe"><ChatPage /></RequirePermission>} />
+          <Route path="/funil" element={<RequirePermission perm="deals.view" area="Funil"><FunilPage /></RequirePermission>} />
+          <Route path="/agenda" element={<RequirePermission perm="visits.view" area="Agenda"><VisitsPage /></RequirePermission>} />
           {/* Visitas virou Agenda (visitas + tarefas + lembretes) — mantém links antigos. */}
-          <Route path="/visitas" element={<VisitsPage />} />
-          <Route path="/quadros" element={<BoardsPage />} />
+          <Route path="/visitas" element={<RequirePermission perm="visits.view" area="Agenda"><VisitsPage /></RequirePermission>} />
+          <Route path="/quadros" element={<RequirePermission perm="boards.view" area="Quadros"><BoardsPage /></RequirePermission>} />
           {/* /vendas (Vendas & Recompra) removido — redireciona pro dashboard */}
-          <Route path="/vendas" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/vendas" element={<HomeRedirect />} />
           {/* /projetos (Entrega) e /educacao removidos — redirecionam pro funil */}
           <Route path="/projetos" element={<Navigate to="/funil" replace />} />
           <Route path="/educacao" element={<Navigate to="/funil" replace />} />
-          <Route path="/ai-agent" element={<AIAgentPage />} />
-          <Route path="/automations" element={<AdminOnly><AutomationsPage /></AdminOnly>} />
+          <Route path="/ai-agent" element={<RequirePermission perm="settings.ai" area="Agente de IA"><AIAgentPage /></RequirePermission>} />
+          <Route path="/automations" element={<RequirePermission perm="automations.view" area="Automações"><AutomationsPage /></RequirePermission>} />
           {/* Rotas antigas → agora abas dentro de /ai-agent */}
           <Route path="/knowledge" element={<Navigate to="/ai-agent" replace />} />
           <Route path="/follow-ups" element={<Navigate to="/automations?tab=followups" replace />} />
           <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
           <Route path="/settings/profile" element={<SettingsPage />} />
           <Route path="/admin" element={<RequireSuperAdmin><AdminPage /></RequireSuperAdmin>} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/relatorios" element={<AdminOnly><ReportsPage /></AdminOnly>} />
-          <Route path="/integracoes" element={<AdminOnly><IntegrationsPage /></AdminOnly>} />
-          <Route path="/logs-auditoria" element={<AdminOnly><AuditLogPage /></AdminOnly>} />
+          <Route path="/tasks" element={<RequirePermission perm="tasks.view" area="Tarefas"><TasksPage /></RequirePermission>} />
+          <Route path="/relatorios" element={<RequirePermission perm="reports.view" area="Relatórios"><ReportsPage /></RequirePermission>} />
+          <Route path="/integracoes" element={<RequirePermission perm="settings.integrations" area="Integrações"><IntegrationsPage /></RequirePermission>} />
+          <Route path="/logs-auditoria" element={<RequirePermission perm="audit.view" area="Auditoria"><AuditLogPage /></RequirePermission>} />
           {/* Credenciais agora é aba dentro de Configurações */}
           <Route path="/settings/credentials" element={<Navigate to="/settings/profile" replace />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </Suspense>
   );

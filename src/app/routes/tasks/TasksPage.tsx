@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlertTriangle, CalendarClock, Check, CheckCircle2, ListTodo, MessageSquare, Pencil, Plus, Repeat, Search, Trash2 } from 'lucide-react';
@@ -42,6 +43,7 @@ function dueText(iso: string, now: Date) {
 
 export default function TasksPage() {
   const { userId } = useAppUser();
+  const perms = usePermission();
   const { operators } = useOperators();
   const { tasks, loading, error, reload, toggleTask, deleteTask } = useTasks();
   const [tab, setTab] = useState<Tab>('pending');
@@ -117,7 +119,9 @@ export default function TasksPage() {
 
   const renderRow = (t: Task) => (
     <TaskRow key={t.id} task={t} now={now} operator={operators.find((o) => o.user_id === t.assigned_to)}
-      onToggle={() => void onToggle(t)} onEdit={() => setForm({ task: t })} onDelete={() => void onDelete(t)} />
+      onToggle={perms.can('tasks.complete') ? () => void onToggle(t) : undefined}
+      onEdit={perms.can('tasks.edit') ? () => setForm({ task: t }) : undefined}
+      onDelete={perms.can('tasks.delete') ? () => void onDelete(t) : undefined} />
   );
 
   return (
@@ -127,7 +131,7 @@ export default function TasksPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Tarefas</h1>
           <p className="text-sm text-[var(--color-text-secondary)]">Pendências, rotinas e follow-ups da equipe.</p>
         </div>
-        <Button onClick={() => setForm({})}><Plus className="h-4 w-4" /> Nova tarefa</Button>
+        {perms.can('tasks.create') && <Button onClick={() => setForm({})}><Plus className="h-4 w-4" /> Nova tarefa</Button>}
       </div>
 
       <div className="mb-4 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
@@ -221,7 +225,7 @@ function Kpi({ icon: Icon, label, value, tone, onClick }: {
 }
 
 function TaskRow({ task, now, operator, onToggle, onEdit, onDelete }: {
-  task: Task; now: Date; operator?: Operator; onToggle: () => void; onEdit: () => void; onDelete: () => void;
+  task: Task; now: Date; operator?: Operator; onToggle?: () => void; onEdit?: () => void; onDelete?: () => void;
 }) {
   const navigate = useNavigate();
   const done = task.status === 'done';
@@ -229,12 +233,12 @@ function TaskRow({ task, now, operator, onToggle, onEdit, onDelete }: {
   const rec = isRecurring(task.recurrence) ? (task.recurrence as TaskRecurrence) : null;
   return (
     <div className="group flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 py-2.5 transition-colors hover:border-[var(--accent-primary)]/40">
-      <button type="button" onClick={onToggle} aria-label={done ? 'Reabrir tarefa' : 'Concluir tarefa'}
+      <button type="button" onClick={onToggle} disabled={!onToggle} aria-label={done ? 'Reabrir tarefa' : 'Concluir tarefa'}
         className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
           done ? 'border-[var(--color-success)] bg-[var(--color-success)] text-white' : 'border-[var(--color-border-card)] hover:border-[var(--color-success)]')}>
         {done && <Check className="h-3 w-3" strokeWidth={3} />}
       </button>
-      <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left" title="Clique para editar">
+      <button type="button" onClick={onEdit} disabled={!onEdit} className="min-w-0 flex-1 text-left disabled:cursor-default" title={onEdit ? 'Clique para editar' : undefined}>
         <div className={cn('truncate text-sm font-medium text-[var(--color-text-primary)]', done && 'text-[var(--color-text-muted)] line-through')}>{task.title}</div>
         {task.description && <div className="truncate text-xs text-[var(--color-text-secondary)]">{task.description}</div>}
       </button>
@@ -258,14 +262,14 @@ function TaskRow({ task, now, operator, onToggle, onEdit, onDelete }: {
         {operator
           ? <span title={operatorLabel(operator)}><Avatar src={operator.avatar_url} name={operatorLabel(operator)} size="sm" className="!h-7 !w-7" /></span>
           : <span className="h-7 w-7" aria-hidden />}
-        <button type="button" onClick={onEdit} aria-label="Editar tarefa"
+        {onEdit && <button type="button" onClick={onEdit} aria-label="Editar tarefa"
           className="rounded p-1 text-[var(--color-text-muted)] opacity-0 transition hover:text-[var(--accent-primary)] focus:opacity-100 group-hover:opacity-100">
           <Pencil className="h-4 w-4" />
-        </button>
-        <button type="button" onClick={onDelete} aria-label="Apagar tarefa"
+        </button>}
+        {onDelete && <button type="button" onClick={onDelete} aria-label="Apagar tarefa"
           className="rounded p-1 text-[var(--color-text-muted)] opacity-0 transition hover:text-[var(--color-error)] focus:opacity-100 group-hover:opacity-100">
           <Trash2 className="h-4 w-4" />
-        </button>
+        </button>}
       </div>
     </div>
   );

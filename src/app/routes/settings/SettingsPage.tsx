@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import {
   Cake,
   KeyRound,
@@ -42,11 +43,14 @@ interface TabDef {
   hint: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  // Permissão que libera a aba (sem = aberta a todos).
+  perm?: string;
   render: () => React.ReactNode;
 }
 
 export default function SettingsPage() {
   const { role } = useAppUser();
+  const perms = usePermission();
   const [active, setActive] = useState<TabId>(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
     return (t as TabId) || 'account';
@@ -68,7 +72,7 @@ export default function SettingsPage() {
             label: 'Equipe',
             hint: 'Convites e roles',
             icon: Users,
-            adminOnly: true,
+            perm: 'users.view',
             render: () => <TeamSettings />,
           },
           {
@@ -76,7 +80,7 @@ export default function SettingsPage() {
             label: 'Canais',
             hint: 'WhatsApp e Instagram',
             icon: MessagesSquare,
-            adminOnly: true,
+            perm: 'settings.channels',
             render: () => <ChannelsSettings />,
           },
           {
@@ -84,7 +88,7 @@ export default function SettingsPage() {
             label: 'Produtos',
             hint: 'Catálogo de produtos',
             icon: Package,
-            adminOnly: true,
+            perm: 'settings.edit',
             render: () => <ProductsSettings />,
           },
           {
@@ -92,7 +96,7 @@ export default function SettingsPage() {
             label: 'Atendimento',
             hint: 'Tempo de resposta (SLA)',
             icon: Timer,
-            adminOnly: true,
+            perm: 'settings.edit',
             render: () => <AttendanceSettings />,
           },
           {
@@ -107,7 +111,7 @@ export default function SettingsPage() {
             label: 'Config. Aniversário',
             hint: 'Disparo automático',
             icon: Cake,
-            adminOnly: true,
+            perm: 'settings.edit',
             render: () => <BirthdaySettings />,
           },
           {
@@ -115,7 +119,7 @@ export default function SettingsPage() {
             label: 'Identidade Visual',
             hint: 'Logo, nome e tema',
             icon: Palette,
-            adminOnly: true,
+            perm: 'settings.edit',
             render: () => <BrandingSettings />,
           },
           {
@@ -123,12 +127,12 @@ export default function SettingsPage() {
             label: 'API',
             hint: 'Chaves de integração',
             icon: KeyRound,
-            adminOnly: true,
+            perm: 'settings.integrations',
             render: () => <ApiKeysSettings />,
           },
         ] as TabDef[]
-      ).filter((t) => !t.adminOnly || role === 'admin'),
-    [role],
+      ).filter((t) => (!t.adminOnly || role === 'admin') && (!t.perm || perms.can(t.perm))),
+    [role, perms],
   );
 
   // Operador só enxerga "Conta"; admin vê tudo. Garante que a aba ativa

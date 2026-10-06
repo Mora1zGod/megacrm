@@ -1,4 +1,5 @@
 import { Avatar } from '@/components/ui/Avatar';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import './inbox.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -106,6 +107,7 @@ export default function InboxPage() {
   const { queues } = useQueues();
   const { tags } = useTags();
   const { userId, role } = useAppUser();
+  const perms = usePermission();
   const { aiEnabledForChannel } = useAiChannels();
   const { providerOf } = useWhatsappProvider();
 
@@ -120,11 +122,12 @@ export default function InboxPage() {
     [operators],
   );
 
-  // Conversa atribuída a OUTRO operador fica bloqueada para quem não é admin.
-  // Sem atribuição, todo mundo vê; admin vê tudo.
+  // Escopo do perfil (Configurações → Usuários e acessos): "só próprias"
+  // bloqueia conversa atribuída a outra pessoa; "equipe" libera as da equipe;
+  // "todas" libera tudo. Sem atribuição, todo mundo vê.
   const isLocked = useCallback(
-    (c: ConversationWithContact) => role !== 'admin' && Boolean(c.assigned_to) && c.assigned_to !== userId,
-    [role, userId],
+    (c: ConversationWithContact) => !perms.inScope('inbox', c.assigned_to),
+    [perms],
   );
 
   // Persiste os filtros na querystring (namespace f*), preservando ?conversation.
@@ -424,7 +427,7 @@ export default function InboxPage() {
 
                 {/* Abaixo de 1440px o painel some: Transferir/Concluir ficam aqui. */}
                 <div className="flex items-center gap-2 min-[1440px]:hidden">
-                  <TransferMenu
+                  {perms.can('inbox.transfer') && <TransferMenu
                     operators={operators}
                     assignedTo={selected.assigned_to}
                     userId={userId}
@@ -433,8 +436,8 @@ export default function InboxPage() {
                   >
                     <ArrowRightLeft className="h-4 w-4" />
                     <span className="hidden xl:inline">Transferir</span>
-                  </TransferMenu>
-                  <button
+                  </TransferMenu>}
+                  {perms.can('inbox.close') && <button
                     onClick={() => void toggleClosed()}
                     title={selected.status !== 'closed' ? 'Concluir atendimento' : 'Reabrir atendimento'}
                     className={cn(
@@ -446,7 +449,7 @@ export default function InboxPage() {
                   >
                     {selected.status !== 'closed' ? <CheckCircle2 className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
                     <span className="hidden xl:inline">{selected.status !== 'closed' ? 'Concluir' : 'Reabrir'}</span>
-                  </button>
+                  </button>}
                 </div>
 
                 {/* Menu ⋮: favoritar, assumir, compartilhar, detalhes */}
@@ -516,11 +519,11 @@ export default function InboxPage() {
                 loading={loadingMsgs}
                 onRetry={retry}
                 onDismiss={dismissFailed}
-                onReply={selected.status !== 'closed' ? setReplyTo : undefined}
-                onForward={setForwardMsg}
+                onReply={selected.status !== 'closed' && perms.can('inbox.reply') ? setReplyTo : undefined}
+                onForward={perms.can('inbox.reply') ? setForwardMsg : undefined}
                 contactName={selected.contact?.name?.trim() || null}
               />
-              {selected.status !== 'closed' && (
+              {selected.status !== 'closed' && perms.can('inbox.reply') && (
                 <MessageInput
                   conversationId={selected.id}
                   withinWindow={effectiveWithinWindow}

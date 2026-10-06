@@ -53,7 +53,7 @@ export default function InvitePage() {
     await supabase.auth.refreshSession();
     setSubmitting(false);
     toast.success('Conta ativada. Bem-vindo!');
-    navigate('/dashboard', { replace: true });
+    navigate('/', { replace: true });
   };
 
   if (loading) {

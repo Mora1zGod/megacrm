@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Bell, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, List, MessageSquare, Pencil, Plus, Trash2, User, Users, X } from 'lucide-react';
@@ -87,6 +88,7 @@ export default function VisitsPage() {
   const [view, setView] = useState<VisitsView>('agenda');
   const [todayCount, setTodayCount] = useState<number | null>(null);
   const { userId } = useAppUser();
+  const perms = usePermission();
   const { operators } = useOperators();
   const [layers, setLayers] = useState<Record<Layer, boolean>>({ visitas: true, tarefas: true, lembretes: true });
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
@@ -268,10 +270,10 @@ export default function VisitsPage() {
               <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setNewMenuOpen(false)} />
               <div role="menu" className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-48 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
                 {([
-                  ['Visita', CalendarDays, () => setCreateOpen(true)],
-                  ['Tarefa', CheckSquare, () => setCreateTaskOpen(true)],
-                  ['Lembrete', Bell, () => setCreateReminderOpen(true)],
-                ] as const).map(([label, Icon, fn]) => (
+                  ['Visita', CalendarDays, () => setCreateOpen(true), 'visits.create'],
+                  ['Tarefa', CheckSquare, () => setCreateTaskOpen(true), 'tasks.create'],
+                  ['Lembrete', Bell, () => setCreateReminderOpen(true), 'reminders.create'],
+                ] as const).filter(([, , , perm]) => perms.can(perm)).map(([label, Icon, fn]) => (
                   <button key={label} type="button" role="menuitem" onClick={() => { setNewMenuOpen(false); fn(); }} className="flex w-full min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
                     <Icon className="h-4 w-4 text-[var(--color-text-secondary)]" /> {label}
                   </button>

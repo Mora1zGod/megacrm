@@ -68,7 +68,7 @@ export default function SignupPage() {
       return;
     }
     toast.success('Conta criada. Bem-vindo!');
-    navigate('/dashboard', { replace: true });
+    navigate('/', { replace: true });
   };
 
   if (status.state === 'loading') {

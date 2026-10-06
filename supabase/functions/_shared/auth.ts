@@ -74,6 +74,42 @@ export async function requireAdmin(req: Request): Promise<Caller & { orgId: stri
   return caller;
 }
 
+// ----------------------------------------------------------------------------
+// Permissões (camada única — mesma regra do banco: perfil + ALLOW − DENY,
+// whatsapp_hub.effective_permissions). Usuário inativo = nenhuma permissão.
+// Se o banco ainda não tiver a camada (SQL da etapa 1 ausente), vale a regra
+// antiga: admin pode tudo, operador pode o que já podia.
+// ----------------------------------------------------------------------------
+const LEGACY_OPERATOR_PERMS = new Set([
+  'inbox.view', 'inbox.reply', 'inbox.start', 'inbox.transfer', 'inbox.close', 'inbox.archive', 'inbox.resume_ai',
+  'contacts.view', 'contacts.create', 'contacts.edit', 'contacts.delete', 'contacts.export',
+]);
+
+export async function callerCan(caller: Caller & { orgId: string }, key: string): Promise<boolean> {
+  if (caller.isSuperAdmin) return true;
+  const { data, error } = await getAdminClient().rpc('user_has_perm', {
+    p_user: caller.userId,
+    p_org: caller.orgId,
+    p_key: key,
+  });
+  if (error) {
+    // Função ausente (SQL ainda não rodado): regra legada.
+    if (/user_has_perm|function|schema cache/i.test(error.message)) {
+      return caller.role === 'admin' || LEGACY_OPERATOR_PERMS.has(key);
+    }
+    throw new AuthError('Não foi possível verificar as permissões.', 500);
+  }
+  return data === true;
+}
+
+export async function requirePermission(req: Request, key: string): Promise<Caller & { orgId: string }> {
+  const caller = await requireOrgCaller(req);
+  if (!(await callerCan(caller, key))) {
+    throw new AuthError('Seu perfil não tem permissão para esta ação.', 403);
+  }
+  return caller;
+}
+
 export async function requireSuperAdmin(req: Request): Promise<Caller> {
   const caller = await requireCaller(req);
   if (!caller.isSuperAdmin) {

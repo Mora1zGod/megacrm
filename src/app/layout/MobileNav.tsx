@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS, type NavItem } from './nav-config';
+import { NAV_ITEMS, navItemVisible, type NavItem } from './nav-config';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { BrandMark } from './BrandMark';
 
@@ -16,11 +17,8 @@ const GROUP_ORDER: NavItem['group'][] = ['Operação', 'Engajamento', 'Gestão',
 // (`hidden md:flex`) deixava o app sem NENHUMA navegação no mobile.
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const { role, isSuperAdmin } = useAppUser();
-  const visibleItems = NAV_ITEMS.filter((item) => {
-    if (item.superAdminOnly) return isSuperAdmin;
-    if (item.adminOnly) return role === 'admin';
-    return true;
-  });
+  const perms = usePermission();
+  const visibleItems = NAV_ITEMS.filter((item) => navItemVisible(item, perms.can, isSuperAdmin));
   const groups = GROUP_ORDER.map((group) => ({
     group,
     items: visibleItems.filter((item) => item.group === group),

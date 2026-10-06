@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Navigate } from 'react-router-dom';
 import { Bot, BookOpen, Clock, Image, LayoutDashboard, Layers, ListTree, Loader2, MessageSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -34,7 +35,8 @@ const TABS: TabDef[] = [
 ];
 
 export default function AIAgentPage() {
-  const { role, loading } = useAppUser();
+  const { loading } = useAppUser();
+  const perms = usePermission();
   const [active, setActive] = useState<TabId>('overview');
   const current = TABS.find((t) => t.id === active) ?? TABS[0];
 
@@ -46,7 +48,7 @@ export default function AIAgentPage() {
     );
   }
   // Tela admin-only: configuração do agente, mídias, base, follow-ups e horário.
-  if (role !== 'admin') return <Navigate to="/dashboard" replace />;
+  if (!perms.can('settings.ai')) return <Navigate to="/" replace />;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { toast } from 'sonner';
 import { ArrowLeft, Bell, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ function dueLabel(iso: string): { text: string; late: boolean } {
 // data opcional. Com data, aparecem também na Agenda.
 export function RemindersPopover() {
   const { userId } = useAppUser();
+  const perms = usePermission();
   const { reminders, create, update, setDone, remove } = useReminders();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'list' | 'new'>('list');
@@ -66,7 +68,7 @@ export function RemindersPopover() {
     <div className="relative">
       <button
         type="button"
-        onClick={() => { setOpen((v) => !v); reset(); setMode(reminders.length ? 'list' : 'new'); }}
+        onClick={() => { setOpen((v) => !v); reset(); setMode(reminders.length || !perms.can('reminders.create') ? 'list' : 'new'); }}
         aria-haspopup="dialog"
         aria-expanded={open}
         className="relative flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
@@ -90,7 +92,7 @@ export function RemindersPopover() {
                 {mode === 'new' ? (editingId ? 'Editar lembrete' : 'Novo lembrete') : 'Lembretes'}
               </div>
               <div className="flex items-center gap-1">
-                {mode === 'list' && (
+                {mode === 'list' && perms.can('reminders.create') && (
                   <button type="button" onClick={() => { reset(); setMode('new'); }} aria-label="Novo lembrete" title="Novo lembrete" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>
                 )}
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"><X className="h-4 w-4" /></button>
@@ -121,13 +123,13 @@ export function RemindersPopover() {
                   <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]" htmlFor="rem-due">Data limite (opcional)</label>
                   <input id="rem-due" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={inputCls} />
                 </div>
-                <label className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 py-2">
+                {perms.can('reminders.share') && <label className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 py-2">
                   <span>
                     <span className="block text-sm font-medium text-[var(--color-text-primary)]">Compartilhar com equipe</span>
                     <span className="block text-xs text-[var(--color-text-muted)]">Todos da equipe poderão ver</span>
                   </span>
                   <input type="checkbox" role="switch" checked={shared} onChange={(e) => setShared(e.target.checked)} className="h-4 w-4 accent-[var(--accent-fill)]" />
-                </label>
+                </label>}
                 <Button className="w-full" onClick={() => void save()} disabled={saving || !title.trim()}>
                   {saving ? 'Salvando…' : editingId ? 'Salvar alterações' : 'Adicionar lembrete'}
                 </Button>
@@ -137,6 +139,8 @@ export function RemindersPopover() {
                 {reminders.map((r) => {
                   const due = r.due_at ? dueLabel(r.due_at) : null;
                   const mine = r.created_by === userId;
+                  const canEdit = mine && perms.can('reminders.edit');
+                  const canDelete = mine && perms.can('reminders.delete');
                   return (
                     <li key={r.id} className="group flex items-start gap-2.5 rounded-lg border border-[var(--color-border-soft)] px-2.5 py-2">
                       <input type="checkbox" checked={r.done} disabled={!mine} title={mine ? 'Concluir' : 'Só quem criou pode concluir'}
@@ -144,9 +148,9 @@ export function RemindersPopover() {
                         className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
                       <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: REMINDER_COLORS[r.color] }} />
                       <div
-                        className={`min-w-0 flex-1 ${mine ? 'cursor-pointer' : ''}`}
-                        onClick={mine ? () => startEdit(r) : undefined}
-                        title={mine ? 'Clique para editar' : undefined}
+                        className={`min-w-0 flex-1 ${canEdit ? 'cursor-pointer' : ''}`}
+                        onClick={canEdit ? () => startEdit(r) : undefined}
+                        title={canEdit ? 'Clique para editar' : undefined}
                       >
                         <div className="text-sm font-medium text-[var(--color-text-primary)]">{r.title}</div>
                         {r.notes && <div className="line-clamp-2 text-xs text-[var(--color-text-secondary)]">{r.notes}</div>}
@@ -155,12 +159,12 @@ export function RemindersPopover() {
                           {r.shared && <span className="inline-flex items-center gap-0.5 text-[var(--color-text-muted)]"><Users className="h-3 w-3" /> equipe</span>}
                         </div>
                       </div>
-                      {mine && (
+                      {canEdit && (
                         <button type="button" onClick={() => startEdit(r)} aria-label="Editar lembrete" title="Editar" className="rounded p-1 text-[var(--color-text-muted)] transition hover:text-[var(--accent-primary)]">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      {mine && (
+                      {canDelete && (
                         <button type="button" onClick={() => void remove(r.id)} aria-label="Apagar lembrete" className="rounded p-1 text-[var(--color-text-muted)] opacity-0 transition group-hover:opacity-100 hover:text-[var(--color-error)] focus:opacity-100">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS, type NavItem } from './nav-config';
+import { NAV_ITEMS, navItemVisible, type NavItem } from './nav-config';
+import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { useTasks } from '@/hooks/useTasks';
 import { useInternalChat } from '@/hooks/useInternalChat';
@@ -24,11 +25,8 @@ export function Sidebar() {
     return !value;
   });
 
-  const visibleItems = NAV_ITEMS.filter((item) => {
-    if (item.superAdminOnly) return isSuperAdmin;
-    if (item.adminOnly) return role === 'admin';
-    return true;
-  });
+  const perms = usePermission();
+  const visibleItems = NAV_ITEMS.filter((item) => navItemVisible(item, perms.can, isSuperAdmin));
   const groups = GROUP_ORDER.map((group) => ({
     group,
     items: visibleItems.filter((item) => item.group === group),
@@ -102,7 +100,7 @@ export function Sidebar() {
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">{displayName?.trim() || 'Usuário'}</div>
-              <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{role === 'admin' ? 'Administrador' : 'Operador'}</div>
+              <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{perms.roleName ?? (role === 'admin' ? 'Administrador' : 'Operador')}</div>
             </div>
           )}
           {!collapsed && <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" title="Online" />}

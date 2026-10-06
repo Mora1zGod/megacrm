@@ -12,7 +12,7 @@
 // internal and never touch WhatsApp.
 // ============================================================================
 
-import { requireOrgCaller, AuthError } from '../_shared/auth.ts';
+import { requirePermission, AuthError } from '../_shared/auth.ts';
 import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { friendlySendError, sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
@@ -34,10 +34,8 @@ Deno.serve(async (req) => {
   if (pre) return pre;
 
   try {
-    const caller = await requireOrgCaller(req);
-    if (caller.role !== 'admin' && caller.role !== 'operator') {
-      return jsonResponse({ ok: false, error: 'Sem permissão para enviar mensagens.' }, { status: 403 });
-    }
+    // Permissão real (perfil + exceções), validada no servidor: "Responder conversa".
+    const caller = await requirePermission(req, 'inbox.reply');
 
     let body: Payload;
     try {
