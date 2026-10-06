@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
+import { setTaskDone } from '@/lib/tasks';
 
 export interface Task {
   id: string;
@@ -15,6 +16,7 @@ export interface Task {
   created_by: string | null;
   completed_at: string | null;
   created_at: string;
+  recurrence?: string | null;
 }
 
 export interface NewTaskInput {
@@ -34,19 +36,25 @@ export function useTasks() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     const { data, error: err } = await getSupabase()
       .from('tasks')
       .select('*')
       .order('due_at', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (err) setError(err.message);
-    else setTasks((data ?? []) as Task[]);
+    else { setTasks((data ?? []) as Task[]); setError(null); }
     setLoading(false);
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const supabase = getSupabase();
+    const ch = supabase
+      .channel(`tasks-page-${Math.random().toString(36).slice(2, 8)}`)
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'tasks' }, () => void load())
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [load]);
 
   const createTask = useCallback(async (input: NewTaskInput) => {
     const { error: err } = await getSupabase().from('tasks').insert({
@@ -65,12 +73,11 @@ export function useTasks() {
 
   const toggleTask = useCallback(async (task: Task) => {
     const done = task.status !== 'done';
-    const { error: err } = await getSupabase()
-      .from('tasks')
-      .update({ status: done ? 'done' : 'pending', completed_at: done ? new Date().toISOString() : null })
-      .eq('id', task.id);
-    if (err) throw new Error(err.message);
-    await load();
+    try {
+      return await setTaskDone(task.id, done);
+    } finally {
+      await load();
+    }
   }, [load]);
 
   const deleteTask = useCallback(async (id: string) => {

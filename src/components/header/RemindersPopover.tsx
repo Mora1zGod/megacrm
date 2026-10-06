@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, Bell, Plus, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, Bell, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppUser } from '@/app/providers/AppUserProvider';
-import { REMINDER_COLORS, useReminders, type ReminderColor } from '@/hooks/useReminders';
+import { REMINDER_COLORS, toLocalInput, useReminders, type Reminder, type ReminderColor } from '@/hooks/useReminders';
 
 const inputCls =
   'w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--accent-primary)]';
@@ -23,7 +23,7 @@ function dueLabel(iso: string): { text: string; late: boolean } {
 // data opcional. Com data, aparecem também na Agenda.
 export function RemindersPopover() {
   const { userId } = useAppUser();
-  const { reminders, create, setDone, remove } = useReminders();
+  const { reminders, create, update, setDone, remove } = useReminders();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'list' | 'new'>('list');
   const [title, setTitle] = useState('');
@@ -32,15 +32,27 @@ export function RemindersPopover() {
   const [due, setDue] = useState('');
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const reset = () => { setTitle(''); setNotes(''); setColor('green'); setDue(''); setShared(false); };
+  const reset = () => { setTitle(''); setNotes(''); setColor('green'); setDue(''); setShared(false); setEditingId(null); };
+
+  const startEdit = (r: Reminder) => {
+    setEditingId(r.id);
+    setTitle(r.title);
+    setNotes(r.notes ?? '');
+    setColor(r.color);
+    setDue(toLocalInput(r.due_at));
+    setShared(r.shared);
+    setMode('new');
+  };
 
   const save = async () => {
     if (!title.trim()) { toast.error('Dê um título ao lembrete.'); return; }
     setSaving(true);
     try {
-      await create({ title, notes, color, due_at: due ? new Date(due).toISOString() : null, shared });
-      toast.success('Lembrete adicionado.');
+      const input = { title, notes, color, due_at: due ? new Date(due).toISOString() : null, shared };
+      if (editingId) { await update(editingId, input); toast.success('Lembrete atualizado.'); }
+      else { await create(input); toast.success('Lembrete adicionado.'); }
       reset();
       setMode('list');
     } catch (e) {
@@ -54,7 +66,7 @@ export function RemindersPopover() {
     <div className="relative">
       <button
         type="button"
-        onClick={() => { setOpen((v) => !v); setMode(reminders.length ? 'list' : 'new'); }}
+        onClick={() => { setOpen((v) => !v); reset(); setMode(reminders.length ? 'list' : 'new'); }}
         aria-haspopup="dialog"
         aria-expanded={open}
         className="relative flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
@@ -72,14 +84,14 @@ export function RemindersPopover() {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
                 {mode === 'new' && reminders.length > 0 && (
-                  <button type="button" onClick={() => setMode('list')} aria-label="Voltar" className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"><ArrowLeft className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => { reset(); setMode('list'); }} aria-label="Voltar" className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"><ArrowLeft className="h-4 w-4" /></button>
                 )}
                 <Bell className="h-4 w-4 text-[var(--accent-primary)]" />
-                {mode === 'new' ? 'Novo lembrete' : 'Lembretes'}
+                {mode === 'new' ? (editingId ? 'Editar lembrete' : 'Novo lembrete') : 'Lembretes'}
               </div>
               <div className="flex items-center gap-1">
                 {mode === 'list' && (
-                  <button type="button" onClick={() => setMode('new')} aria-label="Novo lembrete" title="Novo lembrete" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => { reset(); setMode('new'); }} aria-label="Novo lembrete" title="Novo lembrete" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>
                 )}
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"><X className="h-4 w-4" /></button>
               </div>
@@ -117,7 +129,7 @@ export function RemindersPopover() {
                   <input type="checkbox" role="switch" checked={shared} onChange={(e) => setShared(e.target.checked)} className="h-4 w-4 accent-[var(--accent-fill)]" />
                 </label>
                 <Button className="w-full" onClick={() => void save()} disabled={saving || !title.trim()}>
-                  {saving ? 'Salvando…' : 'Adicionar lembrete'}
+                  {saving ? 'Salvando…' : editingId ? 'Salvar alterações' : 'Adicionar lembrete'}
                 </Button>
               </div>
             ) : (
@@ -131,7 +143,11 @@ export function RemindersPopover() {
                         onChange={() => void setDone(r.id, !r.done).catch((e) => toast.error('Falha', { description: String(e) }))}
                         className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
                       <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: REMINDER_COLORS[r.color] }} />
-                      <div className="min-w-0 flex-1">
+                      <div
+                        className={`min-w-0 flex-1 ${mine ? 'cursor-pointer' : ''}`}
+                        onClick={mine ? () => startEdit(r) : undefined}
+                        title={mine ? 'Clique para editar' : undefined}
+                      >
                         <div className="text-sm font-medium text-[var(--color-text-primary)]">{r.title}</div>
                         {r.notes && <div className="line-clamp-2 text-xs text-[var(--color-text-secondary)]">{r.notes}</div>}
                         <div className="mt-0.5 flex items-center gap-2 text-[11px]">
@@ -139,6 +155,11 @@ export function RemindersPopover() {
                           {r.shared && <span className="inline-flex items-center gap-0.5 text-[var(--color-text-muted)]"><Users className="h-3 w-3" /> equipe</span>}
                         </div>
                       </div>
+                      {mine && (
+                        <button type="button" onClick={() => startEdit(r)} aria-label="Editar lembrete" title="Editar" className="rounded p-1 text-[var(--color-text-muted)] transition hover:text-[var(--accent-primary)]">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {mine && (
                         <button type="button" onClick={() => void remove(r.id)} aria-label="Apagar lembrete" className="rounded p-1 text-[var(--color-text-muted)] opacity-0 transition group-hover:opacity-100 hover:text-[var(--color-error)] focus:opacity-100">
                           <Trash2 className="h-3.5 w-3.5" />

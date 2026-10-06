@@ -24,6 +24,14 @@ export interface Reminder {
   created_at: string;
 }
 
+// ISO -> valor de <input type="datetime-local"> no fuso local.
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // Lembretes visíveis para o usuário: os próprios + os compartilhados (RLS).
 // range = só os com data no intervalo (Agenda); sem range = os em aberto (topo).
 export function useReminders(range?: { fromISO: string; toISO: string }) {
@@ -67,6 +75,18 @@ export function useReminders(range?: { fromISO: string; toISO: string }) {
     await load();
   }, [load]);
 
+  const update = useCallback(async (id: string, input: { title: string; notes?: string | null; color: ReminderColor; due_at?: string | null; shared: boolean }) => {
+    const { error: err } = await getSupabase().from('reminders').update({
+      title: input.title.trim(),
+      notes: input.notes?.trim() || null,
+      color: input.color,
+      due_at: input.due_at || null,
+      shared: input.shared,
+    }).eq('id', id);
+    if (err) throw new Error(err.message);
+    await load();
+  }, [load]);
+
   const setDone = useCallback(async (id: string, done: boolean) => {
     setReminders((cur) => (fromISO ? cur.map((r) => (r.id === id ? { ...r, done } : r)) : cur.filter((r) => r.id !== id || !done)));
     const { error: err } = await getSupabase().from('reminders').update({ done, done_at: done ? new Date().toISOString() : null }).eq('id', id);
@@ -79,5 +99,5 @@ export function useReminders(range?: { fromISO: string; toISO: string }) {
     if (err) { await load(); throw new Error(err.message); }
   }, [load]);
 
-  return { reminders, loading, error, reload: load, create, setDone, remove };
+  return { reminders, loading, error, reload: load, create, update, setDone, remove };
 }

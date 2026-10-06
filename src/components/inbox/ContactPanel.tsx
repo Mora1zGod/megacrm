@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { getSupabase } from '@/lib/supabase';
+import { formatNextDue, setTaskDone } from '@/lib/tasks';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import type { ConversationWithContact } from '@/types/inbox';
 import { operatorLabel, type Operator } from '@/hooks/useOperators';
@@ -167,15 +168,13 @@ export function ContactPanel({
 
   const concluirTarefa = async (id: string) => {
     setTarefas((cur) => cur.filter((t) => t.id !== id));
-    const { error: err } = await getSupabase()
-      .from('tasks')
-      .update({ status: 'done', completed_at: new Date().toISOString() })
-      .eq('id', id);
-    if (err) {
-      toast.error('Falha ao concluir tarefa', { description: err.message });
+    try {
+      const res = await setTaskDone(id, true);
+      toast.success('Tarefa concluída.', res.nextDue ? { description: `Próxima repetição: ${formatNextDue(res.nextDue)}` } : undefined);
+      if (res.nextDue) setTarefasVersion((v) => v + 1);
+    } catch (e) {
+      toast.error('Falha ao concluir tarefa', { description: e instanceof Error ? e.message : String(e) });
       setTarefasVersion((v) => v + 1);
-    } else {
-      toast.success('Tarefa concluída.');
     }
   };
 

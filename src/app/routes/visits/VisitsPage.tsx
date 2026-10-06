@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Bell, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, List, MessageSquare, Plus, Trash2, User, Users, X } from 'lucide-react';
+import { Bell, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, List, MessageSquare, Pencil, Plus, Trash2, User, Users, X } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
-import { REMINDER_COLORS, useReminders, type Reminder, type ReminderColor } from '@/hooks/useReminders';
+import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
+import { formatNextDue, isRecurring, RECURRENCE_LABELS, setTaskDone } from '@/lib/tasks';
+import { REMINDER_COLORS, toLocalInput, useReminders, type Reminder, type ReminderColor } from '@/hooks/useReminders';
 
 interface AgendaTask {
   id: string;
@@ -20,6 +22,8 @@ interface AgendaTask {
   status: 'pending' | 'done';
   assigned_to: string | null;
   contact_id: string | null;
+  description?: string | null;
+  recurrence?: string | null;
 }
 
 type Layer = 'visitas' | 'tarefas' | 'lembretes';
@@ -87,6 +91,7 @@ export default function VisitsPage() {
   const [layers, setLayers] = useState<Record<Layer, boolean>>({ visitas: true, tarefas: true, lembretes: true });
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
   const [detailTask, setDetailTask] = useState<AgendaTask | null>(null);
+  const [editTask, setEditTask] = useState<AgendaTask | null>(null);
   const [detailReminder, setDetailReminder] = useState<Reminder | null>(null);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -106,12 +111,13 @@ export default function VisitsPage() {
     const end = new Date(weekStart); end.setDate(end.getDate() + 7);
     return { fromISO: weekStart.toISOString(), toISO: end.toISOString() };
   }, [weekStart]);
-  const { reminders, create: createReminder, setDone: setReminderDone, remove: removeReminder } = useReminders(weekRange);
+  const { reminders, create: createReminder, update: updateReminder, setDone: setReminderDone, remove: removeReminder } = useReminders(weekRange);
+  const [editReminder, setEditReminder] = useState<Reminder | null>(null);
 
   const loadTasks = async () => {
     const { data } = await getSupabase()
       .from('tasks')
-      .select('id, title, due_at, status, assigned_to, contact_id')
+      .select('*')
       .gte('due_at', weekRange.fromISO)
       .lt('due_at', weekRange.toISO)
       .order('due_at', { ascending: true });
@@ -197,12 +203,13 @@ export default function VisitsPage() {
 
   const toggleTask = async (t: AgendaTask) => {
     const next = t.status === 'done' ? 'pending' : 'done';
-    const { error: err } = await getSupabase()
-      .from('tasks')
-      .update({ status: next, completed_at: next === 'done' ? new Date().toISOString() : null })
-      .eq('id', t.id);
-    if (err) { toast.error('Falha ao atualizar a tarefa', { description: err.message }); return; }
-    toast.success(next === 'done' ? 'Tarefa concluída.' : 'Tarefa reaberta.');
+    try {
+      const res = await setTaskDone(t.id, next === 'done');
+      toast.success(next === 'done' ? 'Tarefa concluída.' : 'Tarefa reaberta.', res.nextDue ? { description: `Próxima repetição: ${formatNextDue(res.nextDue)}` } : undefined);
+    } catch (e) {
+      toast.error('Falha ao atualizar a tarefa', { description: e instanceof Error ? e.message : String(e) });
+      return;
+    }
     setDetailTask(null);
     void loadTasks();
   };
@@ -521,10 +528,15 @@ export default function VisitsPage() {
             <div><span className="text-label">Prazo</span> {new Date(detailTask.due_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
             <div><span className="text-label">Responsável</span> {operatorLabel(operators.find((o) => o.user_id === detailTask.assigned_to)) || 'Ninguém'}</div>
             <div><span className="text-label">Status</span> {detailTask.status === 'done' ? 'Concluída' : 'Pendente'}</div>
+            {isRecurring(detailTask.recurrence) && <div><span className="text-label">Repete</span> {RECURRENCE_LABELS[detailTask.recurrence]}</div>}
+            {detailTask.description && <div className="whitespace-pre-wrap text-[var(--color-text-secondary)]">{detailTask.description}</div>}
           </div>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--color-border-card)] pt-3">
             <Button size="sm" onClick={() => void toggleTask(detailTask)}>
               <CheckSquare className="h-3.5 w-3.5" /> {detailTask.status === 'done' ? 'Reabrir' : 'Concluir'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => { setEditTask(detailTask); setDetailTask(null); }}>
+              <Pencil className="h-3.5 w-3.5" /> Editar
             </Button>
             {detailTask.contact_id && (
               <Button size="sm" variant="outline" onClick={() => navigate(`/inbox?contact=${detailTask.contact_id}`)}>
@@ -548,6 +560,9 @@ export default function VisitsPage() {
               <Button size="sm" onClick={async () => { await setReminderDone(detailReminder.id, !detailReminder.done); setDetailReminder(null); }}>
                 {detailReminder.done ? 'Reabrir' : 'Concluir'}
               </Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditReminder(detailReminder); setDetailReminder(null); }}>
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </Button>
               <Button size="sm" variant="ghost" onClick={async () => { await removeReminder(detailReminder.id); setDetailReminder(null); toast.success('Lembrete apagado.'); }}>
                 <Trash2 className="h-3.5 w-3.5 text-[var(--color-error)]" /> Apagar
               </Button>
@@ -557,12 +572,26 @@ export default function VisitsPage() {
       )}
 
       {createTaskOpen && (
-        <CreateTaskDialog
+        <TaskFormDialog
           defaultDate={toISODate(new Date())}
-          operators={operators.map((o) => ({ id: o.user_id, label: operatorLabel(o) }))}
-          userId={userId}
           onClose={() => setCreateTaskOpen(false)}
-          onCreated={() => { setCreateTaskOpen(false); void loadTasks(); }}
+          onSaved={() => { setCreateTaskOpen(false); void loadTasks(); }}
+        />
+      )}
+
+      {editTask && (
+        <TaskFormDialog
+          initial={editTask}
+          onClose={() => setEditTask(null)}
+          onSaved={() => { setEditTask(null); void loadTasks(); }}
+        />
+      )}
+
+      {editReminder && (
+        <CreateReminderDialog
+          initial={editReminder}
+          onClose={() => setEditReminder(null)}
+          onSave={async (input) => { await updateReminder(editReminder.id, input); setEditReminder(null); toast.success('Lembrete atualizado.'); }}
         />
       )}
 
@@ -838,65 +867,16 @@ function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit
 
 const dlgInput = 'h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
 
-function CreateTaskDialog({ defaultDate, operators, userId, onClose, onCreated }: {
-  defaultDate: string;
-  operators: { id: string; label: string }[];
-  userId: string | null;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState(defaultDate);
-  const [time, setTime] = useState('09:00');
-  const [assignee, setAssignee] = useState(userId ?? '');
-  const [saving, setSaving] = useState(false);
-  const save = async () => {
-    if (!title.trim()) { toast.error('Dê um título à tarefa.'); return; }
-    setSaving(true);
-    const { error } = await getSupabase().from('tasks').insert({
-      title: title.trim(),
-      due_at: new Date(`${date}T${time || '09:00'}:00`).toISOString(),
-      assigned_to: assignee || null,
-      created_by: userId,
-    });
-    setSaving(false);
-    if (error) { toast.error('Não foi possível criar a tarefa', { description: error.message }); return; }
-    toast.success('Tarefa criada.');
-    onCreated();
-  };
-  return (
-    <Dialog open onClose={onClose} title="Nova tarefa">
-      <div className="space-y-3">
-        <div><Label htmlFor="nt-title">Título</Label><input id="nt-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className={dlgInput} placeholder="Ex.: Ligar para o lead" /></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><Label htmlFor="nt-date">Data</Label><input id="nt-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={dlgInput} /></div>
-          <div><Label htmlFor="nt-time">Horário</Label><input id="nt-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className={dlgInput} /></div>
-        </div>
-        <div>
-          <Label htmlFor="nt-who">Responsável</Label>
-          <select id="nt-who" value={assignee} onChange={(e) => setAssignee(e.target.value)} className={dlgInput}>
-            <option value="">Ninguém</option>
-            {operators.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-        </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => void save()} disabled={saving || !title.trim()}>{saving ? 'Salvando…' : 'Criar tarefa'}</Button>
-        </div>
-      </div>
-    </Dialog>
-  );
-}
-
-function CreateReminderDialog({ onClose, onSave }: {
+function CreateReminderDialog({ initial, onClose, onSave }: {
+  initial?: Reminder;
   onClose: () => void;
   onSave: (input: { title: string; notes: string; color: ReminderColor; due_at: string | null; shared: boolean }) => Promise<void>;
 }) {
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [color, setColor] = useState<ReminderColor>('green');
-  const [due, setDue] = useState('');
-  const [shared, setShared] = useState(false);
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [color, setColor] = useState<ReminderColor>(initial?.color ?? 'green');
+  const [due, setDue] = useState(toLocalInput(initial?.due_at));
+  const [shared, setShared] = useState(initial?.shared ?? false);
   const [saving, setSaving] = useState(false);
   const save = async () => {
     if (!title.trim()) { toast.error('Dê um título ao lembrete.'); return; }
@@ -906,7 +886,7 @@ function CreateReminderDialog({ onClose, onSave }: {
     finally { setSaving(false); }
   };
   return (
-    <Dialog open onClose={onClose} title="Novo lembrete">
+    <Dialog open onClose={onClose} title={initial ? 'Editar lembrete' : 'Novo lembrete'}>
       <div className="space-y-3">
         <div><Label htmlFor="nr-title">Título</Label><input id="nr-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className={dlgInput} placeholder="Ex.: Reunião com cliente" /></div>
         <div><Label htmlFor="nr-notes">Notas (opcional)</Label><textarea id="nr-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={`${dlgInput} h-auto py-2`} /></div>
@@ -927,7 +907,7 @@ function CreateReminderDialog({ onClose, onSave }: {
         </label>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => void save()} disabled={saving || !title.trim()}>{saving ? 'Salvando…' : 'Adicionar lembrete'}</Button>
+          <Button onClick={() => void save()} disabled={saving || !title.trim()}>{saving ? 'Salvando…' : initial ? 'Salvar alterações' : 'Adicionar lembrete'}</Button>
         </div>
       </div>
     </Dialog>

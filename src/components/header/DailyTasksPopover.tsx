@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ChevronRight, ClipboardList, Plus, X } from 'lucide-react';
+import { ChevronRight, ClipboardList, Plus, Repeat, X } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { Avatar } from '@/components/ui/Avatar';
+import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
+import { formatNextDue, isRecurring, setTaskDone } from '@/lib/tasks';
 
 interface DayTask {
   id: string;
@@ -13,6 +15,7 @@ interface DayTask {
   due_at: string | null;
   status: 'pending' | 'done';
   assigned_to: string | null;
+  recurrence?: string | null;
 }
 
 function dayBounds() {
@@ -28,16 +31,14 @@ export function DailyTasksPopover() {
   const { operators } = useOperators();
   const [tasks, setTasks] = useState<DayTask[]>([]);
   const [open, setOpen] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState('');
-  const [time, setTime] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
     const { from, to } = dayBounds();
     const { data } = await getSupabase()
       .from('tasks')
-      .select('id, title, due_at, status, assigned_to')
+      .select('*')
       .gte('due_at', from)
       .lt('due_at', to)
       .or(`assigned_to.eq.${userId},assigned_to.is.null`)
@@ -61,27 +62,13 @@ export function DailyTasksPopover() {
   const toggle = async (t: DayTask) => {
     const next = t.status === 'done' ? 'pending' : 'done';
     setTasks((cur) => cur.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
-    const { error } = await getSupabase()
-      .from('tasks')
-      .update({ status: next, completed_at: next === 'done' ? new Date().toISOString() : null })
-      .eq('id', t.id);
-    if (error) { toast.error('Falha ao atualizar a tarefa', { description: error.message }); void load(); }
-  };
-
-  const add = async () => {
-    if (!title.trim()) return;
-    const d = new Date();
-    if (time) { const [h, m] = time.split(':').map(Number); d.setHours(h, m, 0, 0); }
-    else d.setHours(23, 59, 0, 0);
-    const { error } = await getSupabase().from('tasks').insert({
-      title: title.trim(),
-      due_at: d.toISOString(),
-      assigned_to: userId,
-      created_by: userId,
-    });
-    if (error) { toast.error('Não foi possível criar a tarefa', { description: error.message }); return; }
-    setTitle(''); setTime(''); setAdding(false);
-    void load();
+    try {
+      const res = await setTaskDone(t.id, next === 'done');
+      if (res.nextDue) toast.success('Tarefa concluída.', { description: `Próxima repetição: ${formatNextDue(res.nextDue)}` });
+    } catch (e) {
+      toast.error('Falha ao atualizar a tarefa', { description: e instanceof Error ? e.message : String(e) });
+      void load();
+    }
   };
 
   return (
@@ -109,17 +96,10 @@ export function DailyTasksPopover() {
                 <span className="rounded-full bg-[rgba(239,68,68,0.12)] px-2 py-0.5 text-xs font-bold text-[var(--color-error)]">{done}/{tasks.length}</span>
               </div>
               <div className="flex items-center gap-1">
-                <button type="button" onClick={() => setAdding((v) => !v)} aria-label="Nova tarefa para hoje" title="Nova tarefa para hoje" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>
+                <button type="button" onClick={() => { setOpen(false); setFormOpen(true); }} aria-label="Nova tarefa para hoje" title="Nova tarefa para hoje" className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]"><Plus className="h-4 w-4" /></button>
                 <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"><X className="h-4 w-4" /></button>
               </div>
             </div>
-
-            {adding && (
-              <div className="mb-2 flex gap-1.5 px-1">
-                <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void add(); }} placeholder="Nova tarefa para hoje" className="min-w-0 flex-1 rounded-md border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]" />
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Horário" className="w-[92px] rounded-md border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-1.5 text-sm text-[var(--color-text-primary)]" />
-              </div>
-            )}
 
             {tasks.length === 0 ? (
               <div className="px-2 py-4 text-center text-sm text-[var(--color-text-muted)]">Nenhuma tarefa para hoje. 🎉</div>
@@ -133,7 +113,10 @@ export function DailyTasksPopover() {
                       <input type="checkbox" checked={isDone} onChange={() => void toggle(t)} aria-label={`Concluir: ${t.title}`} className="h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
                       <div className="min-w-0 flex-1">
                         <div className={`truncate text-sm ${isDone ? 'text-[var(--color-text-muted)] line-through' : 'text-[var(--color-text-primary)]'}`}>{t.title}</div>
-                        {t.due_at && <div className={`text-xs text-[var(--color-text-muted)] ${isDone ? 'line-through' : ''}`}>{new Date(t.due_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>}
+                        <div className={`flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] ${isDone ? 'line-through' : ''}`}>
+                          {t.due_at && <span>{new Date(t.due_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {isRecurring(t.recurrence) && <Repeat className="h-3 w-3" aria-label="Recorrente" />}
+                        </div>
                       </div>
                       {op && <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" className="!h-7 !w-7" />}
                     </li>
@@ -147,6 +130,9 @@ export function DailyTasksPopover() {
             </Link>
           </div>
         </>
+      )}
+      {formOpen && (
+        <TaskFormDialog onClose={() => setFormOpen(false)} onSaved={() => { setFormOpen(false); void load(); }} />
       )}
     </div>
   );
