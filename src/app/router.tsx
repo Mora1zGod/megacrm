@@ -195,6 +195,8 @@ export function AppRouter() {
           {/* Chat Interno: aberto a toda a equipe (sem AdminOnly). */}
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/funil" element={<AdminOnly><FunilPage /></AdminOnly>} />
+          <Route path="/agenda" element={<VisitsPage />} />
+          {/* Visitas virou Agenda (visitas + tarefas + lembretes) — mantém links antigos. */}
           <Route path="/visitas" element={<VisitsPage />} />
           <Route path="/quadros" element={<BoardsPage />} />
           {/* /vendas (Vendas & Recompra) removido — redireciona pro dashboard */}

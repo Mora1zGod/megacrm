@@ -42,7 +42,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Visão geral', icon: LayoutDashboard, group: 'Operação', adminOnly: true },
   { to: '/inbox', label: 'Atendimento', icon: Inbox, group: 'Operação' },
   { to: '/funil', label: 'Funil', icon: KanbanSquare, group: 'Operação', adminOnly: true },
-  { to: '/visitas', label: 'Visitas', icon: CalendarDays, group: 'Operação' },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays, group: 'Operação' },
   { to: '/contacts', label: 'Contatos', icon: Users, group: 'Operação' },
   { to: '/arquivos', label: 'Arquivos', icon: Paperclip, group: 'Operação' },
   { to: '/chat', label: 'Chat da equipe', icon: MessagesSquare, group: 'Operação' },

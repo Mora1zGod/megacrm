@@ -12,6 +12,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { NewSaleDialog } from '@/components/sales/NewSaleDialog';
 import { GoalPill } from '@/components/sales/GoalPill';
 import { AmaiaStatusPill } from '@/components/ai/AmaiaStatusPill';
+import { DailyTasksPopover } from '@/components/header/DailyTasksPopover';
+import { RemindersPopover } from '@/components/header/RemindersPopover';
 import { OPEN_NEW_SALE_EVENT } from '@/hooks/useSales';
 
 interface HeaderProps {
@@ -21,7 +23,7 @@ interface HeaderProps {
 const CRIAR_ITEMS = [
   { label: 'Contato', icon: User, href: '/contacts' },
   { label: 'Negócio', icon: Briefcase, href: '/funil' },
-  { label: 'Visita', icon: CalendarDays, href: '/visitas' },
+  { label: 'Visita', icon: CalendarDays, href: '/agenda' },
   { label: 'Tarefa', icon: CheckSquare, href: '/tasks' },
   { label: 'Campanha', icon: Megaphone, href: '/campaigns' },
 ] as const;
@@ -92,6 +94,8 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex min-w-0 items-center gap-2 sm:gap-3 shrink-0">
+        <DailyTasksPopover />
+        <RemindersPopover />
         <AmaiaStatusPill />
         {role === 'admin' && <GoalPill />}
         <Button
