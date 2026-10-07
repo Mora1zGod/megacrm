@@ -593,6 +593,11 @@ Regras:
   áreas de admin por `has_perm()`; leads (`owner_id`), tarefas (`assigned_to`) e agenda
   (`created_by`) com escopo via `owner_in_scope(perm_scope(m), dono)`. Nunca criar policy
   `USING (true)` em tabela de domínio — sempre `in_org(org_id)`.
+- Etapa 5 (`20261007170000_access_control_login.sql`): `current_org_active()` também exige
+  o usuário ativo (desativado perde os dados na hora, sem esperar o token expirar);
+  `AccessGate` (src/app/AccessGate.tsx) mostra "Acesso desativado" ou a troca obrigatória
+  de senha (`must_change_password` → `clear_my_password_flag()`); login/logout com IP e
+  dispositivo pela Edge Function `log-access` (fallback RPC `log_access_event`).
 
 ## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
 

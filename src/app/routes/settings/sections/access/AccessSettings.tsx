@@ -432,6 +432,7 @@ const ACTION_LABELS: Record<string, string> = {
   'user.blocked': 'Usuário bloqueado',
   'user.removed': 'Usuário removido',
   'user.password_reset': 'Reset de senha',
+  'auth.password_changed': 'Senha trocada',
   'role.created': 'Perfil criado',
   'role.updated': 'Perfil alterado',
   'role.permissions_changed': 'Permissões do perfil',
@@ -512,7 +513,14 @@ function AuditTab({ members, user, onClearUser }: { members: Member[]; user: Mem
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-[var(--color-text-secondary)]">{r.target_user_id ? nameOf(r.target_user_id) : '—'}</td>
-                <td className="px-3 py-2.5 text-[var(--color-text-secondary)]">{r.summary}</td>
+                <td className="px-3 py-2.5 text-[var(--color-text-secondary)]">
+                  {r.summary}
+                  {(typeof r.metadata?.device === 'string' || typeof r.metadata?.ip === 'string') && (
+                    <div className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                      {[r.metadata.device, r.metadata.ip ? `IP ${String(r.metadata.ip)}` : null].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { getSupabase } from '@/lib/supabase';
+import { logAccess } from '@/lib/accessLog';
 import { useSupabaseConfig } from '@/hooks/useSupabase';
 
 // ----------------------------------------------------------------------------
@@ -98,17 +99,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error.message };
     }
     // Auditoria de login (best-effort; banco sem a etapa 3 só ignora).
-    void supabase.rpc('log_access_event', { p_action: 'auth.login', p_user_agent: navigator.userAgent }).then(() => undefined, () => undefined);
+    void logAccess('auth.login');
     return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
     const supabase = getSupabase();
-    try {
-      await supabase.rpc('log_access_event', { p_action: 'auth.logout', p_user_agent: navigator.userAgent });
-    } catch {
-      // auditoria é best-effort
-    }
+    await logAccess('auth.logout');
     await supabase.auth.signOut();
   }, []);
 

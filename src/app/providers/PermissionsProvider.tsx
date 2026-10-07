@@ -143,6 +143,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'role_permissions' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'access_roles' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'user_permission_overrides' }, () => void load())
+      // Minha linha mudou (desativado, perfil trocado, troca de senha exigida).
+      .on('postgres_changes', { event: 'UPDATE', schema: 'whatsapp_hub', table: 'app_users', filter: `user_id=eq.${userId}` }, () => void load())
       .subscribe();
     const onFocus = () => void load();
     window.addEventListener('focus', onFocus);

@@ -6,6 +6,7 @@ import { useAuth } from './providers/AuthProvider';
 import { useAppUser } from './providers/AppUserProvider';
 import { usePermission } from './providers/PermissionsProvider';
 import { firstAllowedPath } from './layout/nav-config';
+import { AccessGate } from './AccessGate';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Lazy loading the page chunks keeps the initial bundle lean.
@@ -178,9 +179,11 @@ export function AppRouter() {
           element={
             <RequireSetup>
               <RequireSession>
-                <RequirePermission perm="financial.tv" area="Painel TV">
-                  <SalesTvPage />
-                </RequirePermission>
+                <AccessGate>
+                  <RequirePermission perm="financial.tv" area="Painel TV">
+                    <SalesTvPage />
+                  </RequirePermission>
+                </AccessGate>
               </RequireSession>
             </RequireSetup>
           }
@@ -190,7 +193,9 @@ export function AppRouter() {
           element={
             <RequireSetup>
               <RequireSession>
-                <AppLayout />
+                <AccessGate>
+                  <AppLayout />
+                </AccessGate>
               </RequireSession>
             </RequireSetup>
           }

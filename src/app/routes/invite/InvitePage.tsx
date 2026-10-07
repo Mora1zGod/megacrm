@@ -51,6 +51,8 @@ export default function InvitePage() {
     }
     // Garante que o JWT em uso já carrega o claim de role gravado pelo trigger.
     await supabase.auth.refreshSession();
+    // Senha definida agora: cumpre a "troca obrigatória", se o admin marcou.
+    await supabase.rpc('clear_my_password_flag').then(() => undefined, () => undefined);
     setSubmitting(false);
     toast.success('Conta ativada. Bem-vindo!');
     navigate('/', { replace: true });
