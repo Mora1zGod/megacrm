@@ -26,7 +26,70 @@ function classify(mime: string): 'image' | 'audio' | 'video' | 'document' {
   return 'document';
 }
 
-type QuotedMsg = { id: string; zernio_message_id: string | null; platform_message_id: string | null };
+// Encaminhar: o servidor de origem muitas vezes devolve "application/octet-stream"
+// (ou nem manda o tipo), e o Zernio recusa tipo genérico ("Invalid multipart
+// form data"). Descobre o tipo real pelos primeiros bytes do arquivo e, se não
+// der, pela extensão da URL.
+const EXT_MIME: Record<string, string> = {
+  pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+  mp4: 'video/mp4', mov: 'video/quicktime', '3gp': 'video/3gpp', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg',
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', amr: 'audio/amr',
+  doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain', csv: 'text/csv', zip: 'application/zip',
+};
+const MIME_EXT: Record<string, string> = Object.fromEntries(
+  Object.entries(EXT_MIME).reverse().map(([ext, mime]) => [mime, ext]),
+);
+
+function sniffMime(b: Uint8Array): string | null {
+  const at = (o: number, s: string) => s.split('').every((ch, i) => b[o + i] === ch.charCodeAt(0));
+  if (at(0, '%PDF')) return 'application/pdf';
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && at(1, 'PNG')) return 'image/png';
+  if (at(0, 'GIF8')) return 'image/gif';
+  if (at(0, 'RIFF') && at(8, 'WEBP')) return 'image/webp';
+  if (at(0, 'RIFF') && at(8, 'WAVE')) return 'audio/wav';
+  if (at(0, 'OggS')) return 'audio/ogg';
+  if (at(0, 'ID3') || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return 'audio/mpeg';
+  if (at(0, '#!AMR')) return 'audio/amr';
+  if (at(4, 'ftyp')) {
+    if (at(8, 'M4A')) return 'audio/mp4';
+    if (at(8, 'qt')) return 'video/quicktime';
+    if (at(8, '3gp')) return 'video/3gpp';
+    return 'video/mp4';
+  }
+  if (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0) return 'application/msword';
+  if (at(0, 'PK')) {
+    const head = new TextDecoder('latin1').decode(b.subarray(0, Math.min(b.length, 64 * 1024)));
+    if (head.includes('word/')) return EXT_MIME.docx;
+    if (head.includes('xl/')) return EXT_MIME.xlsx;
+    if (head.includes('ppt/')) return EXT_MIME.pptx;
+    return 'application/zip';
+  }
+  return null;
+}
+
+function urlFileName(url: string): string | null {
+  try {
+    const last = decodeURIComponent(new URL(url).pathname.split('/').pop() ?? '');
+    return /\.[a-z0-9]{2,5}$/i.test(last) ? last.slice(-120) : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveForwardMime(bytes: Uint8Array, headerMime: string, url: string): string {
+  const generic = !headerMime || /octet-stream|multipart|^binary\//i.test(headerMime);
+  if (!generic) return headerMime;
+  const sniffed = sniffMime(bytes);
+  if (sniffed) return sniffed;
+  const ext = urlFileName(url)?.split('.').pop()?.toLowerCase() ?? '';
+  return EXT_MIME[ext] ?? 'application/pdf';
+}
+
+type QuotedMsg ={ id: string; zernio_message_id: string | null; platform_message_id: string | null };
 
 Deno.serve(async (req) => {
   const pre = preflight(req);
@@ -137,10 +200,10 @@ Deno.serve(async (req) => {
     let filename: string;
     let bytes: Uint8Array;
     if (file instanceof File) {
-      contentType = classify(file.type || '');
-      mime = file.type || 'application/octet-stream';
-      filename = voiceNote ? 'voice-note.ogg' : (file.name || `arquivo-${contentType}`);
       bytes = new Uint8Array(await file.arrayBuffer());
+      mime = resolveForwardMime(bytes, (file.type || '').toLowerCase(), `https://x/${encodeURIComponent(file.name || '')}`);
+      contentType = classify(mime);
+      filename = voiceNote ? 'voice-note.ogg' : (file.name || `arquivo-${contentType}.${MIME_EXT[mime] ?? 'bin'}`);
     } else {
       const { data: src } = await admin
         .from('messages')
@@ -162,12 +225,15 @@ Deno.serve(async (req) => {
       if (bytes.byteLength > MAX_BYTES) {
         return jsonResponse({ ok: false, error: 'Arquivo excede 25MB.' }, { status: 400 });
       }
-      mime = upstream.headers.get('content-type')?.split(';')[0] || 'application/octet-stream';
+      const headerMime = (upstream.headers.get('content-type')?.split(';')[0] ?? '').trim().toLowerCase();
+      mime = resolveForwardMime(bytes, headerMime, srcRow.media_url);
       contentType = (['image', 'audio', 'video', 'document'] as const).includes(srcRow.content_type as never)
         ? (srcRow.content_type as 'image' | 'audio' | 'video' | 'document')
         : classify(mime);
-      const ext = (mime.split('/')[1] || 'bin').replace('jpeg', 'jpg').replace('quicktime', 'mov');
-      filename = `encaminhado-${contentType}.${ext}`;
+      const ext = MIME_EXT[mime] ?? (mime.split('/')[1] || 'bin').replace('jpeg', 'jpg').replace('quicktime', 'mov');
+      // Documento: mantém o nome original quando a URL traz um.
+      const original = contentType === 'document' ? urlFileName(srcRow.media_url) : null;
+      filename = original && !/^[0-9a-f-]{20,}\./i.test(original) ? original : `encaminhado-${contentType}.${ext}`;
     }
 
     // 1. Sobe a mídia ao Zernio (host da URL usada no attachmentUrl, inclusive

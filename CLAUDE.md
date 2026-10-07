@@ -604,6 +604,9 @@ Regras:
 - `messages.reply_to_id` / `platform_message_id` ("wamid", do webhook Zernio) /
   `forwarded`. Citação nativa: Zernio `replyTo` (id da Meta), UAZAPI `replyid`.
 - Encaminhar mídia: `send-operator-media` com `forward_message_id` (servidor baixa e reenvia).
+  O tipo do arquivo é descoberto pelos bytes/extensão (`resolveForwardMime`) — o Zernio recusa
+  `application/octet-stream`. Vários de uma vez: modo seleção na thread (ícone ☑ no balão) →
+  `ForwardMessageDialog` com `messages[]`, enviadas uma a uma na ordem original (máx. 30 × 5 conversas).
 - SLA: `app_settings.sla_warn_minutes/sla_late_minutes` (Configurações → Atendimento);
   `ConversationWithContact.waitingSince`. Assinatura: `app_users.sign_messages`.
 

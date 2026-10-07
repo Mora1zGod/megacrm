@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AlertCircle, Bot, Check, CheckCheck, Clock, CornerUpRight, FileText, Loader2, Reply, Smartphone, StickyNote, User } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, CheckSquare, Clock, CornerUpRight, FileText, Loader2, Reply, Smartphone, StickyNote, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
@@ -26,6 +26,9 @@ interface MessageThreadProps {
   // Ações por mensagem (passar o mouse no balão).
   onReply?: (m: Message) => void;
   onForward?: (m: Message) => void;
+  // Selecionar várias (encaminhar juntas). selectedIds != null = modo seleção.
+  selectedIds?: Set<string> | null;
+  onToggleSelect?: (m: Message) => void;
   contactName?: string | null;
 }
 
@@ -332,7 +335,8 @@ function FailedActions({
   );
 }
 
-export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, onForward, contactName }: MessageThreadProps) {
+export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, onForward, selectedIds, onToggleSelect, contactName }: MessageThreadProps) {
+  const selecting = Boolean(selectedIds);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const conversationKey = messages[0]?.conversation_id ?? null;
@@ -421,7 +425,9 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
 
         const canAct = !m._state || m._state === 'sent';
         const realId = m._realId ?? (m._tempId ? null : m.id);
-        const actionable = canAct && realId && (onReply || onForward);
+        const actionable = !selecting && canAct && realId && (onReply || onForward || onToggleSelect);
+        const selectable = selecting && canAct && Boolean(realId);
+        const isSelected = selectable && selectedIds!.has(realId!);
         const actions = actionable ? (
           <div className="flex shrink-0 items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
             {onReply && (
@@ -436,6 +442,12 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
                 <CornerUpRight className="h-4 w-4" />
               </button>
             )}
+            {onToggleSelect && (
+              <button type="button" onClick={() => onToggleSelect({ ...m, id: realId! })} aria-label="Selecionar mensagens" title="Selecionar (encaminhar várias)"
+                className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
+                <CheckSquare className="h-4 w-4" />
+              </button>
+            )}
           </div>
         ) : null;
 
@@ -443,12 +455,27 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
           <div key={m._key ?? m.id} id={realId ? `msg-${realId}` : undefined} className="rounded-xl transition-colors">
             {separator}
           <div
-            className={cn('group flex items-end gap-1', isInbound ? 'justify-start' : 'justify-end', isFresh && 'message-in')}
+            onClick={selectable ? () => onToggleSelect?.({ ...m, id: realId! }) : undefined}
+            role={selectable ? 'checkbox' : undefined}
+            aria-checked={selectable ? isSelected : undefined}
+            className={cn('group flex items-end gap-1', isInbound ? 'justify-start' : 'justify-end', isFresh && 'message-in',
+              selecting && '-mx-2 rounded-lg px-2 py-0.5',
+              selectable && 'cursor-pointer',
+              isSelected && 'bg-[var(--color-accent-subtle)]')}
           >
+            {selecting && (
+              <span className={cn('mr-1 flex h-5 w-5 shrink-0 self-center items-center justify-center rounded-full border-2',
+                !selectable && 'invisible',
+                isSelected ? 'border-[var(--accent-fill)] bg-[var(--accent-fill)] text-white' : 'border-[var(--color-border-card)] bg-[var(--color-surface)]',
+                !isInbound && 'mr-auto')}>
+                {isSelected && <Check className="h-3 w-3" strokeWidth={3} />}
+              </span>
+            )}
             {!isInbound && actions}
             <div
               className={cn(
                 'inbox-message-bubble max-w-[85%] sm:max-w-[65%] rounded-2xl px-3.5 py-2 transition-opacity',
+                selecting && 'pointer-events-none select-none',
                 // Estilo WhatsApp: recebida branca, enviada verde (IA e equipe
                 // com a mesma cor; o rótulo acima do texto diz quem enviou).
                 isInbound ? 'inbox-bubble-in rounded-tl-md' : 'inbox-bubble-out rounded-tr-md',

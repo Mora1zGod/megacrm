@@ -18,14 +18,38 @@ function preview(m: Message): string {
   return m.content ? `${label} · ${m.content}` : label;
 }
 
-// Encaminhar uma mensagem (texto ou mídia) para até 5 conversas. Texto sai pelo
-// send-operator-message; mídia pelo send-operator-media com forward_message_id
-// (o servidor baixa o arquivo original e reenvia).
-export function ForwardMessageDialog({ message, conversations, currentConversationId, onClose }: {
-  message: Message;
+function isMedia(m: Message): boolean {
+  return !['text', 'template', 'note'].includes(m.content_type);
+}
+
+// Envia UMA mensagem para UMA conversa. Texto sai pelo send-operator-message;
+// mídia pelo send-operator-media com forward_message_id (o servidor baixa o
+// arquivo original e reenvia).
+async function forwardOne(message: Message, convId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (isMedia(message)) {
+    const form = new FormData();
+    form.append('conversation_id', convId);
+    form.append('forward_message_id', message.id);
+    if (message.content?.trim() && message.content_type !== 'audio') form.append('content', message.content.trim());
+    const { data, error } = await supabase.functions.invoke('send-operator-media', { body: form });
+    if (error || !data?.ok) throw new Error(await extractFunctionErrorMessage(error, data?.error));
+    return;
+  }
+  const { data, error } = await supabase.functions.invoke('send-operator-message', {
+    body: { conversation_id: convId, content: message.content ?? '', forwarded: true },
+  });
+  if (error || !data?.ok) throw new Error(await extractFunctionErrorMessage(error, data?.error));
+  if (data.zernio_error) throw new Error(data.zernio_error as string);
+}
+
+// Encaminhar uma ou várias mensagens (na ordem em que foram enviadas) para até
+// 5 conversas.
+export function ForwardMessageDialog({ messages, conversations, currentConversationId, onClose }: {
+  messages: Message[];
   conversations: ConversationWithContact[];
   currentConversationId: string | null;
-  onClose: () => void;
+  onClose: (sent: boolean) => void;
 }) {
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
@@ -53,47 +77,48 @@ export function ForwardMessageDialog({ message, conversations, currentConversati
     });
   };
 
-  const isMedia = !['text', 'template', 'note'].includes(message.content_type);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const many = messages.length > 1;
 
   const send = async () => {
     if (!picked.length) return;
     setSending(true);
-    const supabase = getSupabase();
-    let ok = 0;
+    const total = picked.length * messages.length;
+    let done = 0;
+    let okConvs = 0;
     const failures: string[] = [];
+    setProgress({ done, total });
     for (const convId of picked) {
       const conv = conversations.find((c) => c.id === convId);
       const who = conv?.contact?.name || conv?.contact?.phone || 'contato';
-      try {
-        if (isMedia) {
-          const form = new FormData();
-          form.append('conversation_id', convId);
-          form.append('forward_message_id', message.id);
-          if (message.content?.trim() && message.content_type !== 'audio') form.append('content', message.content.trim());
-          const { data, error } = await supabase.functions.invoke('send-operator-media', { body: form });
-          if (error || !data?.ok) throw new Error(await extractFunctionErrorMessage(error, data?.error));
-        } else {
-          const { data, error } = await supabase.functions.invoke('send-operator-message', {
-            body: { conversation_id: convId, content: message.content ?? '', forwarded: true },
-          });
-          if (error || !data?.ok) throw new Error(await extractFunctionErrorMessage(error, data?.error));
-          if (data.zernio_error) throw new Error(data.zernio_error as string);
+      let convFailed = 0;
+      // Uma de cada vez, na ordem original — assim chegam na sequência certa.
+      for (const m of messages) {
+        try {
+          await forwardOne(m, convId);
+        } catch (e) {
+          convFailed++;
+          const what = many ? ` (${preview(m).slice(0, 40) || 'mensagem'})` : '';
+          failures.push(`${who}${what}: ${e instanceof Error ? e.message : String(e)}`);
         }
-        ok++;
-      } catch (e) {
-        failures.push(`${who}: ${e instanceof Error ? e.message : String(e)}`);
+        setProgress({ done: ++done, total });
       }
+      if (convFailed < messages.length) okConvs++;
     }
     setSending(false);
-    if (ok) toast.success(ok === 1 ? 'Mensagem encaminhada.' : `Encaminhada para ${ok} conversas.`);
-    if (failures.length) toast.error('Algumas não foram entregues', { description: failures.join('\n') });
-    if (!failures.length) onClose();
+    setProgress(null);
+    const noun = many ? `${messages.length} mensagens encaminhadas` : 'Mensagem encaminhada';
+    if (okConvs) toast.success(okConvs === 1 ? `${noun}.` : `${noun} para ${okConvs} conversas.`);
+    if (failures.length) toast.error('Algumas não foram entregues', { description: failures.slice(0, 6).join('\n') });
+    if (!failures.length) onClose(true);
   };
 
   return (
-    <Dialog open onClose={onClose} title="Encaminhar mensagem" description="Escolha até 5 conversas.">
-      <div className="mb-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-        <div className="line-clamp-3 whitespace-pre-wrap break-words">{preview(message) || '—'}</div>
+    <Dialog open onClose={() => onClose(false)} title={many ? `Encaminhar ${messages.length} mensagens` : 'Encaminhar mensagem'} description="Escolha até 5 conversas.">
+      <div className="mb-3 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+        {messages.map((m) => (
+          <div key={m.id} className={cn('whitespace-pre-wrap break-words', many ? 'line-clamp-1' : 'line-clamp-3')}>{preview(m) || '—'}</div>
+        ))}
       </div>
       <label className="relative mb-2 block">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
@@ -125,9 +150,11 @@ export function ForwardMessageDialog({ message, conversations, currentConversati
         })}
       </ul>
       <div className="flex items-center justify-between gap-2 pt-4">
-        <span className="text-xs text-[var(--color-text-muted)]">{picked.length}/{MAX_TARGETS} selecionadas</span>
+        <span className="text-xs text-[var(--color-text-muted)]">
+          {progress ? `Enviando ${progress.done}/${progress.total}…` : `${picked.length}/${MAX_TARGETS} selecionadas`}
+        </span>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onClose(false)} disabled={sending}>Cancelar</Button>
           <Button onClick={() => void send()} disabled={!picked.length || sending}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CornerUpRight className="h-4 w-4" />}
             Encaminhar

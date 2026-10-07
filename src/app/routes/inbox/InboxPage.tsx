@@ -1,10 +1,11 @@
+import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/Avatar';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import './inbox.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRightLeft, CheckCircle2, Copy, Info, Instagram, MessageCircle, MoreVertical, PanelRightClose, PanelRightOpen, Pin, Plus, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, CheckCircle2, Copy, CornerUpRight, Info, Instagram, MessageCircle, MoreVertical, PanelRightClose, PanelRightOpen, Pin, Plus, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
@@ -68,6 +69,8 @@ function MenuItem({ icon, onClick, children }: { icon: React.ReactNode; onClick:
   );
 }
 
+const MAX_FORWARD_MSGS = 30;
+
 export default function InboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showStartChat, setShowStartChat] = useState(false);
@@ -82,8 +85,20 @@ export default function InboxPage() {
   const [sort, setSort] = useState<InboxSort>('recente');
   // Responder citando / encaminhar (ações do balão).
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
-  useEffect(() => { setReplyTo(null); }, [selectedId]);
+  // Encaminhar: 1 mensagem (atalho do balão) ou várias (modo seleção).
+  const [forwardMsgs, setForwardMsgs] = useState<Message[] | null>(null);
+  const [selectedMsgs, setSelectedMsgs] = useState<Map<string, Message> | null>(null);
+  useEffect(() => { setReplyTo(null); setSelectedMsgs(null); }, [selectedId]);
+  const toggleSelectMsg = useCallback((m: Message) => {
+    setSelectedMsgs((cur) => {
+      const next = new Map(cur ?? []);
+      if (next.has(m.id)) next.delete(m.id);
+      else if (next.size >= MAX_FORWARD_MSGS) { toast.info(`Até ${MAX_FORWARD_MSGS} mensagens por vez.`); return cur; }
+      else next.set(m.id, m);
+      return next;
+    });
+  }, []);
+  const selectedMsgIds = useMemo(() => (selectedMsgs ? new Set(selectedMsgs.keys()) : null), [selectedMsgs]);
   // SLA: limites da org + relógio de 30s para os contadores de espera.
   const { sla } = useSlaConfig();
   const now = useNow(30_000);
@@ -520,10 +535,29 @@ export default function InboxPage() {
                 onRetry={retry}
                 onDismiss={dismissFailed}
                 onReply={selected.status !== 'closed' && perms.can('inbox.reply') ? setReplyTo : undefined}
-                onForward={perms.can('inbox.reply') ? setForwardMsg : undefined}
+                onForward={perms.can('inbox.reply') ? (m) => setForwardMsgs([m]) : undefined}
+                onToggleSelect={perms.can('inbox.reply') ? toggleSelectMsg : undefined}
+                selectedIds={selectedMsgIds}
                 contactName={selected.contact?.name?.trim() || null}
               />
-              {selected.status !== 'closed' && perms.can('inbox.reply') && (
+              {selectedMsgs ? (
+                <div className="flex items-center gap-2 border-t border-[var(--color-border-soft)] bg-[var(--color-surface)] px-4 py-3">
+                  <button type="button" onClick={() => setSelectedMsgs(null)} aria-label="Cancelar seleção"
+                    className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
+                    <X className="h-5 w-5" />
+                  </button>
+                  <span className="flex-1 text-sm font-medium text-[var(--color-text-primary)]">
+                    {selectedMsgs.size === 0 ? 'Toque nas mensagens para selecionar' : `${selectedMsgs.size} selecionada${selectedMsgs.size > 1 ? 's' : ''}`}
+                  </span>
+                  <Button size="sm" disabled={selectedMsgs.size === 0}
+                    onClick={() => {
+                      const list = [...selectedMsgs.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+                      setForwardMsgs(list);
+                    }}>
+                    <CornerUpRight className="h-4 w-4" /> Encaminhar
+                  </Button>
+                </div>
+              ) : selected.status !== 'closed' && perms.can('inbox.reply') && (
                 <MessageInput
                   conversationId={selected.id}
                   withinWindow={effectiveWithinWindow}
@@ -652,12 +686,12 @@ export default function InboxPage() {
         />
       )}
 
-      {forwardMsg && (
+      {forwardMsgs && (
         <ForwardMessageDialog
-          message={forwardMsg}
+          messages={forwardMsgs}
           conversations={conversations}
           currentConversationId={selectedId}
-          onClose={() => { setForwardMsg(null); void reloadConvs(); }}
+          onClose={(sent) => { setForwardMsgs(null); if (sent) setSelectedMsgs(null); void reloadConvs(); }}
         />
       )}
     </div>
