@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { maskPhoneBR } from '@/lib/phone';
 import { toast } from 'sonner';
 import { Check, Minus, ShieldCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
 
   const [name, setName] = useState(member?.display_name ?? '');
   const [email, setEmail] = useState(member?.email ?? '');
-  const [phone, setPhone] = useState(member?.phone ?? '');
+  const [phone, setPhone] = useState(maskPhoneBR(member?.phone));
   const [job, setJob] = useState(member?.job_title ?? '');
   const [teamId, setTeamId] = useState(member?.team_id ?? '');
   const [roleId, setRoleId] = useState(member?.access_role_id ?? defaultRole?.id ?? '');
@@ -83,7 +84,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
     const patch: Record<string, unknown> = {};
     if (canEditInfo) {
       if ((member.display_name ?? '') !== name.trim()) patch.display_name = name.trim() || null;
-      if ((member.phone ?? '') !== phone.trim()) patch.phone = phone.trim() || null;
+      if (maskPhoneBR(member.phone) !== phone.trim()) patch.phone = phone.trim() || null;
       if ((member.job_title ?? '') !== job.trim()) patch.job_title = job.trim() || null;
       if ((member.team_id ?? '') !== teamId) patch.team_id = teamId || null;
       if (member.must_change_password !== mustChange && !isSelf) patch.must_change_password = mustChange;
@@ -128,7 +129,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Telefone" htmlFor="u-phone">
-            <input id="u-phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canEditInfo} className={inputCls} placeholder="(68) 99999-0000" />
+            <input id="u-phone" value={phone} onChange={(e) => setPhone(maskPhoneBR(e.target.value))} inputMode="tel" maxLength={15} disabled={!canEditInfo} className={inputCls} placeholder="(68) 99999-0000" />
           </Field>
           <Field label="Cargo" htmlFor="u-job">
             <input id="u-job" value={job} onChange={(e) => setJob(e.target.value)} disabled={!canEditInfo} className={inputCls} placeholder="Ex.: Atendente" />

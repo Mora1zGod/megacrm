@@ -8,7 +8,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
-import { formatPhoneDisplay } from '@/lib/phone';
+import { maskPhoneBR } from '@/lib/phone';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { UserDrawer } from './UserDrawer';
@@ -190,7 +190,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
                           {memberLabel(m)} {me && <span className="text-xs font-normal text-[var(--color-text-muted)]">(você)</span>}
                         </div>
                         <div className="truncate text-xs text-[var(--color-text-secondary)]">{m.email}</div>
-                        {m.phone && <div className="truncate text-xs text-[var(--color-text-muted)]">{formatPhoneDisplay(m.phone)}</div>}
+                        {m.phone && <div className="truncate text-xs text-[var(--color-text-muted)]">{maskPhoneBR(m.phone)}</div>}
                       </div>
                     </div>
                   </td>

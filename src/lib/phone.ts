@@ -24,6 +24,21 @@ export function normalizePhone(
   }
 }
 
+// Máscara de digitação BR: "68999428493" → "(68) 99942-8493" (fixo: "(68) 3224-1234").
+// Aceita valores já salvos com +55 e remove o código do país.
+export function maskPhoneBR(raw: string | null | undefined): string {
+  let d = (raw ?? '').replace(/\D/g, '');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+  d = d.slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  const ddd = d.slice(0, 2);
+  const rest = d.slice(2);
+  if (rest.length <= 4) return `(${ddd}) ${rest}`;
+  const split = rest.length === 9 ? 5 : 4;
+  return `(${ddd}) ${rest.slice(0, split)}-${rest.slice(split)}`;
+}
+
 // Exibição: +5568999238046 → +55 68 99923-8046 (BR). Outros formatos ficam como estão.
 export function formatPhoneDisplay(phone: string | null | undefined): string {
   if (!phone) return '';
