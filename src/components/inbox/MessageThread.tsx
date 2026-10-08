@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AlertCircle, Bot, Check, CheckCheck, CheckSquare, Clock, CornerUpRight, FileText, Loader2, Pencil, Reply, Smartphone, StickyNote, User } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, CheckSquare, Clock, CornerUpRight, ExternalLink, FileText, Loader2, Play, Pencil, Reply, Smartphone, StickyNote, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
@@ -164,6 +164,10 @@ function MediaContent({ message }: { message: Message }) {
   const caption = message.content?.trim();
 
   if (isHttp) {
+    // Reel/post compartilhado no Instagram: vem como link da PÁGINA (instagram.com/reel/…), não como arquivo de vídeo —
+    // o player ficava em 0:00. Mostra um cartão que abre no Instagram.
+    const ig = instagramShare(rawUrl);
+    if (ig) return <ShareCard url={rawUrl} title={ig} caption={caption} />;
     if (message.content_type === 'image') {
       return <ImageContent url={url} alt={caption || label} caption={caption} />;
     }
@@ -175,7 +179,7 @@ function MediaContent({ message }: { message: Message }) {
       return <AudioContent message={message} url={url} caption={caption} />;
     }
     if (message.content_type === 'video') {
-      return <video controls src={url} className="max-h-64 rounded-lg" />;
+      return <VideoContent url={url} caption={caption} />;
     }
     // Documento/arquivo: cartão em vez de link solto — dá alvo de clique
     // maior e deixa claro que é anexo, não texto da conversa.
@@ -204,6 +208,53 @@ function MediaContent({ message }: { message: Message }) {
   );
 }
 
+function instagramShare(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (!/(^|\.)instagram\.com$/i.test(u.hostname)) return null;
+    const kind = u.pathname.split('/').filter(Boolean)[0]?.toLowerCase();
+    if (kind === 'reel' || kind === 'reels') return 'Reel do Instagram';
+    if (kind === 'p') return 'Publicação do Instagram';
+    if (kind === 'tv') return 'Vídeo do Instagram';
+    if (kind === 'stories') return 'Story do Instagram';
+    return 'Link do Instagram';
+  } catch { return null; }
+}
+
+function ShareCard({ url, title, caption }: { url: string; title: string; caption?: string }) {
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      className="flex max-w-xs items-center gap-3 rounded-lg border border-current/20 bg-black/10 px-3 py-2.5 transition hover:bg-black/20">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white">
+        <Play className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block truncate text-xs opacity-70">{caption || 'Compartilhado pelo contato · toque para abrir'}</span>
+      </span>
+      <ExternalLink className="h-4 w-4 shrink-0 opacity-60" />
+    </a>
+  );
+}
+
+// Vídeo: se o arquivo não carregar (link vencido da Meta, formato não suportado), oferece abrir em outra aba.
+function VideoContent({ url, caption }: { url: string; caption?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg border border-current/20 bg-black/10 px-2.5 py-2 hover:bg-black/20">
+        <Play className="h-4 w-4 shrink-0 opacity-80" />
+        <span className="min-w-0 flex-1 text-sm">Não deu para tocar o vídeo aqui. <u>Abrir em outra aba</u></span>
+      </a>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <video controls preload="metadata" playsInline src={url} onError={() => setFailed(true)} className="max-h-64 rounded-lg" />
+      {caption && <p className="whitespace-pre-wrap text-sm">{caption}</p>}
+    </div>
+  );
+}
 
 // Áudio + transcrição. A transcrição vem pronta no `content` (gravada pela
 // função transcribe-audio). Quando ela falhou — o texto começa com

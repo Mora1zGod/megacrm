@@ -29,6 +29,8 @@ const EVENT_URL = 'https://www.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcao
 const EVENT_ACTION = 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEvento';
 const BUCKET = 'whatsapp-hub-purchases';
 const MAX_ROUNDS = 6;          // chamadas por "Buscar notas" (cada uma traz até 50 documentos)
+const ROUND_BUDGET_MS = 25_000; // não começa outra rodada depois disso (a função tem 60 s)
+const CONCURRENCY = 6;          // notas gravadas em paralelo
 const WAIT_MS = 60 * 60 * 1000; // regra da SEFAZ: sem documento novo → esperar 1 hora
 
 class HttpError extends Error {
@@ -56,7 +58,7 @@ function asUser(token: string): SupabaseClient<any, any, any> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Ctx { token: string; userId: string; orgId: string; db: SupabaseClient<any, any, any>; sys: SupabaseClient }
+interface Ctx { token: string; userId: string; orgId: string; db: SupabaseClient<any, any, any>; sys: SupabaseClient; canSup?: boolean }
 
 async function auth(req: ApiRequest): Promise<Ctx> {
   const h = req.headers?.authorization ?? req.headers?.Authorization;
@@ -244,8 +246,11 @@ async function importPayload(ctx: Ctx, p: InvoicePayload, extra: Record<string, 
     }
   }
   // Completa o cadastro do fornecedor com o que veio no XML (só campos vazios).
-  const { data: canSup } = await ctx.db.rpc('has_perm', { p_key: 'purchases.suppliers' });
-  if (supplier?.doc && canSup === true) {
+  if (ctx.canSup === undefined) {
+    const { data: canSup } = await ctx.db.rpc('has_perm', { p_key: 'purchases.suppliers' });
+    ctx.canSup = canSup === true;
+  }
+  if (supplier?.doc && ctx.canSup) {
     const { data: party } = await ctx.sys.schema('whatsapp_hub').from('fin_parties')
       .select('*').eq('org_id', ctx.orgId).eq('doc', supplier.doc).maybeSingle();
     if (party) {
@@ -270,30 +275,65 @@ async function applyCancel(ctx: Ctx, key: string) {
   else await t.update({ sefaz_situation: 'cancelada' }).eq('id', data.id);
 }
 
-async function processDocs(ctx: Ctx, companyId: string, docs: Array<{ nsu: string; schema: string; xml: string }>) {
-  let notas = 0; let completas = 0; let eventos = 0;
-  for (const d of docs) {
+interface DocResult { notas: number; completas: number; eventos: number; falhas: number; erros: string[]; minIssue: string | null; maxIssue: string | null }
+
+async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const x = items[i++]; await fn(x); }
+  }));
+}
+
+async function processDocs(ctx: Ctx, companyId: string, docs: Array<{ nsu: string; schema: string; xml: string }>): Promise<DocResult> {
+  const r: DocResult = { notas: 0, completas: 0, eventos: 0, falhas: 0, erros: [], minIssue: null, maxIssue: null };
+  const seen = (d: string | null) => {
+    if (!d) return;
+    if (!r.minIssue || d < r.minIssue) r.minIssue = d;
+    if (!r.maxIssue || d > r.maxIssue) r.maxIssue = d;
+  };
+  const fail = (d: { nsu: string; schema: string }, e: unknown) => {
+    const msg = e instanceof Error ? e.message : String(e);
+    r.falhas++;
+    if (r.erros.length < 5) r.erros.push(`NSU ${Number(d.nsu)}: ${msg}`);
+    console.error('sefaz doc', d.nsu, d.schema, msg);
+  };
+  // Notas primeiro (em paralelo); eventos depois, porque o cancelamento procura a nota já gravada.
+  // Notas do MESMO fornecedor ficam na mesma fila: o cadastro automático do fornecedor não pode correr em dobro.
+  const isNote = (d: { schema: string }) => d.schema.startsWith('procNFe') || d.schema.startsWith('resNFe');
+  const groups = new Map<string, Array<{ d: typeof docs[number]; p: InvoicePayload; full: boolean }>>();
+  for (const d of docs.filter(isNote)) {
     try {
-      if (d.schema.startsWith('procNFe')) {
-        const p = parseFullNfe(d.xml);
-        await importPayload(ctx, p, { source: 'sefaz', company_id: companyId, nsu: d.nsu }, d.xml);
-        completas++;
-      } else if (d.schema.startsWith('resNFe')) {
-        const p = parseSummary(d.xml);
-        if (!p) continue;
-        await importPayload(ctx, p, { source: 'sefaz', company_id: companyId, nsu: d.nsu });
-        if (p.situation === 'cancelada') await applyCancel(ctx, p.access_key);
-        notas++;
-      } else if (d.schema.startsWith('resEvento') || d.schema.startsWith('procEventoNFe')) {
-        const ev = parseEvent(d.xml);
-        if (ev && ev.type === '110111') await applyCancel(ctx, ev.key);
-        eventos++;
-      }
-    } catch (e) {
-      console.error('sefaz doc', d.nsu, d.schema, e instanceof Error ? e.message : e);
-    }
+      const full = d.schema.startsWith('procNFe');
+      const p = full ? parseFullNfe(d.xml) : parseSummary(d.xml);
+      if (!p) continue;
+      const k = p.supplier_doc || p.access_key;
+      groups.set(k, [...(groups.get(k) ?? []), { d, p, full }]);
+    } catch (e) { fail(d, e); }
   }
-  return { notas, completas, eventos };
+  await pool([...groups.values()], CONCURRENCY, async (list) => {
+    for (const { d, p, full } of list) {
+      try {
+        if (full) {
+          await importPayload(ctx, p, { source: 'sefaz', company_id: companyId, nsu: d.nsu }, d.xml);
+          r.completas++;
+        } else {
+          await importPayload(ctx, p, { source: 'sefaz', company_id: companyId, nsu: d.nsu });
+          if (p.situation === 'cancelada') await applyCancel(ctx, p.access_key);
+          r.notas++;
+        }
+        seen(p.issue_date);
+      } catch (e) { fail(d, e); }
+    }
+  });
+  for (const d of docs) {
+    if (isNote(d) || !(d.schema.startsWith('resEvento') || d.schema.startsWith('procEventoNFe'))) continue;
+    try {
+      const ev = parseEvent(d.xml);
+      if (ev && ev.type === '110111') await applyCancel(ctx, ev.key);
+      r.eventos++;
+    } catch (e) { fail(d, e); }
+  }
+  return r;
 }
 
 // ------------------------------------------------------------------ ações
@@ -357,32 +397,44 @@ async function setEnabled(ctx: Ctx, b: Record<string, unknown>) {
 
 async function sync(ctx: Ctx, b: Record<string, unknown>) {
   await requirePerm(ctx, 'purchases.invoice', 'buscar notas na SEFAZ');
+  const started = Date.now();
   const comp = await company(ctx, b.company_id);
   const { data: st } = await ctx.sys.schema('whatsapp_hub').from('pur_sefaz_state').select('*').eq('company_id', comp.id).eq('org_id', ctx.orgId).maybeSingle();
   if (st && st.enabled === false) throw new HttpError(400, 'A busca automática está desligada para esta empresa.');
   if (st?.next_sync_after && new Date(st.next_sync_after).getTime() > Date.now()) {
     const at = new Date(st.next_sync_after).toLocaleTimeString('pt-BR', { timeZone: 'America/Rio_Branco', hour: '2-digit', minute: '2-digit' });
-    return { ok: true, waiting: true, message: `A SEFAZ pede para esperar: não há notas novas. Próxima busca liberada às ${at}.` };
+    return {
+      ok: true, waiting: true, more: false, next_sync_after: st.next_sync_after, last_nsu: st.last_nsu ?? null, max_nsu: st.max_nsu ?? null,
+      message: `A SEFAZ só libera nova busca às ${at} (regra dela: 1 hora de espera quando não há nada novo ou quando pede para aguardar).`,
+    };
   }
   const cert = await loadCert(ctx, comp.id);
   const doc = docFor(cert, comp);
   const uf = String(st?.uf_code ?? '12');
   let nsu = String(st?.last_nsu ?? '000000000000000').padStart(15, '0');
   let maxNsu = String(st?.max_nsu ?? '');
-  const total = { notas: 0, completas: 0, eventos: 0 };
-  let status = ''; let wait = false;
+  const total: DocResult = { notas: 0, completas: 0, eventos: 0, falhas: 0, erros: [], minIssue: null, maxIssue: null };
+  let status = ''; let wait = false; let finished = false;
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    if (round > 0 && Date.now() - started > ROUND_BUDGET_MS) break; // deixa o resto para a próxima chamada
     const xml = await soap(DIST_URL, DIST_ACTION, distBody(doc, uf, `<distNSU><ultNSU>${nsu}</ultNSU></distNSU>`), cert);
     const r = parseDistResponse(xml, gunzipSync);
     status = `${r.cStat} — ${r.xMotivo}`;
     if (r.cStat === '656') { wait = true; break; }           // consumo indevido
-    if (r.cStat === '137') { wait = true; if (r.ultNSU) nsu = r.ultNSU; if (r.maxNSU) maxNsu = r.maxNSU; break; }
+    if (r.cStat === '137') { wait = true; finished = true; if (r.ultNSU) nsu = r.ultNSU; if (r.maxNSU) maxNsu = r.maxNSU; break; }
     if (r.cStat !== '138') throw new HttpError(400, `SEFAZ: ${status}`);
-    const got = await processDocs(ctx, comp.id, r.docs);
-    total.notas += got.notas; total.completas += got.completas; total.eventos += got.eventos;
+    // Grava o ultNSU ANTES de processar: repetir um NSU já respondido faz a SEFAZ bloquear por 1 hora (656).
     nsu = r.ultNSU || nsu; maxNsu = r.maxNSU || maxNsu;
     await setState(ctx, comp.id, { last_nsu: nsu, max_nsu: maxNsu || null, last_sync_at: new Date().toISOString(), last_status: status });
-    if (maxNsu && nsu >= maxNsu) { wait = true; break; }
+    const got = await processDocs(ctx, comp.id, r.docs);
+    total.notas += got.notas; total.completas += got.completas; total.eventos += got.eventos; total.falhas += got.falhas;
+    total.erros.push(...got.erros.slice(0, 5 - total.erros.length));
+    for (const d of [got.minIssue, got.maxIssue]) {
+      if (!d) continue;
+      if (!total.minIssue || d < total.minIssue) total.minIssue = d;
+      if (!total.maxIssue || d > total.maxIssue) total.maxIssue = d;
+    }
+    if (maxNsu && nsu >= maxNsu) { wait = true; finished = true; break; }
   }
   await setState(ctx, comp.id, {
     last_nsu: nsu, max_nsu: maxNsu || null, last_sync_at: new Date().toISOString(), last_status: status,
@@ -390,9 +442,10 @@ async function sync(ctx: Ctx, b: Record<string, unknown>) {
   });
   const n = total.notas + total.completas;
   return {
-    ok: true, ...total, more: !wait,
-    message: n ? `${n} nota(s) recebida(s) da SEFAZ${total.eventos ? ` e ${total.eventos} evento(s)` : ''}.` + (!wait ? ' Ainda há mais: clique em buscar de novo.' : '')
-      : 'Nenhuma nota nova na SEFAZ.',
+    ok: true, notas: total.notas, completas: total.completas, eventos: total.eventos, falhas: total.falhas, erros: total.erros,
+    min_issue: total.minIssue, max_issue: total.maxIssue, last_nsu: nsu, max_nsu: maxNsu || null,
+    more: !wait, finished, waiting: wait && !finished,
+    message: n ? `${n} nota(s) recebida(s) da SEFAZ${total.eventos ? ` e ${total.eventos} evento(s)` : ''}.` : 'Nenhuma nota nova nesta busca.',
   };
 }
 

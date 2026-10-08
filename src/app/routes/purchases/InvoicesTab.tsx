@@ -24,7 +24,7 @@ type Quick = '' | 'fin' | 'stock' | 'summary';
 
 export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const perms = usePermission();
-  const [from, setFrom] = useState(monthStart(addDays(todaySP(), -60)));
+  const [from, setFrom] = useState(monthStart(addDays(todaySP(), -95))); // a SEFAZ guarda ~3 meses
   const [to, setTo] = useState(todaySP());
   const [by, setBy] = useState<'entry' | 'issue' | 'created'>('entry');
   const [companyId, setCompanyId] = useState('');
@@ -71,12 +71,34 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   useEffect(() => { void load(); }, [load]);
   const current = useOpenDoc('pur_invoices_v', openId, rows);
 
+  // Busca contínua: cada chamada traz algumas centenas de documentos; repete enquanto a SEFAZ tiver mais.
   const syncSefaz = async () => {
     const cid = syncCompany || lookups.companies.find((c) => c.is_default)?.id;
     if (!cid) return;
     setSyncing(true);
-    try { const r = await sefazApi<{ message: string }>('sync', { company_id: cid }); toast.success(r.message); void load(); }
-    catch (e) { toast.error('Busca na SEFAZ', { description: e instanceof Error ? e.message : String(e) }); }
+    const tid = toast.loading('Buscando notas na SEFAZ…');
+    let notas = 0; let falhas = 0; let minIssue: string | null = null; const erros: string[] = [];
+    type SyncResp = { message: string; notas?: number; completas?: number; falhas?: number; erros?: string[]; min_issue?: string | null; more?: boolean; waiting?: boolean; last_nsu?: string | null; max_nsu?: string | null };
+    try {
+      for (let i = 0; i < 20; i++) {
+        const r = await sefazApi<SyncResp>('sync', { company_id: cid });
+        notas += (r.notas ?? 0) + (r.completas ?? 0); falhas += r.falhas ?? 0; erros.push(...(r.erros ?? []));
+        if (r.min_issue && (!minIssue || r.min_issue < minIssue)) minIssue = r.min_issue;
+        const left = r.max_nsu && r.last_nsu ? Math.max(0, Number(r.max_nsu) - Number(r.last_nsu)) : null;
+        if (!r.more) {
+          toast.dismiss(tid);
+          const head = notas ? `${notas} nota(s) recebida(s) da SEFAZ.` : '';
+          if (r.waiting && !notas) toast.info(r.message);
+          else toast.success(head || 'Nenhuma nota nova na SEFAZ.', { description: r.waiting ? r.message : 'Tudo em dia com a SEFAZ (ela guarda só os últimos 3 meses).' });
+          break;
+        }
+        toast.loading(`Buscando notas na SEFAZ… ${notas} recebida(s)${left !== null ? ` · faltam ~${left} documento(s)` : ''}`, { id: tid });
+      }
+      if (falhas) toast.error(`${falhas} documento(s) não entraram`, { description: erros.slice(0, 3).join(' · ') });
+      // Mostra as notas recém-chegadas mesmo que a emissão seja anterior ao período escolhido.
+      if (minIssue && minIssue < from) setFrom(minIssue);
+      void load();
+    } catch (e) { toast.dismiss(tid); toast.error('Busca na SEFAZ', { description: e instanceof Error ? e.message : String(e) }); void load(); }
     finally { setSyncing(false); }
   };
   const importFiles = async (files: FileList | null) => {

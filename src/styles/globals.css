@@ -350,11 +350,18 @@ select option {
 /* -----------------------------------------------------------------------------
    Focus ring
    ----------------------------------------------------------------------------- */
-:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+:where(button, a, [tabindex]):focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
   border-radius: 6px;
 }
+/* Campos: o anel acompanha o arredondamento do próprio campo (sem "caixa" de 6px por fora). */
+:where(input, select, textarea):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  outline-offset: 0;
+}
+/* Campo dentro de uma caixa que já mostra o foco (ex.: pesquisa do SearchSelect). */
+.no-focus-ring:focus-visible { outline: none; }
 
 /* -----------------------------------------------------------------------------
    Motion utilitário — pra dropdown/modal/drawer novos usarem em vez de

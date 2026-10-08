@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,9 +14,10 @@ const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 
 // Select com barra de pesquisa (acentos e maiúsculas não importam).
 // Cabeçalhos (header) aparecem só quando algum item abaixo deles bate na busca.
-export function SearchSelect({ id, value, onChange, options, placeholder = 'Escolha…', emptyLabel, disabled, className, searchPlaceholder = 'Pesquisar…' }: {
+export function SearchSelect({ id, value, onChange, options, placeholder = 'Escolha…', emptyLabel, disabled, className, searchPlaceholder = 'Pesquisar…', icon }: {
   id?: string; value: string; onChange: (v: string) => void; options: SearchOption[]; placeholder?: string;
   emptyLabel?: string; disabled?: boolean; className?: string; searchPlaceholder?: string;
+  icon?: ReactNode; // ícone à esquerda do campo
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -65,13 +66,17 @@ export function SearchSelect({ id, value, onChange, options, placeholder = 'Esco
     <div ref={box} className={cn('relative', className)}>
       <button id={id} type="button" disabled={disabled} onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
         className="flex h-10 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 text-left text-sm text-[var(--color-text-primary)] focus:border-[var(--accent-primary)] focus:outline-none disabled:opacity-50">
-        <span className={cn('truncate', !selected && 'text-[var(--color-text-muted)]')}>{selected ? selected.label : value === '' && emptyLabel ? emptyLabel : placeholder}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {icon && <span className="shrink-0 text-[var(--color-text-muted)] [&>svg]:h-4 [&>svg]:w-4">{icon}</span>}
+          <span className={cn('truncate', !selected && 'text-[var(--color-text-muted)]')}>{selected ? selected.label : value === '' && emptyLabel ? emptyLabel : placeholder}</span>
+        </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
       </button>
       {open && (
         <div className="absolute left-0 right-0 z-[var(--z-popover,60)] mt-1 min-w-[280px] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] shadow-[var(--shadow-lg)]">
-          <div className="flex items-center gap-2 border-b border-[var(--color-border-soft)] px-3">
-            <Search className="h-4 w-4 text-[var(--color-text-muted)]" />
+          <div className="p-2">
+          <div className="flex h-9 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2.5 focus-within:border-[var(--accent-primary)]">
+            <Search className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, selectable.length - 1)); }
@@ -79,10 +84,11 @@ export function SearchSelect({ id, value, onChange, options, placeholder = 'Esco
                 else if (e.key === 'Enter') { e.preventDefault(); const o = selectable[active]; if (o) pick(o.value); }
                 else if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
               }}
-              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--color-text-muted)]" />
+              className="no-focus-ring h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-[var(--color-text-primary)] shadow-none outline-none placeholder:text-[var(--color-text-muted)]" />
             {q && <button type="button" aria-label="Limpar" onClick={() => setQ('')} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"><X className="h-4 w-4" /></button>}
           </div>
-          <ul ref={list} role="listbox" className="max-h-72 overflow-auto py-1">
+          </div>
+          <ul ref={list} role="listbox" className="max-h-72 overflow-auto border-t border-[var(--color-border-soft)] py-1">
             {selectable.length === 0 && <li className="px-3 py-3 text-sm text-[var(--color-text-muted)]">Nada encontrado.</li>}
             {visible.map((o, i) => {
               if (o.header) {

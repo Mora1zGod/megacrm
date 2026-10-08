@@ -123,16 +123,24 @@ export function SubTabs<T extends string>({ tabs, value, onChange }: { tabs: [T,
 }
 
 // Plano de contas com pesquisa (por código ou nome). Agrupadoras viram títulos.
-export function ChartPicker({ id, chart, kind, value, onChange, emptyLabel, placeholder = 'Escolha a conta…' }: {
-  id?: string; chart: ChartAccount[]; kind: EntryKind; value: string; onChange: (v: string) => void; emptyLabel?: string; placeholder?: string;
+// Só aparecem os grupos que têm conta permitida (conta a pagar: despesas e deduções; a receber: receitas).
+export function ChartPicker({ id, chart, kind, value, onChange, emptyLabel, placeholder = 'Escolha a conta…', icon }: {
+  id?: string; chart: ChartAccount[]; kind: EntryKind; value: string; onChange: (v: string) => void; emptyLabel?: string; placeholder?: string; icon?: ReactNode;
 }) {
   const options = useMemo<SearchOption[]>(() => {
+    const byId = new Map(chart.map((c) => [c.id, c]));
+    const used = new Set<string>();
+    for (const c of chart) {
+      if (c.is_synthetic || !(chartAllowed(c, kind) || c.id === value)) continue;
+      used.add(c.id);
+      for (let p = c.parent_id ? byId.get(c.parent_id) : undefined; p && !used.has(p.id); p = p.parent_id ? byId.get(p.parent_id) : undefined) used.add(p.id);
+    }
     const out: SearchOption[] = [];
     for (const c of chartTree(chart)) {
-      if (c.is_synthetic) out.push({ value: c.id, label: `${c.code} ${c.name}`, header: true, depth: c.depth });
-      else if (chartAllowed(c, kind) || c.id === value) out.push({ value: c.id, label: `${c.code} ${c.name}`, depth: c.depth });
+      if (!used.has(c.id)) continue;
+      out.push({ value: c.id, label: `${c.code} ${c.name}`, header: c.is_synthetic, depth: c.depth });
     }
     return out;
   }, [chart, kind, value]);
-  return <SearchSelect id={id} value={value} onChange={onChange} options={options} placeholder={placeholder} emptyLabel={emptyLabel} searchPlaceholder="Pesquisar código ou nome da conta…" />;
+  return <SearchSelect id={id} value={value} onChange={onChange} options={options} placeholder={placeholder} emptyLabel={emptyLabel} icon={icon} searchPlaceholder="Pesquisar código ou nome da conta…" />;
 }
