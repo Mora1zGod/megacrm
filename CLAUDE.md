@@ -621,6 +621,9 @@ Regras:
   O tipo do arquivo é descoberto pelos bytes/extensão (`resolveForwardMime`) — o Zernio recusa
   `application/octet-stream`. Vários de uma vez: modo seleção na thread (ícone ☑ no balão) →
   `ForwardMessageDialog` com `messages[]`, enviadas uma a uma na ordem original (máx. 30 × 5 conversas).
+- Editar mensagem (08/10/2026): `edit-operator-message` — texto da equipe, só número UAZAPI
+  (`POST /message/edit {id,text}`, id = `messages.zernio_message_id`), até 15 min; grava
+  `messages.edited_at` ("editada" no balão). Zernio/Meta e Instagram não editam pela API.
 - SLA: `app_settings.sla_warn_minutes/sla_late_minutes` (Configurações → Atendimento);
   `ConversationWithContact.waitingSince`. Assinatura: `app_users.sign_messages`.
 

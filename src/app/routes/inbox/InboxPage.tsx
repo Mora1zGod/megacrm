@@ -39,6 +39,7 @@ import { ContactTagsEditor } from '@/components/inbox/ContactTagsEditor';
 import { TransferMenu } from '@/components/inbox/TransferMenu';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { ForwardMessageDialog } from '@/components/inbox/ForwardMessageDialog';
+import { EditMessageDialog } from '@/components/inbox/EditMessageDialog';
 import { useSlaConfig } from '@/hooks/useSlaConfig';
 import { useNow } from '@/lib/sla';
 
@@ -99,6 +100,9 @@ export default function InboxPage() {
     });
   }, []);
   const selectedMsgIds = useMemo(() => (selectedMsgs ? new Set(selectedMsgs.keys()) : null), [selectedMsgs]);
+  // Editar: WhatsApp pelo número UAZAPI, texto da equipe, até 15 min (janela do
+  // WhatsApp). O número oficial (Zernio/Meta) não permite editar pela API.
+  const [editingMsg, setEditingMsg] = useState<Message | null>(null);
   // SLA: limites da org + relógio de 30s para os contadores de espera.
   const { sla } = useSlaConfig();
   const now = useNow(30_000);
@@ -537,6 +541,11 @@ export default function InboxPage() {
                 onReply={selected.status !== 'closed' && perms.can('inbox.reply') ? setReplyTo : undefined}
                 onForward={perms.can('inbox.reply') ? (m) => setForwardMsgs([m]) : undefined}
                 onToggleSelect={perms.can('inbox.reply') ? toggleSelectMsg : undefined}
+                onEdit={perms.can('inbox.reply') ? setEditingMsg : undefined}
+                canEdit={(m) => selected.provider === 'uazapi' && selected.channel !== 'instagram'
+                  && m.direction === 'outbound' && m.sender_type === 'operator' && m.content_type === 'text'
+                  && (m.sender_id === userId || perms.isAdmin)
+                  && Date.now() - new Date(m.created_at).getTime() < 15 * 60 * 1000}
                 selectedIds={selectedMsgIds}
                 contactName={selected.contact?.name?.trim() || null}
               />
@@ -686,6 +695,7 @@ export default function InboxPage() {
         />
       )}
 
+      {editingMsg && <EditMessageDialog message={editingMsg} onClose={() => setEditingMsg(null)} />}
       {forwardMsgs && (
         <ForwardMessageDialog
           messages={forwardMsgs}

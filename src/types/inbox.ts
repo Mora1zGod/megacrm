@@ -64,6 +64,8 @@ export interface Message {
   platform_message_id?: string | null;
   // Mensagem encaminhada de outra conversa.
   forwarded?: boolean;
+  // Texto corrigido pela equipe depois do envio (edit-operator-message).
+  edited_at?: string | null;
 }
 
 export interface ConversationWithContact extends Conversation {

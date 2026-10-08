@@ -98,6 +98,15 @@ export async function uazapiSendText(
   return { messageId: messageIdOf(root) };
 }
 
+// POST /message/edit {id, text} — edita texto já enviado pela própria
+// instância, dentro da janela do WhatsApp (docs.uazapi.com/endpoint/post/message~edit).
+export async function uazapiEditText(
+  ctx: UazapiContext,
+  input: { id: string; text: string },
+): Promise<void> {
+  await ufetch(ctx, '/message/edit', { id: input.id, text: input.text });
+}
+
 export async function uazapiSendMedia(
   ctx: UazapiContext,
   input: {

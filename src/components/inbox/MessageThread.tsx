@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AlertCircle, Bot, Check, CheckCheck, CheckSquare, Clock, CornerUpRight, FileText, Loader2, Reply, Smartphone, StickyNote, User } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, CheckSquare, Clock, CornerUpRight, FileText, Loader2, Pencil, Reply, Smartphone, StickyNote, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
@@ -29,6 +29,9 @@ interface MessageThreadProps {
   // Selecionar várias (encaminhar juntas). selectedIds != null = modo seleção.
   selectedIds?: Set<string> | null;
   onToggleSelect?: (m: Message) => void;
+  // Editar texto enviado (só quando o canal permite — ver canEdit).
+  onEdit?: (m: Message) => void;
+  canEdit?: (m: Message) => boolean;
   contactName?: string | null;
 }
 
@@ -335,7 +338,7 @@ function FailedActions({
   );
 }
 
-export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, onForward, selectedIds, onToggleSelect, contactName }: MessageThreadProps) {
+export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, onForward, selectedIds, onToggleSelect, onEdit, canEdit, contactName }: MessageThreadProps) {
   const selecting = Boolean(selectedIds);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -442,6 +445,12 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
                 <CornerUpRight className="h-4 w-4" />
               </button>
             )}
+            {onEdit && canEdit?.({ ...m, id: realId! }) && (
+              <button type="button" onClick={() => onEdit({ ...m, id: realId! })} aria-label="Editar mensagem" title="Editar (até 15 min)"
+                className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
             {onToggleSelect && (
               <button type="button" onClick={() => onToggleSelect({ ...m, id: realId! })} aria-label="Selecionar mensagens" title="Selecionar (encaminhar várias)"
                 className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
@@ -537,6 +546,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
                   isInbound ? 'justify-start' : 'justify-end',
                 )}
               >
+                {m.edited_at && <span className="italic">editada ·</span>}
                 <span>{formatTime(m.created_at)}</span>
                 {!isInbound && m._state === 'pending' && (
                   <span className="inline-flex items-center gap-1">
