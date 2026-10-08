@@ -121,10 +121,10 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
     >
       <section className="space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)]">Dados do usuário</h3>
-        <Field label="Nome completo" htmlFor="u-name">
+        <Field label="Nome completo" required htmlFor="u-name">
           <input id="u-name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canEditInfo} className={inputCls} placeholder="Ex.: Maria da Silva" />
         </Field>
-        <Field label="E-mail" htmlFor="u-email">
+        <Field label="E-mail" required htmlFor="u-email">
           <input id="u-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!creating} className={inputCls} placeholder="maria@amaipark.com" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
@@ -145,7 +145,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
 
       <section className="mt-6 space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)]">Acesso</h3>
-        <Field label="Perfil de acesso" htmlFor="u-role"
+        <Field label="Perfil de acesso" required htmlFor="u-role"
           hint={isSelf ? 'Você não pode alterar o próprio perfil.' : member?.is_super_admin ? 'Super admin: acesso protegido.' : undefined}>
           <select id="u-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} disabled={!canPickRole} className={inputCls}>
             {roles.filter((r) => !r.is_admin || perms.isAdmin || r.id === member?.access_role_id).map((r) => (

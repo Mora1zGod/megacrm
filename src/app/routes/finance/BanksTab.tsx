@@ -134,12 +134,12 @@ function TransferDialog({ lookups, onClose, onDone }: { lookups: Lookups; onClos
     <Dialog open onClose={onClose} title="Nova transferência" description="Sai de uma conta e entra na outra no mesmo ato.">
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Sai de" htmlFor="tr-from">
+          <Field label="Sai de" required htmlFor="tr-from">
             <select id="tr-from" value={fromId} onChange={(e) => setFromId(e.target.value)} className={inputCls}>
               {active.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.company_name})</option>)}
             </select>
           </Field>
-          <Field label="Entra em" htmlFor="tr-to">
+          <Field label="Entra em" required htmlFor="tr-to">
             <select id="tr-to" value={toId} onChange={(e) => setToId(e.target.value)} className={inputCls}>
               {active.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.company_name})</option>)}
             </select>
@@ -149,8 +149,8 @@ function TransferDialog({ lookups, onClose, onDone }: { lookups: Lookups; onClos
           <p className="rounded-lg bg-[rgba(245,158,11,0.1)] px-3 py-2 text-xs">Atenção: as contas são de empresas diferentes ({from.company_name} → {to.company_name}).</p>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Valor" htmlFor="tr-amount"><MoneyInput id="tr-amount" cents={amount} onChange={setAmount} autoFocus /></Field>
-          <Field label="Data" htmlFor="tr-date"><input id="tr-date" type="date" max={todaySP()} value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></Field>
+          <Field label="Valor" required htmlFor="tr-amount"><MoneyInput id="tr-amount" cents={amount} onChange={setAmount} autoFocus /></Field>
+          <Field label="Data" required htmlFor="tr-date"><input id="tr-date" type="date" max={todaySP()} value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></Field>
         </div>
         <Field label="Descrição" htmlFor="tr-desc"><input id="tr-desc" value={desc} onChange={(e) => setDesc(e.target.value.slice(0, 200))} className={inputCls} placeholder="Ex.: Sangria do caixa para o banco" /></Field>
       </div>

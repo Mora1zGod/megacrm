@@ -110,10 +110,10 @@ function CertDialog({ company, onClose, onDone }: { company: CertCompany; onClos
   return (
     <Dialog open onClose={onClose} opaque title={`Certificado digital · ${company.name}`} description="Arquivo A1 (.pfx ou .p12) e a senha dele. O CNPJ do certificado precisa ser o da empresa (ou da mesma raiz).">
       <div className="space-y-3">
-        <Field label="Arquivo do certificado" htmlFor="ct-file">
+        <Field label="Arquivo do certificado" required htmlFor="ct-file">
           <input id="ct-file" type="file" accept=".pfx,.p12,application/x-pkcs12" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm" />
         </Field>
-        <Field label="Senha do certificado" htmlFor="ct-pass">
+        <Field label="Senha do certificado" required htmlFor="ct-pass">
           <input id="ct-pass" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
         </Field>
         <p className="flex items-start gap-2 text-xs text-[var(--color-text-muted)]"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0" /> A senha é usada só no servidor para abrir o certificado e fica guardada cifrada junto com ele.</p>
@@ -174,10 +174,10 @@ function BandForm({ band, lookups, onClose, onSaved }: { band: Band | null; look
   return (
     <Dialog open onClose={onClose} opaque title={band ? 'Editar faixa' : 'Nova faixa de aprovação'}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="De (valor)" htmlFor="bd-min"><MoneyInput id="bd-min" cents={min} onChange={setMin} /></Field>
+        <Field label="De (valor)" required htmlFor="bd-min"><MoneyInput id="bd-min" cents={min} onChange={setMin} /></Field>
         <Field label="Até (valor)" htmlFor="bd-max"><MoneyInput id="bd-max" cents={max} onChange={setMax} disabled={noMax} /></Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={noMax} onChange={(e) => setNoMax(e.target.checked)} /> Sem limite máximo</label>
-        <div className="sm:col-span-2"><Field label="Perfil que aprova" htmlFor="bd-role">
+        <div className="sm:col-span-2"><Field label="Perfil que aprova" required htmlFor="bd-role">
           <select id="bd-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} className={inputCls}>
             <option value="">Escolha…</option>{lookups.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>

@@ -133,7 +133,7 @@ export function SignupLinkDialog({ roles, teams, onClose }: { roles: AccessRole[
             <div className="space-y-3 rounded-[var(--radius-card)] border border-dashed border-[var(--color-border-card)] p-3">
               <div className="text-sm font-semibold text-[var(--color-text-primary)]">{links.length ? 'Novo link' : 'Gerar link de cadastro'}</div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Perfil sugerido" htmlFor="sl-role" hint="Você pode trocar na hora de aprovar.">
+                <Field label="Perfil sugerido" required htmlFor="sl-role" hint="Você pode trocar na hora de aprovar.">
                   <select id="sl-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} className={inputCls}>
                     {roles.filter((r) => !r.is_admin).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
@@ -203,7 +203,7 @@ export function ApproveSignupDialog({ member, roles, teams, canGrantAdmin, onClo
         )}
       </div>
       <div className="space-y-3">
-        <Field label="Perfil de acesso" htmlFor="ap-role">
+        <Field label="Perfil de acesso" required htmlFor="ap-role">
           <select id="ap-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} className={inputCls}>
             {roles.filter((r) => canGrantAdmin || !r.is_admin).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>

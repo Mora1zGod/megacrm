@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   Building2, Calendar, CreditCard, FileText, Globe, Hash, Info, Landmark, Loader2, Mail, MapPin, Phone, Save, Search, Store,
@@ -11,9 +11,9 @@ import { getSupabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/money';
 import { maskPhoneBR } from '@/lib/phone';
 import { formatDoc, maskCEP, maskDoc, onlyDigits } from '@/lib/format';
-import { chartAllowed, chartTree } from '../finance/data';
-import { fmtDate, fmtDateTime, purError, type CnpjData, type PurLookups, type Supplier } from './data';
+import { fmtDate, fmtDateTime, purError, usePurLookups, type CnpjData, type PurLookups, type Supplier } from './data';
 import { Badge } from './ui';
+import { ChartPicker } from '../finance/ui';
 
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 const NOTES_MAX = 1000;
@@ -61,12 +61,13 @@ function Section({ icon: Icon, title, hint, children }: { icon: LucideIcon; titl
 const statusTone = (s: string | null | undefined) => !s ? 'muted' as const : /ATIVA/i.test(s) ? 'success' as const : /SUSPENSA|INAPTA/i.test(s) ? 'warn' as const : 'error' as const;
 const toDate = (s: string | null | undefined) => (s && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : '');
 
-export function SupplierForm({ lookups, supplier, categories, onClose, onSaved }: {
+export function SupplierForm({ lookups, supplier, categories, onClose, onSaved, defaultKind = 'supplier' }: {
   lookups: PurLookups; supplier: Supplier | null; categories: string[]; onClose: () => void; onSaved: (id: string) => void;
+  defaultKind?: Supplier['kind'];
 }) {
   const s = supplier;
   const [f, setF] = useState({
-    kind: s?.kind ?? 'supplier', doc: maskDoc(s?.doc), name: s?.name ?? '', trade_name: s?.trade_name ?? '',
+    kind: s?.kind ?? defaultKind, doc: maskDoc(s?.doc), name: s?.name ?? '', trade_name: s?.trade_name ?? '',
     state_registration: s?.state_registration ?? '', municipal_registration: s?.municipal_registration ?? '', category: s?.category ?? '',
     email: s?.email ?? '', phone: maskPhoneBR(s?.phone), whatsapp: maskPhoneBR(s?.whatsapp), website: s?.website ?? '', contact_name: s?.contact_name ?? '',
     founded_on: toDate(s?.founded_on), zip_code: maskCEP(s?.zip_code), street: s?.street ?? '', street_number: s?.street_number ?? '',
@@ -83,7 +84,6 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved }
   const [looking, setLooking] = useState(false);
   const [cepBusy, setCepBusy] = useState(false);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
-  const tree = useMemo(() => chartTree(lookups.chart).filter((c) => chartAllowed(c, 'payable')), [lookups.chart]);
   const docDigits = onlyDigits(f.doc);
   const duplicate = docDigits.length >= 11 ? lookups.suppliers.find((p) => p.doc === docDigits && p.id !== s?.id) : undefined;
 
@@ -149,7 +149,8 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved }
 
   const save = async () => {
     if (f.name.trim().length < 2) { toast.error('Informe a razão social / nome.'); return; }
-    if (docDigits && docDigits.length !== 11 && docDigits.length !== 14) { toast.error('CPF deve ter 11 números e CNPJ 14.'); return; }
+    if (!docDigits) { toast.error('Informe o CNPJ ou CPF.'); return; }
+    if (docDigits.length !== 11 && docDigits.length !== 14) { toast.error('CPF deve ter 11 números e CNPJ 14.'); return; }
     if (duplicate) { toast.error(`Este CNPJ/CPF já está cadastrado (${duplicate.name}).`); return; }
     setBusy(true);
     const row: Record<string, unknown> = {
@@ -313,11 +314,7 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved }
             <L label="Chave Pix" htmlFor="sf-pix"><IconInput icon={CreditCard} id="sf-pix" value={f.pix_key} onChange={(v) => set('pix_key', v)} placeholder="CNPJ, e-mail, telefone…" /></L>
             <L label="Condição habitual" htmlFor="sf-terms"><IconInput icon={Calendar} id="sf-terms" value={f.payment_terms} onChange={(v) => set('payment_terms', v)} placeholder="Ex.: 28 dias" /></L>
             <L label="Conta do plano (padrão)" htmlFor="sf-chart">
-              <div className={boxCls}>
-                <select id="sf-chart" value={f.default_chart_account_id} onChange={(e) => set('default_chart_account_id', e.target.value)} className={innerCls}>
-                  <option value="">—</option>{tree.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
-                </select>
-              </div>
+              <ChartPicker id="sf-chart" chart={lookups.chart} kind="payable" value={f.default_chart_account_id} onChange={(v) => set('default_chart_account_id', v)} emptyLabel="—" />
             </L>
           </div>
         </Section>
@@ -349,4 +346,15 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved }
       </div>
     </Dialog>
   );
+}
+
+// Cadastro completo aberto de qualquer tela (ex.: "+" da conta a pagar).
+export function SupplierFormDialog({ supplierId, defaultKind, onClose, onSaved }: {
+  supplierId?: string | null; defaultKind?: Supplier['kind']; onClose: () => void; onSaved: (id: string) => void;
+}) {
+  const pur = usePurLookups();
+  if (pur.loading) return null;
+  const categories = Array.from(new Set(pur.suppliers.map((x) => x.category).filter((c): c is string => !!c))).sort();
+  const sup = supplierId ? pur.suppliers.find((x) => x.id === supplierId) ?? null : null;
+  return <SupplierForm lookups={pur} supplier={sup} categories={categories} defaultKind={defaultKind} onClose={onClose} onSaved={onSaved} />;
 }

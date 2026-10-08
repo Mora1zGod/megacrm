@@ -158,7 +158,7 @@ function ReqForm({ lookups, req, onClose, onSaved }: { lookups: PurLookups; req:
     <Dialog open onClose={onClose} widthClass="max-w-4xl" opaque title={req ? `Editar requisição ${req.number ?? ''}` : 'Nova requisição de compra'}
       description="Diga o que precisa, quanto e para quando. Quem pede não aprova: depois de enviar, outra pessoa com alçada decide.">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Empresa" htmlFor="rq-co">
+        <Field label="Empresa" required htmlFor="rq-co">
           <select id="rq-co" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inputCls}>
             {lookups.companies.filter((c) => c.is_active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -175,7 +175,7 @@ function ReqForm({ lookups, req, onClose, onSaved }: { lookups: PurLookups; req:
             {lookups.costCenters.filter((c) => c.is_active || c.id === ccId).map((c) => <option key={c.id} value={c.id}>{c.code ? `${c.code} ` : ''}{c.name}</option>)}
           </select>
         </Field>
-        <Field label="Urgência" htmlFor="rq-urg">
+        <Field label="Urgência" required htmlFor="rq-urg">
           <select id="rq-urg" value={urgency} onChange={(e) => setUrgency(e.target.value as Requisition['urgency'])} className={inputCls}>
             {Object.entries(URGENCY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
@@ -186,7 +186,7 @@ function ReqForm({ lookups, req, onClose, onSaved }: { lookups: PurLookups; req:
         <div className="flex items-end text-sm text-[var(--color-text-secondary)]">Estimado: <b className="ml-1 tabular-nums text-[var(--color-text-primary)]">{formatBRL(total)}</b></div>
       </div>
       <div className="mt-3">
-        <Field label="Justificativa" htmlFor="rq-just" hint="Para que é a compra. Obrigatória para enviar.">
+        <Field label="Justificativa" required htmlFor="rq-just" hint="Para que é a compra. Obrigatória para enviar.">
           <textarea id="rq-just" rows={2} value={just} onChange={(e) => setJust(e.target.value.slice(0, 1000))} className={`${inputCls} h-auto py-2`} placeholder="Ex.: reposição de cloro para o mês de novembro" />
         </Field>
       </div>
@@ -205,10 +205,10 @@ function ReqForm({ lookups, req, onClose, onSaved }: { lookups: PurLookups; req:
                 {activeItems.map((i) => <option key={i.id} value={i.id}>{i.code ? `${i.code} · ` : ''}{i.name}</option>)}
               </select>
             </Field>
-            <Field label={idx === 0 ? 'Descrição' : ''} htmlFor={`rq-d-${l.key}`}>
+            <Field required={idx === 0} label={idx === 0 ? 'Descrição' : ''} htmlFor={`rq-d-${l.key}`}>
               <input id={`rq-d-${l.key}`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} className={inputCls} placeholder="O que comprar" />
             </Field>
-            <Field label={idx === 0 ? 'Qtd.' : ''} htmlFor={`rq-q-${l.key}`}><QtyInput id={`rq-q-${l.key}`} value={l.qty} onChange={(n) => set(l.key, { qty: n })} /></Field>
+            <Field required={idx === 0} label={idx === 0 ? 'Qtd.' : ''} htmlFor={`rq-q-${l.key}`}><QtyInput id={`rq-q-${l.key}`} value={l.qty} onChange={(n) => set(l.key, { qty: n })} /></Field>
             <Field label={idx === 0 ? 'Unid.' : ''} htmlFor={`rq-u-${l.key}`}>
               <input id={`rq-u-${l.key}`} value={l.unit} onChange={(e) => set(l.key, { unit: e.target.value.toUpperCase().slice(0, 6) })} className={inputCls} />
             </Field>

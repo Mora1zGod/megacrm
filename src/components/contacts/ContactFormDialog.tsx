@@ -126,7 +126,7 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="contact_phone">Telefone</Label>
+            <Label htmlFor="contact_phone">Telefone <span className="text-[var(--color-error)]">*</span></Label>
             <Input
               id="contact_phone"
               value={phone}

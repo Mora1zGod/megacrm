@@ -6,9 +6,9 @@ import { Dialog } from '@/components/ui/dialog';
 import { getSupabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
-import { chartAllowed, chartTree } from '../finance/data';
 import { fmtDate, purError, qtyFmt, type InvItem, type InvLocation, type PurLookups } from './data';
 import { Badge, EmptyRow, Field, inputCls, MoneyInput, SubTabs, TableWrap, tdCls, thCls } from './ui';
+import { ChartPicker } from '../finance/ui';
 
 interface Balance { item_id: string; item_name: string; unit: string; location_id: string; location_name: string; lot: string | null; expiry: string | null; qty: number }
 
@@ -94,7 +94,6 @@ export function CatalogTab({ lookups }: { lookups: PurLookups }) {
 function ItemForm({ item, lookups, onClose }: { item: InvItem | null; lookups: PurLookups; onClose: () => void }) {
   const [f, setF] = useState({ code: item?.code ?? '', name: item?.name ?? '', unit: item?.unit ?? 'UN', requires_lot: item?.requires_lot ?? false, ncm: item?.ncm ?? '', gtin: item?.gtin ?? '', chart_account_id: item?.chart_account_id ?? '', is_active: item?.is_active ?? true, last_cost_cents: item?.last_cost_cents ?? 0 });
   const [busy, setBusy] = useState(false);
-  const tree = useMemo(() => chartTree(lookups.chart).filter((c) => chartAllowed(c, 'payable')), [lookups.chart]);
   const save = async () => {
     if (f.name.trim().length < 2) { toast.error('Informe o nome do item.'); return; }
     setBusy(true);
@@ -109,15 +108,13 @@ function ItemForm({ item, lookups, onClose }: { item: InvItem | null; lookups: P
     <Dialog open onClose={onClose} opaque title={item ? 'Editar item' : 'Novo item'}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Código interno" htmlFor="it-code"><input id="it-code" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} className={inputCls} /></Field>
-        <Field label="Unidade" htmlFor="it-unit"><input id="it-unit" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value.toUpperCase().slice(0, 6) })} className={inputCls} /></Field>
-        <div className="sm:col-span-2"><Field label="Nome" htmlFor="it-name"><input id="it-name" autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} /></Field></div>
+        <Field label="Unidade" required htmlFor="it-unit"><input id="it-unit" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value.toUpperCase().slice(0, 6) })} className={inputCls} /></Field>
+        <div className="sm:col-span-2"><Field label="Nome" required htmlFor="it-name"><input id="it-name" autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} /></Field></div>
         <Field label="Código de barras (EAN)" htmlFor="it-gtin"><input id="it-gtin" value={f.gtin} onChange={(e) => setF({ ...f, gtin: e.target.value.replace(/\D/g, '') })} className={inputCls} /></Field>
         <Field label="NCM" htmlFor="it-ncm"><input id="it-ncm" value={f.ncm} onChange={(e) => setF({ ...f, ncm: e.target.value.replace(/\D/g, '').slice(0, 8) })} className={inputCls} /></Field>
         <Field label="Último custo" htmlFor="it-cost"><MoneyInput id="it-cost" cents={f.last_cost_cents} onChange={(c) => setF({ ...f, last_cost_cents: c })} /></Field>
         <Field label="Conta do plano" htmlFor="it-chart">
-          <select id="it-chart" value={f.chart_account_id} onChange={(e) => setF({ ...f, chart_account_id: e.target.value })} className={inputCls}>
-            <option value="">—</option>{tree.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
-          </select>
+          <ChartPicker id="it-chart" chart={lookups.chart} kind="payable" value={f.chart_account_id} onChange={(v) => setF({ ...f, chart_account_id: v })} emptyLabel="—" />
         </Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.requires_lot} onChange={(e) => setF({ ...f, requires_lot: e.target.checked })} /> Exige lote e validade</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} /> Ativo</label>
@@ -135,7 +132,7 @@ function LocationForm({ loc, lookups, onClose }: { loc: InvLocation | null; look
   return (
     <Dialog open onClose={onClose} opaque title={loc ? 'Editar local' : 'Novo local de estoque'}>
       <div className="space-y-3">
-        <Field label="Nome" htmlFor="lc-name"><input id="lc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Almoxarifado" /></Field>
+        <Field label="Nome" required htmlFor="lc-name"><input id="lc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Almoxarifado" /></Field>
         <Field label="Empresa" htmlFor="lc-co">
           <select id="lc-co" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inputCls}>
             <option value="">Todas</option>{lookups.companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

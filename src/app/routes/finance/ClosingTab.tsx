@@ -75,7 +75,7 @@ function CloseDialog({ company, current, onClose, onDone }: { company: Company; 
   const [busy, setBusy] = useState(false);
   return (
     <Dialog open onClose={onClose} title={`Fechar período · ${company.name}`} description={current ? `Hoje está fechado até ${fmtDate(current)}.` : 'O período desta empresa está aberto.'}>
-      <Field label="Fechar até (inclusive)" htmlFor="cl-until" hint="Só até ontem ou antes.">
+      <Field label="Fechar até (inclusive)" required htmlFor="cl-until" hint="Só até ontem ou antes.">
         <input id="cl-until" type="date" max={yesterday} value={until} onChange={(e) => setUntil(e.target.value)} className={inputCls} />
       </Field>
       <div className="flex justify-end gap-2 pt-4">

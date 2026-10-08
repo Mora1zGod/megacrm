@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { SearchSelect, type SearchOption } from '@/components/ui/SearchSelect';
 import { Loader2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatBRL, maskMoneyInput } from '@/lib/money';
 import { Field, inputCls } from '@/app/routes/settings/sections/access/ui';
-import { STATUS_LABEL, type Company, type InstStatus } from './data';
+import { chartAllowed, chartTree, STATUS_LABEL, type ChartAccount, type Company, type EntryKind, type InstStatus } from './data';
 
 export { Field, inputCls };
 
@@ -93,7 +94,7 @@ export function ReasonDialog({ title, description, confirmLabel, danger, onClose
   return (
     <Dialog open onClose={onClose} title={title} description={description}>
       {extra}
-      <Field label="Motivo (obrigatório)" htmlFor="rs-reason" hint="Fica registrado na auditoria. Mínimo de 5 letras.">
+      <Field label="Motivo" required htmlFor="rs-reason" hint="Fica registrado na auditoria. Mínimo de 5 letras.">
         <textarea id="rs-reason" autoFocus value={reason} onChange={(e) => setReason(e.target.value.slice(0, 300))} rows={3}
           className={cn(inputCls, 'h-auto py-2')} placeholder="Ex.: lançado em duplicidade" />
       </Field>
@@ -119,4 +120,19 @@ export function SubTabs<T extends string>({ tabs, value, onChange }: { tabs: [T,
       ))}
     </div>
   );
+}
+
+// Plano de contas com pesquisa (por código ou nome). Agrupadoras viram títulos.
+export function ChartPicker({ id, chart, kind, value, onChange, emptyLabel, placeholder = 'Escolha a conta…' }: {
+  id?: string; chart: ChartAccount[]; kind: EntryKind; value: string; onChange: (v: string) => void; emptyLabel?: string; placeholder?: string;
+}) {
+  const options = useMemo<SearchOption[]>(() => {
+    const out: SearchOption[] = [];
+    for (const c of chartTree(chart)) {
+      if (c.is_synthetic) out.push({ value: c.id, label: `${c.code} ${c.name}`, header: true, depth: c.depth });
+      else if (chartAllowed(c, kind) || c.id === value) out.push({ value: c.id, label: `${c.code} ${c.name}`, depth: c.depth });
+    }
+    return out;
+  }, [chart, kind, value]);
+  return <SearchSelect id={id} value={value} onChange={onChange} options={options} placeholder={placeholder} emptyLabel={emptyLabel} searchPlaceholder="Pesquisar código ou nome da conta…" />;
 }

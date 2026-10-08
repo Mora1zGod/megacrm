@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Ban, CloudDownload, Download, Eye, FilePlus2, FileUp, Link2, Loader2, PackagePlus, RotateCcw, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Ban, CloudDownload, KeyRound, Download, Eye, FilePlus2, FileUp, Link2, Loader2, PackagePlus, RotateCcw, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -9,13 +10,14 @@ import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { AuditList } from '../finance/AuditList';
 import { formatDoc } from '../finance/SetupTab';
-import { chartAllowed, chartTree, STATUS_LABEL, type InstallmentRow } from '../finance/data';
+import { STATUS_LABEL, type InstallmentRow } from '../finance/data';
 import { StatusBadge } from '../finance/ui';
 import {
   addDays, DOC_TYPE, fmtDate, fmtDateTime, INVOICE_STATUS, monthStart, purError, qtyFmt, rpc, sefazApi, SOURCE, todaySP,
   type Invoice, type InvoiceItem, type InvoiceStatus, type PurLookups, type TabProps,
 } from './data';
 import { Badge, Card, EmptyRow, Field, inputCls, KV, Metric, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useDebounced, useOpenDoc } from './ui';
+import { ChartPicker } from '../finance/ui';
 
 interface Summary { count: number; total_cents: number; prev_total_cents: number; fin_pending_count: number; fin_pending_cents: number; stock_pending_count: number; stock_pending_cents: number; summary_count: number }
 type Quick = '' | 'fin' | 'stock' | 'summary';
@@ -37,6 +39,15 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const [syncing, setSyncing] = useState(false);
   const [syncCompany, setSyncCompany] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [, setParams] = useSearchParams();
+  const [certInfo, setCertInfo] = useState<{ any: boolean; loaded: boolean }>({ any: true, loaded: false });
+  useEffect(() => {
+    if (!perms.can('purchases.invoice')) return;
+    sefazApi<{ companies: Array<{ has_cert: boolean }> }>('cert_status')
+      .then((r) => setCertInfo({ any: r.companies.some((c) => c.has_cert), loaded: true }))
+      .catch(() => setCertInfo({ any: true, loaded: true }));
+  }, [perms]);
+  const goCert = () => setParams((p) => { p.set('tab', 'config'); p.delete('doc'); return p; });
 
   const load = useCallback(async () => {
     const col = by === 'issue' ? 'issue_date' : by === 'created' ? 'created_at' : 'effective_date';
@@ -127,6 +138,14 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         <Field label="Buscar" htmlFor="nf-q"><input id="nf-q" value={text} onChange={(e) => setText(e.target.value)} placeholder="Número, fornecedor, CNPJ, chave" className={`${inputCls} min-w-[220px]`} /></Field>
       </div>
 
+      {certInfo.loaded && !certInfo.any && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[rgba(245,158,11,0.4)] bg-[rgba(245,158,11,0.06)] p-3 text-sm">
+          <span className="flex items-center gap-2"><KeyRound className="h-4 w-4 shrink-0" /> Para puxar as notas da SEFAZ automaticamente, envie o <b>certificado digital A1</b> (.pfx) da empresa.</span>
+          {perms.can('purchases.setup') ? <Button size="sm" onClick={goCert}><KeyRound className="h-4 w-4" /> Enviar certificado</Button>
+            : <span className="text-xs text-[var(--color-text-muted)]">Peça a quem configura Compras.</span>}
+        </div>
+      )}
+
       {perms.can('purchases.invoice') && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="w-56"><select value={syncCompany} onChange={(e) => setSyncCompany(e.target.value)} className={inputCls} aria-label="Empresa para buscar na SEFAZ">
@@ -136,6 +155,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
           <input ref={fileRef} type="file" accept=".xml,text/xml,application/xml" multiple hidden onChange={(e) => importFiles(e.target.files)} />
           <Button variant="outline" onClick={() => fileRef.current?.click()}><FileUp className="h-4 w-4" /> Importar XML</Button>
           <Button variant="outline" onClick={() => setManual(true)}><FilePlus2 className="h-4 w-4" /> Lançamento manual</Button>
+          {perms.can('purchases.setup') && <Button variant="ghost" onClick={goCert}><KeyRound className="h-4 w-4" /> Certificado digital</Button>}
         </div>
       )}
 
@@ -185,23 +205,23 @@ function ManualDialog({ lookups, onClose, onSaved }: { lookups: PurLookups; onCl
   return (
     <Dialog open onClose={onClose} widthClass="max-w-2xl" opaque title="Lançamento manual" description="Para recibo, boleto, contrato ou nota que não veio por XML. O motivo é obrigatório e fica registrado.">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Tipo de documento" htmlFor="mn-t">
+        <Field label="Tipo de documento" required htmlFor="mn-t">
           <select id="mn-t" value={docType} onChange={(e) => setDocType(e.target.value)} className={inputCls}>{Object.entries(DOC_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         </Field>
-        <Field label="Número" htmlFor="mn-n"><input id="mn-n" value={number} onChange={(e) => setNumber(e.target.value.slice(0, 40))} className={inputCls} /></Field>
-        <Field label="Fornecedor" htmlFor="mn-p">
+        <Field label="Número" required htmlFor="mn-n"><input id="mn-n" value={number} onChange={(e) => setNumber(e.target.value.slice(0, 40))} className={inputCls} /></Field>
+        <Field label="Fornecedor" required htmlFor="mn-p">
           <select id="mn-p" value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputCls}>
             <option value="">Escolha…</option>{lookups.suppliers.filter((p) => p.is_active && p.kind !== 'customer').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        <Field label="Empresa" htmlFor="mn-c">
+        <Field label="Empresa" required htmlFor="mn-c">
           <select id="mn-c" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inputCls}>{lookups.companies.filter((c) => c.is_active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         </Field>
-        <Field label="Emissão" htmlFor="mn-i"><input id="mn-i" type="date" value={issue} onChange={(e) => setIssue(e.target.value)} className={inputCls} /></Field>
+        <Field label="Emissão" required htmlFor="mn-i"><input id="mn-i" type="date" value={issue} onChange={(e) => setIssue(e.target.value)} className={inputCls} /></Field>
         <Field label="Vencimento" htmlFor="mn-d"><input id="mn-d" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={inputCls} /></Field>
-        <Field label="Valor" htmlFor="mn-v"><MoneyInput id="mn-v" cents={total} onChange={setTotal} /></Field>
+        <Field label="Valor" required htmlFor="mn-v"><MoneyInput id="mn-v" cents={total} onChange={setTotal} /></Field>
       </div>
-      <div className="mt-3"><Field label="Motivo da entrada manual" htmlFor="mn-r"><textarea id="mn-r" rows={2} value={reason} onChange={(e) => setReason(e.target.value.slice(0, 500))} className={`${inputCls} h-auto py-2`} placeholder="Ex.: prestador sem nota fiscal" /></Field></div>
+      <div className="mt-3"><Field label="Motivo da entrada manual" required htmlFor="mn-r"><textarea id="mn-r" rows={2} value={reason} onChange={(e) => setReason(e.target.value.slice(0, 500))} className={`${inputCls} h-auto py-2`} placeholder="Ex.: prestador sem nota fiscal" /></Field></div>
       <div className="flex justify-end gap-2 pt-5">
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
         <Button disabled={busy} onClick={async () => {
@@ -493,7 +513,6 @@ function PaymentsTab({ inv, dues, lookups, canEdit, onDone }: { inv: Invoice; du
     if (!inv.fin_entry_id && canEdit && inv.status !== 'summary') rpc<Candidate[]>('pur_invoice_fin_candidates', { p_id: inv.id }).then(setCands).catch(() => setCands([]));
   }, [inv.id, inv.fin_entry_id, inv.status, canEdit, canSeeFin]);
 
-  const tree = useMemo(() => chartTree(lookups.chart).filter((c) => chartAllowed(c, 'payable')), [lookups.chart]);
   const dueTotal = dues.reduce((s, d) => s + d.amount_cents, 0);
   const run = async (fn: string, args: Record<string, unknown>, ok: string) => {
     setBusy(true);
@@ -536,11 +555,8 @@ function PaymentsTab({ inv, dues, lookups, canEdit, onDone }: { inv: Invoice; du
         <>
           <Card title="Criar conta a pagar a partir da nota">
             <div className="grid items-end gap-2 sm:grid-cols-[2fr_1fr_auto]">
-              <Field label="Plano de contas" htmlFor="pf-ch">
-                <select id="pf-ch" value={chart} onChange={(e) => setChart(e.target.value)} className={inputCls}>
-                  <option value="">Escolha…</option>
-                  {tree.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
-                </select>
+              <Field label="Plano de contas" required htmlFor="pf-ch">
+                <ChartPicker id="pf-ch" chart={lookups.chart} kind="payable" value={chart} onChange={setChart} />
               </Field>
               <Field label="Centro de custo" htmlFor="pf-cc">
                 <select id="pf-cc" value={cc} onChange={(e) => setCc(e.target.value)} className={inputCls}>

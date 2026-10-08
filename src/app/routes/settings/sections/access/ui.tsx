@@ -6,10 +6,10 @@ import type { Member } from './useAccessData';
 export const inputCls =
   'h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--accent-primary)] disabled:opacity-60';
 
-export function Field({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: ReactNode }) {
+export function Field({ label, htmlFor, hint, required, children }: { label: string; htmlFor?: string; hint?: string; required?: boolean; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold text-[var(--color-text-secondary)]">{label}</label>
+      <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold text-[var(--color-text-secondary)]">{label}{required && <span className="text-[var(--color-error)]" aria-label="obrigatório"> *</span>}</label>
       {children}
       {hint && <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{hint}</p>}
     </div>

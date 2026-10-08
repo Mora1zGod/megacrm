@@ -89,10 +89,10 @@ function ItemsEditor({ lines, setLines, lookups }: { lines: Line[]; setLines: (f
               {items.map((i) => <option key={i.id} value={i.id}>{i.code ? `${i.code} · ` : ''}{i.name}</option>)}
             </select>
           </Field>
-          <Field label={idx === 0 ? 'Descrição' : ''} htmlFor={`od-${l.key}`}><input id={`od-${l.key}`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} className={inputCls} /></Field>
-          <Field label={idx === 0 ? 'Qtd.' : ''} htmlFor={`oq-${l.key}`}><QtyInput id={`oq-${l.key}`} value={l.qty} onChange={(n) => set(l.key, { qty: n })} /></Field>
+          <Field required={idx === 0} label={idx === 0 ? 'Descrição' : ''} htmlFor={`od-${l.key}`}><input id={`od-${l.key}`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} className={inputCls} /></Field>
+          <Field required={idx === 0} label={idx === 0 ? 'Qtd.' : ''} htmlFor={`oq-${l.key}`}><QtyInput id={`oq-${l.key}`} value={l.qty} onChange={(n) => set(l.key, { qty: n })} /></Field>
           <Field label={idx === 0 ? 'Unid.' : ''} htmlFor={`ou-${l.key}`}><input id={`ou-${l.key}`} value={l.unit} onChange={(e) => set(l.key, { unit: e.target.value.toUpperCase().slice(0, 6) })} className={inputCls} /></Field>
-          <Field label={idx === 0 ? 'Preço (un.)' : ''} htmlFor={`op-${l.key}`}><MoneyInput id={`op-${l.key}`} cents={l.unit_cents} onChange={(c) => set(l.key, { unit_cents: c })} /></Field>
+          <Field required={idx === 0} label={idx === 0 ? 'Preço (un.)' : ''} htmlFor={`op-${l.key}`}><MoneyInput id={`op-${l.key}`} cents={l.unit_cents} onChange={(c) => set(l.key, { unit_cents: c })} /></Field>
           <Button variant="ghost" size="icon" aria-label="Remover" disabled={l.received_qty > 0}
             onClick={() => setLines((ls) => (l.id ? ls.map((x) => (x.key === l.key ? { ...x, remove: true } : x)) : ls.filter((x) => x.key !== l.key)))}><Trash2 className="h-4 w-4" /></Button>
           {l.received_qty > 0 && <p className="text-[11px] text-[var(--color-text-muted)] sm:col-span-6">Já recebido: {qtyFmt(l.received_qty)} — a quantidade não pode ficar abaixo disso.</p>}
@@ -135,12 +135,12 @@ function OrderForm({ lookups, order, onClose, onSaved }: { lookups: PurLookups; 
   return (
     <Dialog open onClose={onClose} widthClass="max-w-4xl" opaque title="Pedido avulso" description="Pedido sem cotação (compra direta). Fica como rascunho até você emitir.">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Empresa" htmlFor="po-co">
+        <Field label="Empresa" required htmlFor="po-co">
           <select id="po-co" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={inputCls}>
             {lookups.companies.filter((c) => c.is_active).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
-        <Field label="Fornecedor" htmlFor="po-p">
+        <Field label="Fornecedor" required htmlFor="po-p">
           <select id="po-p" value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputCls}>
             <option value="">Escolha…</option>
             {lookups.suppliers.filter((p) => p.is_active && p.kind !== 'customer').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -176,7 +176,7 @@ function ReviseDialog({ order, items, lookups, onClose, onDone }: { order: Order
         <Field label="Condição de pagamento" htmlFor="rv-t"><input id="rv-t" value={terms} onChange={(e) => setTerms(e.target.value)} className={inputCls} /></Field>
       </div>
       <div className="mt-4"><ItemsEditor lines={lines} setLines={setLines} lookups={lookups} /></div>
-      <div className="mt-4"><Field label="Motivo da revisão (obrigatório)" htmlFor="rv-r"><textarea id="rv-r" rows={2} value={reason} onChange={(e) => setReason(e.target.value.slice(0, 300))} className={`${inputCls} h-auto py-2`} placeholder="Ex.: fornecedor reajustou o preço" /></Field></div>
+      <div className="mt-4"><Field label="Motivo da revisão" required htmlFor="rv-r"><textarea id="rv-r" rows={2} value={reason} onChange={(e) => setReason(e.target.value.slice(0, 300))} className={`${inputCls} h-auto py-2`} placeholder="Ex.: fornecedor reajustou o preço" /></Field></div>
       <div className="flex justify-end gap-2 pt-5">
         <Button variant="outline" onClick={onClose}>Voltar</Button>
         <Button disabled={busy || reason.trim().length < 5} onClick={async () => {

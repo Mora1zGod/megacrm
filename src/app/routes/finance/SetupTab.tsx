@@ -9,8 +9,8 @@ import { usePermission } from '@/app/providers/PermissionsProvider';
 import { formatBRL } from '@/lib/money';
 import { chartTree, friendlyError, NATURE_LABEL, type Account, type ChartAccount, type Company, type CostCenter, type Lookups, type Nature, type Party } from './data';
 import { EmptyRow, Field, inputCls, MoneyInput, SubTabs, TableWrap, tdCls, thCls } from './ui';
-import { formatDoc, formatPhone, maskCNPJ, maskDoc, onlyDigits } from '@/lib/format';
-import { maskPhoneBR } from '@/lib/phone';
+import { formatDoc, formatPhone, maskCNPJ, onlyDigits } from '@/lib/format';
+import { SupplierFormDialog } from '../purchases/SupplierForm';
 
 type Sec = 'empresas' | 'bancos' | 'plano' | 'centros' | 'pessoas';
 
@@ -102,7 +102,7 @@ function CompanyForm({ company, onClose, onSaved }: { company: Company | null; o
         if (ok) onSaved();
         return ok;
       }}>
-      <Field label="Nome" htmlFor="co-name"><input id="co-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></Field>
+      <Field label="Nome" required htmlFor="co-name"><input id="co-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></Field>
       <Field label="CNPJ" htmlFor="co-cnpj"><input id="co-cnpj" value={cnpj} inputMode="numeric" onChange={(e) => setCnpj(maskCNPJ(e.target.value))} className={inputCls} placeholder="00.000.000/0000-00" /></Field>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Ativa</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} disabled={company?.is_default} onChange={(e) => setIsDefault(e.target.checked)} /> Empresa padrão</label>
@@ -163,12 +163,12 @@ function AccountForm({ account, lookups, onClose }: { account: Account | null; l
         return ok;
       }}>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Nome" htmlFor="ac-name"><input id="ac-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Sicredi AMAI" /></Field>
-        <Field label="Tipo" htmlFor="ac-kind">
+        <Field label="Nome" required htmlFor="ac-name"><input id="ac-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Sicredi AMAI" /></Field>
+        <Field label="Tipo" required htmlFor="ac-kind">
           <select id="ac-kind" value={kind} onChange={(e) => setKind(e.target.value as 'bank' | 'cash')} className={inputCls}><option value="bank">Banco</option><option value="cash">Caixa</option></select>
         </Field>
       </div>
-      <Field label="Empresa dona" htmlFor="ac-company" hint={locked ? 'Já tem movimento: a empresa não muda.' : undefined}>
+      <Field label="Empresa dona" required htmlFor="ac-company" hint={locked ? 'Já tem movimento: a empresa não muda.' : undefined}>
         <select id="ac-company" disabled={locked} value={company} onChange={(e) => setCompany(e.target.value)} className={inputCls}>
           {lookups.companies.filter((c) => c.is_active || c.id === company).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -194,10 +194,24 @@ const NATURES = Object.keys(NATURE_LABEL) as Nature[];
 function Chart({ lookups }: { lookups: Lookups }) {
   const can = usePermission().can('financial.setup');
   const [edit, setEdit] = useState<ChartAccount | 'new' | null>(null);
-  const tree = chartTree(lookups.chart);
+  const [q, setQ] = useState('');
+  const all = chartTree(lookups.chart);
+  // Busca: mostra as contas que batem e as agrupadoras acima delas.
+  const tree = (() => {
+    const t = q.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (!t) return all;
+    const hit = new Set(all.filter((c) => `${c.code} ${c.name}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(t)).map((c) => c.id));
+    const byId = new Map(all.map((c) => [c.id, c]));
+    for (const id of Array.from(hit)) { let p = byId.get(id)?.parent_id; while (p) { hit.add(p); p = byId.get(p)?.parent_id ?? null; } }
+    return all.filter((c) => hit.has(c.id));
+  })();
   return (
     <>
       <Header text="Sintética agrupa; só analítica recebe lançamento. Conta a pagar usa despesas e deduções; a receber, só receitas." onNew={can ? () => setEdit('new') : undefined} />
+      <div className="relative max-w-sm">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar conta por código ou nome…" aria-label="Pesquisar no plano de contas" className={cn(inputCls, 'pl-9')} />
+      </div>
       <TableWrap minWidth={760}>
         <thead><tr className="border-b border-[var(--color-border-card)]">
           <th className={thCls}>Código / Nome</th><th className={thCls}>Tipo</th><th className={thCls}>Natureza</th><th className={thCls}>Nível</th><th className={thCls}>Situação</th><th className={thCls} />
@@ -257,16 +271,16 @@ function ChartForm({ item, lookups, onClose }: { item: ChartAccount | null; look
         </select>
       </Field>
       <div className="grid grid-cols-[140px_1fr] gap-3">
-        <Field label="Código" htmlFor="ch-code"><input id="ch-code" value={code} onChange={(e) => setCode(e.target.value)} className={inputCls} placeholder="4.07" /></Field>
-        <Field label="Nome" htmlFor="ch-name"><input id="ch-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></Field>
+        <Field label="Código" required htmlFor="ch-code"><input id="ch-code" value={code} onChange={(e) => setCode(e.target.value)} className={inputCls} placeholder="4.07" /></Field>
+        <Field label="Nome" required htmlFor="ch-name"><input id="ch-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Tipo" htmlFor="ch-type">
+        <Field label="Tipo" required htmlFor="ch-type">
           <select id="ch-type" disabled={Boolean(parentRow)} value={type} onChange={(e) => setType(e.target.value as 'revenue' | 'expense')} className={inputCls}>
             <option value="revenue">RECEITA</option><option value="expense">DESPESA</option>
           </select>
         </Field>
-        <Field label="Natureza" htmlFor="ch-nat">
+        <Field label="Natureza" required htmlFor="ch-nat">
           <select id="ch-nat" value={nature} onChange={(e) => setNature(e.target.value as Nature)} className={inputCls}>
             {NATURES.map((n) => <option key={n} value={n}>{NATURE_LABEL[n]}</option>)}
           </select>
@@ -327,7 +341,7 @@ function CostCenterForm({ item, lookups, onClose }: { item: CostCenter | null; l
       </Field>
       <div className="grid grid-cols-[120px_1fr] gap-3">
         <Field label="Código" htmlFor="cc-code"><input id="cc-code" value={code} onChange={(e) => setCode(e.target.value)} className={inputCls} /></Field>
-        <Field label="Nome" htmlFor="cc-name"><input id="cc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Parque aquático" /></Field>
+        <Field label="Nome" required htmlFor="cc-name"><input id="cc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Parque aquático" /></Field>
       </div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Ativo</label>
     </FormDialog>
@@ -370,44 +384,11 @@ function Parties({ lookups }: { lookups: Lookups }) {
           ))}
         </tbody>
       </TableWrap>
-      {edit && <PartyForm item={edit === 'new' ? null : edit} lookups={lookups} onClose={() => setEdit(null)} />}
+      {edit && <SupplierFormDialog supplierId={edit === 'new' ? null : edit.id} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void lookups.reload(); }} />}
     </>
   );
 }
 
 export { formatDoc };
 
-function PartyForm({ item, lookups, onClose }: { item: Party | null; lookups: Lookups; onClose: () => void }) {
-  const [name, setName] = useState(item?.name ?? '');
-  const [kind, setKind] = useState<Party['kind']>(item?.kind ?? 'supplier');
-  const [doc, setDoc] = useState(maskDoc(item?.doc));
-  const [email, setEmail] = useState(item?.email ?? '');
-  const [phone, setPhone] = useState(maskPhoneBR(item?.phone));
-  const [active, setActive] = useState(item?.is_active ?? true);
-  return (
-    <FormDialog title={item ? 'Editar pessoa' : 'Novo fornecedor/cliente'} onClose={onClose}
-      onSave={async () => {
-        const d = doc.replace(/\D/g, '');
-        if (d && d.length !== 11 && d.length !== 14) { toast.error('CPF deve ter 11 números e CNPJ 14.'); return false; }
-        const ok = await save('fin_parties', item?.id ?? null, { name: name.trim(), kind, doc: d || null, email: email.trim() || null, phone: onlyDigits(phone) || null, is_active: active });
-        if (ok) void lookups.reload();
-        return ok;
-      }}>
-      <Field label="Nome / razão social" htmlFor="pt-name"><input id="pt-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Tipo" htmlFor="pt-kind">
-          <select id="pt-kind" value={kind} onChange={(e) => setKind(e.target.value as Party['kind'])} className={inputCls}>
-            <option value="supplier">Fornecedor</option><option value="customer">Cliente</option><option value="both">Fornecedor e cliente</option>
-          </select>
-        </Field>
-        <Field label="CPF/CNPJ" htmlFor="pt-doc"><input id="pt-doc" inputMode="numeric" value={doc} onChange={(e) => setDoc(maskDoc(e.target.value))} className={inputCls} placeholder="000.000.000-00 ou 00.000.000/0000-00" /></Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="E-mail" htmlFor="pt-email"><input id="pt-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} /></Field>
-        <Field label="Telefone" htmlFor="pt-phone"><input id="pt-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(maskPhoneBR(e.target.value))} className={inputCls} placeholder="(68) 99999-9999" /></Field>
-      </div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Ativo</label>
-    </FormDialog>
-  );
-}
 

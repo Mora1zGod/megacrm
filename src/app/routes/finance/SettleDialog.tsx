@@ -60,7 +60,7 @@ export function SettleDialog({ row, lookups, onClose, onDone }: {
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Data" htmlFor="st-date">
+            <Field label="Data" required htmlFor="st-date">
               <input id="st-date" type="date" max={todaySP()} value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
             </Field>
             <Field label={`Banco/caixa (${row.company_name})`} htmlFor="st-acc">
@@ -69,7 +69,7 @@ export function SettleDialog({ row, lookups, onClose, onDone }: {
               </select>
             </Field>
           </div>
-          <Field label="Valor da parcela a baixar" htmlFor="st-amount" hint="Menor que o saldo = baixa parcial; o resto continua em aberto.">
+          <Field label="Valor da parcela a baixar" required htmlFor="st-amount" hint="Menor que o saldo = baixa parcial; o resto continua em aberto.">
             <MoneyInput id="st-amount" cents={amount} onChange={setAmount} autoFocus />
           </Field>
           <div className="grid grid-cols-3 gap-3">

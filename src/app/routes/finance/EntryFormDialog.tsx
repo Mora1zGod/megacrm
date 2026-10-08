@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Paperclip, Plus, Sparkles } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
@@ -7,9 +7,11 @@ import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { formatBRL, splitInstallments } from '@/lib/money';
-import { addMonths, chartAllowed, chartTree, fmtDate, friendlyError, rpc, todaySP, type Entry, type EntryKind, type Lookups } from './data';
-import { CompanySelect, Field, inputCls, MoneyInput } from './ui';
-import { formatDoc, maskDoc } from '@/lib/format';
+import { addMonths, chartAllowed, fmtDate, friendlyError, rpc, todaySP, type Entry, type EntryKind, type Lookups } from './data';
+import { ChartPicker, CompanySelect, Field, inputCls, MoneyInput } from './ui';
+import { formatDoc } from '@/lib/format';
+import { SearchSelect } from '@/components/ui/SearchSelect';
+import { SupplierFormDialog } from '../purchases/SupplierForm';
 
 const SUGGESTIONS: Record<EntryKind, Array<{ label: string; description: string; code: string }>> = {
   payable: [
@@ -54,25 +56,9 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
   const [notes, setNotes] = useState(entry?.notes ?? '');
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
-  const [newParty, setNewParty] = useState<{ name: string; doc: string } | null>(null);
+  const [newParty, setNewParty] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const tree = useMemo(() => chartTree(lookups.chart), [lookups.chart]);
-  // Agrupado igual à árvore: cada sintética vira um <optgroup> com as analíticas permitidas abaixo dela.
-  const groups = useMemo(() => {
-    const out: Array<{ label: string; items: typeof tree }> = [];
-    let current: { label: string; items: typeof tree } | null = null;
-    for (const c of tree) {
-      if (c.is_synthetic) {
-        current = { label: `${'  '.repeat(c.depth)}${c.code} ${c.name}`, items: [] };
-        out.push(current);
-      } else if (chartAllowed(c, kind) || c.id === chartId) {
-        if (!current) { current = { label: 'Outras', items: [] }; out.push(current); }
-        current.items.push(c);
-      }
-    }
-    return out.filter((g) => g.items.length > 0);
-  }, [tree, kind, chartId]);
 
   const parties = lookups.parties.filter((p) => p.is_active && (p.kind === 'both' || p.kind === (kind === 'payable' ? 'supplier' : 'customer') || p.id === partyId));
   const preview = splitInstallments(total, installments);
@@ -84,18 +70,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
     else toast.info('Descrição preenchida. Escolha a conta do plano — a conta sugerida não existe no seu plano.');
   };
 
-  const createParty = async () => {
-    if (!newParty || newParty.name.trim().length < 2) { toast.error('Informe o nome.'); return; }
-    const doc = newParty.doc.replace(/\D/g, '');
-    if (doc && doc.length !== 11 && doc.length !== 14) { toast.error('CPF deve ter 11 números e CNPJ 14.'); return; }
-    const { data, error } = await getSupabase().from('fin_parties')
-      .insert({ name: newParty.name.trim(), doc: doc || null, kind: kind === 'payable' ? 'supplier' : 'customer' })
-      .select('id').single();
-    if (error) { toast.error('Não foi possível cadastrar', { description: friendlyError(error) }); return; }
-    await lookups.reload();
-    setPartyId((data as { id: string }).id);
-    setNewParty(null);
-  };
+
 
   const uploadFiles = async (entryId: string) => {
     if (!files.length || !orgId) return;
@@ -164,46 +139,29 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
         )}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="Empresa" htmlFor="ef-company" hint={editing && hasSettlement ? 'Já houve baixa: a empresa não muda.' : undefined}>
+          <Field label="Empresa" required htmlFor="ef-company" hint={editing && hasSettlement ? 'Já houve baixa: a empresa não muda.' : undefined}>
             <CompanySelect id="ef-company" companies={lookups.companies} value={companyId} onChange={setCompanyId} allLabel={null} onlyActive={!editing} />
           </Field>
           <Field label={kind === 'payable' ? 'Fornecedor' : 'Cliente'} htmlFor="ef-party">
-            {newParty ? (
-              <div className="flex gap-1.5">
-                <input autoFocus value={newParty.name} onChange={(e) => setNewParty({ ...newParty, name: e.target.value })} placeholder="Nome" className={inputCls} />
-                <input value={newParty.doc} inputMode="numeric" onChange={(e) => setNewParty({ ...newParty, doc: maskDoc(e.target.value) })} placeholder="CPF/CNPJ" className={cn(inputCls, 'w-40')} />
-                <Button size="sm" onClick={() => void createParty()} className="h-10">Salvar</Button>
-                <Button size="sm" variant="outline" onClick={() => setNewParty(null)} className="h-10">×</Button>
-              </div>
-            ) : (
-              <div className="flex gap-1.5">
-                <select id="ef-party" value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputCls}>
-                  <option value="">— sem {kind === 'payable' ? 'fornecedor' : 'cliente'} —</option>
-                  {parties.map((p) => <option key={p.id} value={p.id}>{p.name}{p.doc ? ` · ${formatDoc(p.doc)}` : ''}</option>)}
-                </select>
-                <Button type="button" size="sm" variant="outline" className="h-10" onClick={() => setNewParty({ name: '', doc: '' })} title="Cadastrar novo">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-1.5">
+              <SearchSelect id="ef-party" value={partyId} onChange={setPartyId} emptyLabel={`— sem ${kind === 'payable' ? 'fornecedor' : 'cliente'} —`}
+                searchPlaceholder="Pesquisar nome ou CNPJ/CPF…" className="min-w-0 flex-1"
+                options={parties.map((p) => ({ value: p.id, label: p.name, hint: p.doc ? `${formatDoc(p.doc)} ${p.doc}` : undefined }))} />
+              <Button type="button" size="sm" variant="outline" className="h-10" onClick={() => setNewParty(true)} title={`Cadastrar ${kind === 'payable' ? 'fornecedor' : 'cliente'}`}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </Field>
         </div>
 
-        <Field label="Descrição" htmlFor="ef-desc">
+        <Field label="Descrição" required htmlFor="ef-desc">
           <input id="ef-desc" value={description} onChange={(e) => setDescription(e.target.value.slice(0, 200))} className={inputCls}
             placeholder={kind === 'payable' ? 'Ex.: Conta de energia de outubro' : 'Ex.: Evento de aniversário — família Souza'} />
         </Field>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="Plano de contas" htmlFor="ef-chart" hint={kind === 'payable' ? 'Só despesas e deduções.' : 'Só receitas.'}>
-            <select id="ef-chart" value={chartId} onChange={(e) => setChartId(e.target.value)} className={inputCls}>
-              <option value="">Escolha a conta…</option>
-              {groups.map((g) => (
-                <optgroup key={g.label} label={g.label}>
-                  {g.items.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
-                </optgroup>
-              ))}
-            </select>
+          <Field label="Plano de contas" required htmlFor="ef-chart" hint={kind === 'payable' ? 'Só despesas e deduções.' : 'Só receitas.'}>
+            <ChartPicker id="ef-chart" chart={lookups.chart} kind={kind} value={chartId} onChange={setChartId} />
           </Field>
           <Field label="Centro de custo (opcional)" htmlFor="ef-cc">
             <select id="ef-cc" value={ccId} onChange={(e) => setCcId(e.target.value)} className={inputCls}>
@@ -214,7 +172,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Field label="Valor total" htmlFor="ef-total">
+          <Field label="Valor total" required htmlFor="ef-total">
             <MoneyInput id="ef-total" cents={total} onChange={setTotal} disabled={editing} />
           </Field>
           <Field label="Emissão" htmlFor="ef-issue">
@@ -224,7 +182,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
             <input id="ef-comp" type="date" value={competence} onChange={(e) => setCompetence(e.target.value)} className={inputCls} />
           </Field>
           {!editing && (
-            <Field label="1º vencimento" htmlFor="ef-due">
+            <Field label="1º vencimento" required htmlFor="ef-due">
               <input id="ef-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={inputCls} />
             </Field>
           )}
@@ -272,6 +230,8 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
         <Button onClick={() => void save()} disabled={saving}>{saving && <Loader2 className="h-4 w-4 animate-spin" />} {editing ? 'Salvar alterações' : 'Lançar'}</Button>
       </div>
+      {newParty && <SupplierFormDialog defaultKind={kind === 'payable' ? 'supplier' : 'customer'} onClose={() => setNewParty(false)}
+        onSaved={async (id) => { setNewParty(false); await lookups.reload(); setPartyId(id); }} />}
     </Dialog>
   );
 }
