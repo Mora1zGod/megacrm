@@ -8,6 +8,7 @@ import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { fmtDate, purError, qtyFmt, type InvItem, type InvLocation, type PurLookups } from './data';
 import { Badge, EmptyRow, Field, inputCls, MoneyInput, SubTabs, TableWrap, tdCls, thCls } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 import { ChartPicker } from '../finance/ui';
 
 interface Balance { item_id: string; item_name: string; unit: string; location_id: string; location_name: string; lot: string | null; expiry: string | null; qty: number }
@@ -30,6 +31,14 @@ export function CatalogTab({ lookups }: { lookups: PurLookups }) {
     return lookups.items.filter((i) => !t || [i.name, i.code, i.gtin].some((x) => x?.toLowerCase().includes(t)));
   }, [lookups.items, q]);
 
+  const grid = useGrid('megacrm_grid_inv_items', [
+    { id: 'code', label: 'Código', width: 100, sortValue: (i: InvItem) => i.code ?? '', render: (i: InvItem) => i.code ?? '—' },
+    { id: 'name', label: 'Item', width: 300, minWidth: 140, sortValue: (i: InvItem) => i.name, render: (i: InvItem) => <span className="block truncate">{i.name}{!i.is_active && <span className="ml-1"><Badge tone="muted">inativo</Badge></span>}</span> },
+    { id: 'unit', label: 'Unid.', width: 70, sortValue: (i: InvItem) => i.unit, render: (i: InvItem) => i.unit },
+    { id: 'ean', label: 'EAN / NCM', width: 180, sortValue: (i: InvItem) => i.gtin ?? i.ncm ?? '', exportValue: (i: InvItem) => [i.gtin, i.ncm].filter(Boolean).join(' · '), render: (i: InvItem) => <span className="text-xs">{[i.gtin, i.ncm].filter(Boolean).join(' · ') || '—'}</span> },
+    { id: 'cost', label: 'Último custo', width: 120, align: 'right' as const, sortValue: (i: InvItem) => i.last_cost_cents ?? -1, render: (i: InvItem) => <span className="tabular-nums">{i.last_cost_cents !== null ? formatBRL(i.last_cost_cents) : '—'}</span> },
+    { id: 'lot', label: 'Lote', width: 100, sortValue: (i: InvItem) => (i.requires_lot ? 1 : 0), exportValue: (i: InvItem) => (i.requires_lot ? 'exige lote' : ''), render: (i: InvItem) => (i.requires_lot ? <Badge tone="warn">exige lote</Badge> : '—') },
+  ], items ?? []);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -40,21 +49,7 @@ export function CatalogTab({ lookups }: { lookups: PurLookups }) {
         {can && sec === 'locais' && <Button onClick={() => setEditLoc('new')}><Plus className="h-4 w-4" /> Novo local</Button>}
       </div>
       {sec === 'itens' && (
-        <TableWrap minWidth={800}>
-          <thead><tr className="border-b border-[var(--color-border-card)]"><th className={thCls}>Código</th><th className={thCls}>Item</th><th className={thCls}>Unid.</th><th className={thCls}>EAN / NCM</th><th className={`${thCls} text-right`}>Último custo</th><th className={thCls}>Lote</th><th className={thCls}></th></tr></thead>
-          <tbody>
-            {items.length === 0 && <EmptyRow cols={7} text="Nenhum item cadastrado." />}
-            {items.map((i) => (
-              <tr key={i.id} className="border-b border-[var(--color-border-soft)] last:border-0">
-                <td className={tdCls}>{i.code ?? '—'}</td><td className={tdCls}>{i.name}{!i.is_active && <span className="ml-1"><Badge tone="muted">inativo</Badge></span>}</td><td className={tdCls}>{i.unit}</td>
-                <td className={`${tdCls} text-xs`}>{[i.gtin, i.ncm].filter(Boolean).join(' · ') || '—'}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{i.last_cost_cents !== null ? formatBRL(i.last_cost_cents) : '—'}</td>
-                <td className={tdCls}>{i.requires_lot ? <Badge tone="warn">exige lote</Badge> : '—'}</td>
-                <td className={`${tdCls} text-right`}>{can && <Button size="sm" variant="ghost" onClick={() => setEditItem(i)}><Pencil className="h-3.5 w-3.5" /></Button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
+        <DataGrid grid={grid} rowKey={(r) => r.id} emptyText="Nenhum item cadastrado." actionsWidth={60} actions={can ? (i) => <Button size="sm" variant="ghost" onClick={() => setEditItem(i)} aria-label="Editar item"><Pencil className="h-3.5 w-3.5" /></Button> : undefined} />
       )}
       {sec === 'locais' && (
         <TableWrap minWidth={500}>

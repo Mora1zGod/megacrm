@@ -11,7 +11,8 @@ import {
   DIVERGENCE, DIVERGENCE_STATUS, fmtDate, fmtDateTime, personName, purError, qtyFmt, RECEIPT_STATUS, rpc,
   type OrderItem, type PurLookups, type Receipt, type ReceiptItem, type ReceiptStatus, type TabProps,
 } from './data';
-import { Badge, EmptyRow, Field, inputCls, KV, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { Badge, Field, inputCls, KV, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 type ReceiptRow = Receipt & { created_by: string | null; done_by: string | null; pur_orders: { number: string | null; party_id: string | null } | null };
 
@@ -29,6 +30,15 @@ export function ReceiptsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const current = useOpenDoc<ReceiptRow>('pur_receipts', openId, rows, '*, pur_orders(number, party_id)');
   const party = (id: string | null | undefined) => lookups.suppliers.find((p) => p.id === id)?.name ?? '—';
 
+  const grid = useGrid('megacrm_grid_pur_receipt', [
+    { id: 'number', label: 'Número', width: 110, sortValue: (r: ReceiptRow) => r.number ?? '', render: (r: ReceiptRow) => <span className="font-semibold">{r.number}</span> },
+    { id: 'order', label: 'Pedido', width: 110, sortValue: (r: ReceiptRow) => r.pur_orders?.number ?? '', render: (r: ReceiptRow) => r.pur_orders?.number ?? '—' },
+    { id: 'party', label: 'Fornecedor', width: 240, sortValue: (r: ReceiptRow) => party(r.pur_orders?.party_id), render: (r: ReceiptRow) => <span className="block truncate">{party(r.pur_orders?.party_id)}</span> },
+    { id: 'date', label: 'Data', width: 105, sortValue: (r: ReceiptRow) => r.received_date ?? '', render: (r: ReceiptRow) => fmtDate(r.received_date) },
+    { id: 'loc', label: 'Local', width: 150, sortValue: (r: ReceiptRow) => lookups.locations.find((l) => l.id === r.location_id)?.name ?? '', render: (r: ReceiptRow) => lookups.locations.find((l) => l.id === r.location_id)?.name ?? '—' },
+    { id: 'by', label: 'Conferido por', width: 150, sortValue: (r: ReceiptRow) => personName(lookups.people, r.done_by ?? r.created_by), render: (r: ReceiptRow) => <span className="block truncate">{personName(lookups.people, r.done_by ?? r.created_by)}</span> },
+    { id: 'status', label: 'Situação', width: 150, sortValue: (r: ReceiptRow) => RECEIPT_STATUS[r.status][0], render: (r: ReceiptRow) => <StatusPill map={RECEIPT_STATUS} status={r.status} /> },
+  ], rows ?? []);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -36,26 +46,7 @@ export function ReceiptsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         <span className="text-xs text-[var(--color-text-muted)]">Para receber, abra o pedido e clique em “Receber”.</span>
       </div>
       {!rows ? <Spinner /> : (
-        <TableWrap minWidth={760}>
-          <thead><tr className="border-b border-[var(--color-border-card)]">
-            <th className={thCls}>Número</th><th className={thCls}>Pedido</th><th className={thCls}>Fornecedor</th><th className={thCls}>Data</th>
-            <th className={thCls}>Local</th><th className={thCls}>Conferido por</th><th className={thCls}>Situação</th>
-          </tr></thead>
-          <tbody>
-            {rows.length === 0 && <EmptyRow cols={7} text="Nenhum recebimento." />}
-            {rows.map((r) => (
-              <tr key={r.id} onClick={() => onOpen('receipt', r.id)} className="cursor-pointer border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]">
-                <td className={`${tdCls} font-semibold`}>{r.number}</td>
-                <td className={tdCls}>{r.pur_orders?.number ?? '—'}</td>
-                <td className={tdCls}>{party(r.pur_orders?.party_id)}</td>
-                <td className={tdCls}>{fmtDate(r.received_date)}</td>
-                <td className={tdCls}>{lookups.locations.find((l) => l.id === r.location_id)?.name ?? '—'}</td>
-                <td className={tdCls}>{personName(lookups.people, r.done_by ?? r.created_by)}</td>
-                <td className={tdCls}><StatusPill map={RECEIPT_STATUS} status={r.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
+        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('receipt', r.id)} emptyText="Nenhum recebimento." />
       )}
       {openId && current && <ReceiptDetail rc={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}
     </div>

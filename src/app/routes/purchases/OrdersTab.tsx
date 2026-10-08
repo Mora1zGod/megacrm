@@ -12,7 +12,8 @@ import {
   fmtDate, fmtDateTime, ORDER_STATUS, purError, qtyFmt, RECEIPT_STATUS, rpc, todaySP,
   type Order, type OrderItem, type OrderStatus, type PurLookups, type Receipt, type TabProps,
 } from './data';
-import { EmptyRow, Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const perms = usePermission();
@@ -35,6 +36,16 @@ export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
     return !t || !rows ? rows : rows.filter((r) => [r.number, r.party_name, r.party_doc].some((x) => x?.toLowerCase().includes(t)));
   }, [rows, q]);
 
+  const grid = useGrid('megacrm_grid_pur_order', [
+    { id: 'number', label: 'Número', width: 120, sortValue: (r: Order) => r.number ?? '', render: (r: Order) => <span className="font-semibold">{r.number ?? 'rascunho'}{r.revision > 0 && <span className="ml-1 text-xs font-normal text-[var(--color-text-muted)]">rev. {r.revision}</span>}</span> },
+    { id: 'party', label: 'Fornecedor', width: 260, sortValue: (r: Order) => r.party_name ?? '', render: (r: Order) => <span className="block truncate">{r.party_name ?? '—'}</span> },
+    { id: 'company', label: 'Empresa', width: 120, sortValue: (r: Order) => r.company_name ?? '', render: (r: Order) => <span className="block truncate">{r.company_name}</span> },
+    { id: 'issued', label: 'Emitido', width: 140, sortValue: (r: Order) => r.issued_at ?? '', render: (r: Order) => (r.issued_at ? fmtDateTime(r.issued_at) : '—') },
+    { id: 'expected', label: 'Previsão', width: 105, sortValue: (r: Order) => r.expected_date ?? '', render: (r: Order) => fmtDate(r.expected_date) },
+    { id: 'total', label: 'Total', width: 120, align: 'right' as const, sortValue: (r: Order) => r.total_cents, exportValue: (r: Order) => r.total_cents / 100, render: (r: Order) => <span className="tabular-nums">{formatBRL(r.total_cents)}</span> },
+    { id: 'pending', label: 'Itens pendentes', width: 120, align: 'right' as const, sortValue: (r: Order) => r.pending_lines, render: (r: Order) => <span className="tabular-nums">{r.pending_lines}/{r.lines}</span> },
+    { id: 'status', label: 'Situação', width: 160, sortValue: (r: Order) => ORDER_STATUS[r.status][0], render: (r: Order) => <StatusPill map={ORDER_STATUS} status={r.status} /> },
+  ], filtered ?? []);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -44,27 +55,7 @@ export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         {perms.can('purchases.order') && <Button variant="outline" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Pedido avulso</Button>}
       </div>
       {!filtered ? <Spinner /> : (
-        <TableWrap minWidth={900}>
-          <thead><tr className="border-b border-[var(--color-border-card)]">
-            <th className={thCls}>Número</th><th className={thCls}>Fornecedor</th><th className={thCls}>Empresa</th><th className={thCls}>Emitido</th>
-            <th className={thCls}>Previsão</th><th className={`${thCls} text-right`}>Total</th><th className={`${thCls} text-right`}>Itens pendentes</th><th className={thCls}>Situação</th>
-          </tr></thead>
-          <tbody>
-            {filtered.length === 0 && <EmptyRow cols={8} text="Nenhum pedido." />}
-            {filtered.map((r) => (
-              <tr key={r.id} onClick={() => onOpen('order', r.id)} className="cursor-pointer border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]">
-                <td className={`${tdCls} font-semibold`}>{r.number ?? 'rascunho'}{r.revision > 0 && <span className="ml-1 text-xs text-[var(--color-text-muted)]">rev. {r.revision}</span>}</td>
-                <td className={tdCls}>{r.party_name ?? '—'}</td>
-                <td className={tdCls}>{r.company_name}</td>
-                <td className={tdCls}>{r.issued_at ? fmtDateTime(r.issued_at) : '—'}</td>
-                <td className={tdCls}>{fmtDate(r.expected_date)}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{formatBRL(r.total_cents)}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{r.pending_lines}/{r.lines}</td>
-                <td className={tdCls}><StatusPill map={ORDER_STATUS} status={r.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
+        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('order', r.id)} emptyText="Nenhum pedido." />
       )}
       {creating && <OrderForm lookups={lookups} order={null} onClose={() => setCreating(false)} onSaved={(id) => { setCreating(false); void load(); onOpen('order', id); }} />}
       {openId && current && !creating && <OrderDetail order={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}

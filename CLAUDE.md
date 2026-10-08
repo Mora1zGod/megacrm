@@ -739,3 +739,8 @@ Regras:
   financeiro → `financial.setup`; compras → `purchases.setup`; refs da mesma org/empresa). `fin_company_users` + `fin_company_user_set` +
   `my_default_company()` (`20261008190000_company_settings.sql`). Certificado A1 agora fica na aba Certificados (Compras só consome).
 - Consulta CNPJ/CEP: `src/lib/cnpj-lookup.ts` (BrasilAPI → CNPJ.ws → CNPJá; CEP BrasilAPI → ViaCEP), tudo no formato da BrasilAPI.
+- Tabelas: `src/components/ui/GridTable.tsx` — `useGrid(chave, colunas, linhas)` + `<DataGrid>` (arrastar título = mover coluna, borda = largura,
+  clique = ordenar; salvo no navegador por tabela; `GridReset`, `gridExportRows` + `lib/table-export.ts` p/ Excel/PDF). Usado em Contas a
+  pagar/receber, Notas de entrada, Requisições, Cotações, Pedidos, Recebimentos, Fornecedores, Itens, Transferências, Pessoas, Contatos,
+  Usuários, Agenda (lista) e Funil (lista). Notas de entrada: botões $ e estoque abrem conciliações separadas (`pur_invoice_post` com só
+  `p_finance` ou só `p_stock`).

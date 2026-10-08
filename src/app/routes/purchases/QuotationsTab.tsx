@@ -13,7 +13,8 @@ import {
   fmtDateTime, personName, purError, qtyFmt, QUOTE_STATUS, rpc,
   type PurLookups, type QuotePrice, type QuoteItem, type QuoteStatus, type QuoteSupplier, type Quotation, type TabProps,
 } from './data';
-import { EmptyRow, Field, inputCls, KV, MoneyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { Field, inputCls, KV, MoneyInput, ReasonDialog, Spinner, StatusPill, SubTabs, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 type QuoteRow = Quotation & { pur_requisitions: { number: string | null; justification: string | null } | null };
 
@@ -30,6 +31,14 @@ export function QuotationsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps)
   useEffect(() => { void load(); }, [load]);
   const current = useOpenDoc<QuoteRow>('pur_quotations', openId, rows, '*, pur_requisitions(number, justification)');
 
+  const grid = useGrid('megacrm_grid_pur_quote', [
+    { id: 'number', label: 'Número', width: 110, sortValue: (r: QuoteRow) => r.number ?? '', render: (r: QuoteRow) => <span className="font-semibold">{r.number}</span> },
+    { id: 'req', label: 'Requisição', width: 280, sortValue: (r: QuoteRow) => r.pur_requisitions?.number ?? '', render: (r: QuoteRow) => <span className="block truncate">{r.pur_requisitions?.number ?? '—'} <span className="text-xs text-[var(--color-text-muted)]">{r.pur_requisitions?.justification?.slice(0, 60)}</span></span> },
+    { id: 'created', label: 'Aberta em', width: 140, sortValue: (r: QuoteRow) => r.created_at, render: (r: QuoteRow) => fmtDateTime(r.created_at) },
+    { id: 'by', label: 'Por', width: 150, sortValue: (r: QuoteRow) => personName(lookups.people, r.created_by), render: (r: QuoteRow) => <span className="block truncate">{personName(lookups.people, r.created_by)}</span> },
+    { id: 'total', label: 'Total vencedor', width: 130, align: 'right' as const, sortValue: (r: QuoteRow) => r.total_cents ?? -1, render: (r: QuoteRow) => <span className="tabular-nums">{r.total_cents !== null ? formatBRL(r.total_cents) : '—'}</span> },
+    { id: 'status', label: 'Situação', width: 160, sortValue: (r: QuoteRow) => QUOTE_STATUS[r.status][0], render: (r: QuoteRow) => <StatusPill map={QUOTE_STATUS} status={r.status} /> },
+  ], rows ?? []);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -37,25 +46,7 @@ export function QuotationsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps)
         <span className="text-xs text-[var(--color-text-muted)]">Cotações nascem de uma requisição aprovada (botão “Abrir cotação”).</span>
       </div>
       {!rows ? <Spinner /> : (
-        <TableWrap minWidth={760}>
-          <thead><tr className="border-b border-[var(--color-border-card)]">
-            <th className={thCls}>Número</th><th className={thCls}>Requisição</th><th className={thCls}>Aberta em</th><th className={thCls}>Por</th>
-            <th className={`${thCls} text-right`}>Total vencedor</th><th className={thCls}>Situação</th>
-          </tr></thead>
-          <tbody>
-            {rows.length === 0 && <EmptyRow cols={6} text="Nenhuma cotação." />}
-            {rows.map((r) => (
-              <tr key={r.id} onClick={() => onOpen('quotation', r.id)} className="cursor-pointer border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]">
-                <td className={`${tdCls} font-semibold`}>{r.number}</td>
-                <td className={tdCls}>{r.pur_requisitions?.number ?? '—'} <span className="text-xs text-[var(--color-text-muted)]">{r.pur_requisitions?.justification?.slice(0, 60)}</span></td>
-                <td className={tdCls}>{fmtDateTime(r.created_at)}</td>
-                <td className={tdCls}>{personName(lookups.people, r.created_by)}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{r.total_cents !== null ? formatBRL(r.total_cents) : '—'}</td>
-                <td className={tdCls}><StatusPill map={QUOTE_STATUS} status={r.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
+        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('quotation', r.id)} emptyText="Nenhuma cotação." />
       )}
       {openId && current && <QuoteDetail quote={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}
     </div>

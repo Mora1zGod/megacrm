@@ -103,16 +103,16 @@ export function GridHead<T>({ grid, thClass, lead, trail }: { grid: Grid<T>; thC
             onDrop={(e) => { e.preventDefault(); if (dragId.current) grid.move(dragId.current, c.id); dragId.current = null; setOver(null); }}
             onDragEnd={() => { dragId.current = null; setOver(null); }}
             aria-sort={s === 'asc' ? 'ascending' : s === 'desc' ? 'descending' : undefined}
-            className={cn(thClass, 'group relative select-none', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center',
+            className={cn(thClass, 'group relative cursor-grab select-none', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center',
               over === c.id && 'bg-[var(--color-accent-subtle)]')}>
             <span className={cn('flex items-center gap-1', c.align === 'right' && 'justify-end', c.align === 'center' && 'justify-center')}>
-              <GripVertical className="h-3 w-3 shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-60" aria-hidden />
+              <GripVertical className="pointer-events-none absolute left-0.5 top-1/2 h-3 w-3 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-50" aria-hidden />
               {c.sortValue ? (
                 <button type="button" onClick={() => grid.toggleSort(c.id)} className="flex min-w-0 items-center gap-1 uppercase hover:text-[var(--color-text-primary)]"
                   title="Clique para ordenar · arraste para mudar a posição">
                   <span className="truncate">{c.label}</span>
                   {s === 'asc' ? <ArrowUp className="h-3 w-3 shrink-0 text-[var(--accent-primary)]" /> : s === 'desc' ? <ArrowDown className="h-3 w-3 shrink-0 text-[var(--accent-primary)]" />
-                    : <ArrowUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                    : <ArrowUpDown className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-40" />}
                 </button>
               ) : <span className="truncate">{c.label}</span>}
             </span>
@@ -135,4 +135,108 @@ export function GridColGroup<T>({ grid, lead = [], trail = [] }: { grid: Grid<T>
       {trail.map((w, i) => <col key={`t${i}`} style={{ width: w }} />)}
     </colgroup>
   );
+}
+
+// ---------------------------------------------------------------------------
+// DataGrid: a tabela completa (colunas móveis/redimensionáveis/ordenáveis) pronta para qualquer lista.
+//   const grid = useGrid('chave', columns, rows);
+//   <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={…} actions={(r) => …} />
+// ---------------------------------------------------------------------------
+export function DataGrid<T>({
+  grid, rowKey, onRowClick, rowClassName, actions, actionsWidth = 140, actionsLabel = 'Ações', emptyText = 'Nada encontrado com esses filtros.',
+  footer, selection, thClass = DEFAULT_TH, tdClass = DEFAULT_TD, className,
+}: {
+  grid: Grid<T>;
+  rowKey: (r: T) => string;
+  onRowClick?: (r: T) => void;
+  rowClassName?: (r: T) => string | undefined | false | null;
+  actions?: (r: T) => ReactNode;
+  actionsWidth?: number;
+  actionsLabel?: string;
+  emptyText?: string;
+  footer?: Record<string, ReactNode>;          // conteúdo do rodapé por id de coluna
+  selection?: { selected: Set<string>; onChange: (next: Set<string>) => void };
+  thClass?: string; tdClass?: string; className?: string;
+}) {
+  const rows = grid.sorted;
+  const lead = selection ? [44] : [];
+  const trail = actions ? [actionsWidth] : [];
+  const width = lead.reduce((a, b) => a + b, 0) + grid.cols.reduce((a, c) => a + grid.width(c), 0) + trail.reduce((a, b) => a + b, 0);
+  const allOn = !!selection && rows.length > 0 && rows.every((r) => selection.selected.has(rowKey(r)));
+  const someOn = !!selection && rows.some((r) => selection.selected.has(rowKey(r)));
+  const toggle = (id: string) => {
+    if (!selection) return;
+    const n = new Set(selection.selected);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    selection.onChange(n);
+  };
+  return (
+    <div className={cn('overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]', className)}>
+      <table className="text-sm" style={{ tableLayout: 'fixed', width, minWidth: '100%' }}>
+        <GridColGroup grid={grid} lead={lead} trail={trail} />
+        <thead>
+          <GridHead grid={grid} thClass={thClass}
+            lead={selection ? (
+              <th className={cn(thClass, 'w-11')}>
+                <input type="checkbox" aria-label="Marcar todas" checked={allOn} ref={(el) => { if (el) el.indeterminate = someOn && !allOn; }}
+                  onChange={() => { const n = new Set(selection.selected); for (const r of rows) { if (allOn) n.delete(rowKey(r)); else n.add(rowKey(r)); } selection.onChange(n); }} className="h-4 w-4 accent-[var(--accent-fill)]" />
+              </th>
+            ) : undefined}
+            trail={actions ? <th className={cn(thClass, 'text-right')}>{actionsLabel}</th> : undefined} />
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr><td colSpan={grid.cols.length + lead.length + trail.length} className="px-3 py-8 text-center text-sm text-[var(--color-text-muted)]">{emptyText}</td></tr>
+          )}
+          {rows.map((r) => {
+            const id = rowKey(r);
+            return (
+              <tr key={id} onClick={onRowClick ? () => onRowClick(r) : undefined}
+                className={cn('border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]', onRowClick && 'cursor-pointer',
+                  selection?.selected.has(id) && 'bg-[var(--color-accent-subtle)]', rowClassName?.(r))}>
+                {selection && (
+                  <td className={tdClass} onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label="Marcar linha" checked={selection.selected.has(id)} onChange={() => toggle(id)} className="h-4 w-4 accent-[var(--accent-fill)]" />
+                  </td>
+                )}
+                {grid.cols.map((c) => (
+                  <td key={c.id} className={cn(tdClass, 'overflow-hidden', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.className)}>{c.render(r)}</td>
+                ))}
+                {actions && <td className={cn(tdClass, 'text-right')} onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
+              </tr>
+            );
+          })}
+        </tbody>
+        {footer && rows.length > 0 && (
+          <tfoot><tr className="border-t border-[var(--color-border-card)] font-semibold">
+            {selection && <td className={tdClass} />}
+            {grid.cols.map((c) => <td key={c.id} className={cn(tdClass, 'whitespace-nowrap', c.align === 'right' && 'text-right tabular-nums')}>{footer[c.id] ?? null}</td>)}
+            {actions && <td />}
+          </tr></tfoot>
+        )}
+      </table>
+    </div>
+  );
+}
+
+const DEFAULT_TH = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)] whitespace-nowrap';
+const DEFAULT_TD = 'px-3 py-2 align-middle';
+
+// Botão "Colunas padrão" (só aparece quando a pessoa mexeu nas colunas).
+export function GridReset<T>({ grid }: { grid: Grid<T> }) {
+  if (!grid.customized) return null;
+  return (
+    <button type="button" onClick={grid.reset} title="Volta a ordem e a largura original das colunas"
+      className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
+      Colunas padrão
+    </button>
+  );
+}
+
+// Linhas para exportar (Excel/PDF) na ordem de colunas que a pessoa arrumou.
+export function gridExportRows<T>(grid: Grid<T>): { header: string[]; rows: Array<Array<string | number | null>> } {
+  return {
+    header: grid.cols.map((c) => c.label),
+    rows: grid.sorted.map((r) => grid.cols.map((c) => (c.exportValue ? c.exportValue(r) : c.sortValue ? c.sortValue(r) : ''))),
+  };
 }

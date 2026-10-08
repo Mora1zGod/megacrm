@@ -12,7 +12,8 @@ import {
   fmtDate, fmtDateTime, personName, purError, qtyFmt, REQ_STATUS, rpc, todaySP, URGENCY,
   type PurLookups, type ReqItem, type ReqStatus, type Requisition, type TabProps,
 } from './data';
-import { Badge, EmptyRow, Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { Badge, Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const perms = usePermission();
@@ -42,6 +43,17 @@ export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProp
   const pendingCount = rows?.filter((r) => r.status === 'submitted').length ?? 0;
   const current = useOpenDoc('pur_requisitions_v', openId, rows);
 
+  const grid = useGrid('megacrm_grid_pur_req', [
+    { id: 'number', label: 'Número', width: 110, sortValue: (r: Requisition) => r.number ?? '', render: (r: Requisition) => <span className="font-semibold">{r.number ?? <span className="font-normal text-[var(--color-text-muted)]">rascunho</span>}</span> },
+    { id: 'created', label: 'Criada', width: 140, sortValue: (r: Requisition) => r.created_at, render: (r: Requisition) => fmtDateTime(r.created_at) },
+    { id: 'by', label: 'Solicitante', width: 160, sortValue: (r: Requisition) => personName(lookups.people, r.requested_by), render: (r: Requisition) => <span className="block truncate">{personName(lookups.people, r.requested_by)}</span> },
+    { id: 'team', label: 'Setor / C. custo', width: 180, sortValue: (r: Requisition) => [r.team_name, r.cost_center_name].filter(Boolean).join(' · '), render: (r: Requisition) => <span className="block truncate">{[r.team_name, r.cost_center_name].filter(Boolean).join(' · ') || '—'}</span> },
+    { id: 'items', label: 'Itens', width: 70, align: 'right' as const, sortValue: (r: Requisition) => r.items_count, render: (r: Requisition) => <span className="tabular-nums">{r.items_count}</span> },
+    { id: 'est', label: 'Estimado', width: 120, align: 'right' as const, sortValue: (r: Requisition) => r.estimated_cents, exportValue: (r: Requisition) => r.estimated_cents / 100, render: (r: Requisition) => <span className="tabular-nums">{formatBRL(r.estimated_cents)}</span> },
+    { id: 'urg', label: 'Urgência', width: 100, sortValue: (r: Requisition) => ['low', 'normal', 'high', 'urgent'].indexOf(r.urgency), render: (r: Requisition) => (r.urgency === 'urgent' || r.urgency === 'high' ? <Badge tone={r.urgency === 'urgent' ? 'error' : 'warn'}>{URGENCY[r.urgency]}</Badge> : URGENCY[r.urgency]) },
+    { id: 'need', label: 'Precisa até', width: 110, sortValue: (r: Requisition) => r.needed_by ?? '', render: (r: Requisition) => fmtDate(r.needed_by) },
+    { id: 'status', label: 'Situação', width: 170, sortValue: (r: Requisition) => REQ_STATUS[r.status][0], render: (r: Requisition) => <StatusPill map={REQ_STATUS} status={r.status} /> },
+  ], filtered ?? []);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-2">
@@ -58,29 +70,7 @@ export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProp
       </div>
 
       {!filtered ? <Spinner /> : (
-        <TableWrap minWidth={980}>
-          <thead><tr className="border-b border-[var(--color-border-card)]">
-            <th className={thCls}>Número</th><th className={thCls}>Criada</th><th className={thCls}>Solicitante</th><th className={thCls}>Setor / C. custo</th>
-            <th className={`${thCls} text-right`}>Itens</th><th className={`${thCls} text-right`}>Estimado</th><th className={thCls}>Urgência</th>
-            <th className={thCls}>Precisa até</th><th className={thCls}>Situação</th>
-          </tr></thead>
-          <tbody>
-            {filtered.length === 0 && <EmptyRow cols={9} text="Nenhuma requisição por aqui." />}
-            {filtered.map((r) => (
-              <tr key={r.id} onClick={() => onOpen('requisition', r.id)} className="cursor-pointer border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]">
-                <td className={`${tdCls} font-semibold`}>{r.number ?? <span className="text-[var(--color-text-muted)]">rascunho</span>}</td>
-                <td className={tdCls}>{fmtDateTime(r.created_at)}</td>
-                <td className={tdCls}>{personName(lookups.people, r.requested_by)}</td>
-                <td className={tdCls}>{[r.team_name, r.cost_center_name].filter(Boolean).join(' · ') || '—'}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{r.items_count}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{formatBRL(r.estimated_cents)}</td>
-                <td className={tdCls}>{r.urgency === 'urgent' || r.urgency === 'high' ? <Badge tone={r.urgency === 'urgent' ? 'error' : 'warn'}>{URGENCY[r.urgency]}</Badge> : URGENCY[r.urgency]}</td>
-                <td className={tdCls}>{fmtDate(r.needed_by)}</td>
-                <td className={tdCls}><StatusPill map={REQ_STATUS} status={r.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
+        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('requisition', r.id)} emptyText="Nenhuma requisição por aqui." />
       )}
 
       {editing && (

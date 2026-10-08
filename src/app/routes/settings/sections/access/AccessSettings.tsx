@@ -15,6 +15,7 @@ import { UserDrawer } from './UserDrawer';
 import { ApproveSignupDialog, SignupLinkDialog } from './SignupLinks';
 import { RoleEditor } from './RoleEditor';
 import { formatWhen, inputCls, StatusPill } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 import { invokeManage, memberLabel, MODULE_LABELS, useAccessData, type AccessRole, type Member } from './useAccessData';
 
 type Tab = 'users' | 'roles' | 'teams' | 'audit';
@@ -162,6 +163,27 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
     inactive: data.members.filter((m) => m.status !== 'active' && m.status !== 'pending').length,
   };
 
+  const grid = useGrid<Member>('megacrm_grid_users', [
+    { id: 'name', label: 'Nome', width: 280, minWidth: 160, sortValue: (m) => memberLabel(m), exportValue: (m) => memberLabel(m), render: (m) => (
+      <div className="flex items-center gap-3">
+        <Avatar src={m.avatar_url} name={memberLabel(m)} size="sm" className="!h-9 !w-9" />
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-[var(--color-text-primary)]">{memberLabel(m)} {m.user_id === userId && <span className="text-xs font-normal text-[var(--color-text-muted)]">(você)</span>}</div>
+          <div className="truncate text-xs text-[var(--color-text-secondary)]">{m.email}</div>
+          {m.phone && <div className="truncate text-xs text-[var(--color-text-muted)]">{maskPhoneBR(m.phone)}</div>}
+        </div>
+      </div>
+    ) },
+    { id: 'job', label: 'Cargo', width: 140, sortValue: (m) => m.job_title ?? '', render: (m) => <span className="block truncate text-[var(--color-text-secondary)]">{m.job_title || '—'}</span> },
+    { id: 'team', label: 'Equipe', width: 130, sortValue: (m) => m.team_name ?? '', render: (m) => <span className="block truncate text-[var(--color-text-secondary)]">{m.team_name || '—'}</span> },
+    { id: 'role', label: 'Perfil de acesso', width: 170, sortValue: (m) => (m.is_super_admin ? 'Super Admin' : m.role_name ?? ''), render: (m) => (
+      <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold', m.role_is_admin ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-primary)]')}>
+        {m.role_is_admin && <ShieldCheck className="h-3 w-3" />}{m.is_super_admin ? 'Super Admin' : m.role_name ?? '—'}
+      </span>
+    ) },
+    { id: 'status', label: 'Status', width: 150, sortValue: (m) => m.status, render: (m) => <StatusPill m={m} /> },
+    { id: 'last', label: 'Último acesso', width: 130, sortValue: (m) => m.last_sign_in_at ?? '', exportValue: (m) => formatWhen(m.last_sign_in_at), render: (m) => <span className="text-xs text-[var(--color-text-secondary)]">{formatWhen(m.last_sign_in_at)}</span> },
+  ], list);
   return (
     <div className="space-y-3">
       {counts.approval > 0 && status !== 'approval' && perms.can('users.create') && (
@@ -187,94 +209,47 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]">
-        <table className="w-full min-w-[920px] text-sm">
-          <thead>
-            <tr className="border-b border-[var(--color-border-card)] text-left text-xs font-semibold text-[var(--color-text-muted)]">
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-3 py-3">Cargo</th>
-              <th className="px-3 py-3">Equipe</th>
-              <th className="px-3 py-3">Perfil de acesso</th>
-              <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3">Último acesso</th>
-              <th className="px-3 py-3 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--color-text-muted)]">Nenhum usuário encontrado.</td></tr>
-            )}
-            {list.map((m) => {
-              const me = m.user_id === userId;
-              const canManage = !me && (!m.is_super_admin || false);
-              return (
-                <tr key={m.user_id} className={cn('border-b border-[var(--color-border-soft)] last:border-0', m.status !== 'active' && m.status !== 'pending' && 'opacity-60')}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={m.avatar_url} name={memberLabel(m)} size="sm" className="!h-9 !w-9" />
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-[var(--color-text-primary)]">
-                          {memberLabel(m)} {me && <span className="text-xs font-normal text-[var(--color-text-muted)]">(você)</span>}
-                        </div>
-                        <div className="truncate text-xs text-[var(--color-text-secondary)]">{m.email}</div>
-                        {m.phone && <div className="truncate text-xs text-[var(--color-text-muted)]">{maskPhoneBR(m.phone)}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-[var(--color-text-secondary)]">{m.job_title || '—'}</td>
-                  <td className="px-3 py-3 text-[var(--color-text-secondary)]">{m.team_name || '—'}</td>
-                  <td className="px-3 py-3">
-                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                      m.role_is_admin ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-primary)]')}>
-                      {m.role_is_admin && <ShieldCheck className="h-3 w-3" />}
-                      {m.is_super_admin ? 'Super Admin' : m.role_name ?? '—'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3"><StatusPill m={m} /></td>
-                  <td className="px-3 py-3 text-xs text-[var(--color-text-secondary)]">{formatWhen(m.last_sign_in_at)}</td>
-                  <td className="px-3 py-3">
-                    {m.status === 'pending' ? (
-                      <div className="flex justify-end gap-1">
-                        {perms.can('users.create') ? (
-                          <>
-                            <Button size="sm" onClick={() => setApproving(m)} disabled={busy === m.user_id}><UserCheck className="h-3.5 w-3.5" /> Aprovar</Button>
-                            <Button size="sm" variant="outline" onClick={() => void reject(m)} disabled={busy === m.user_id} className="text-[var(--color-error)]"><UserX className="h-3.5 w-3.5" /> Recusar</Button>
-                          </>
-                        ) : <span className="text-xs text-[var(--color-text-muted)]">Aguardando</span>}
-                      </div>
-                    ) : (
-                    <div className="relative flex justify-end gap-1">
-                      <Button size="sm" variant="outline" onClick={() => onEdit(m)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
-                      <button type="button" onClick={() => setMenu(menu === m.user_id ? null : m.user_id)} disabled={busy === m.user_id}
-                        aria-label="Mais ações" className="rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                      {menu === m.user_id && (
-                        <>
-                          <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setMenu(null)} />
-                          <div className="absolute right-0 top-[calc(100%+4px)] z-[calc(var(--z-dropdown)+1)] w-56 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
-                            <MenuItem icon={Pencil} label="Editar / alterar perfil" onClick={() => { setMenu(null); onEdit(m); }} />
-                            {perms.isAdmin && !me && !m.role_is_admin && <MenuItem icon={KeyRound} label="Alterar permissões" onClick={() => { setMenu(null); onEdit(m); }} />}
-                            {canManage && m.invite_pending && m.status === 'active' && perms.can('users.create') &&
-                              <MenuItem icon={Mail} label="Reenviar convite" onClick={() => void act(m, 'resend_invite')} />}
-                            {canManage && !m.invite_pending && perms.can('users.reset_password') &&
-                              <MenuItem icon={KeyRound} label="Resetar senha" onClick={() => void act(m, 'reset_password')} />}
-                            {canManage && perms.can('users.deactivate') && (m.status === 'active'
-                              ? <MenuItem icon={UserX} label="Desativar" danger onClick={() => void act(m, 'deactivate')} />
-                              : <MenuItem icon={UserCheck} label="Reativar" onClick={() => void act(m, 'reactivate')} />)}
-                            {perms.can('audit.view') && <MenuItem icon={History} label="Ver histórico" onClick={() => { setMenu(null); onHistory(m); }} />}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <DataGrid grid={grid} rowKey={(m) => m.user_id} emptyText="Nenhum usuário encontrado." actionsWidth={170}
+        rowClassName={(m) => m.status !== 'active' && m.status !== 'pending' && 'opacity-60'}
+        actions={(m) => {
+          const me = m.user_id === userId;
+          const canManage = !me && (!m.is_super_admin || false);
+          return m.status === 'pending' ? (
+              <div className="flex justify-end gap-1">
+                {perms.can('users.create') ? (
+                  <>
+                    <Button size="sm" onClick={() => setApproving(m)} disabled={busy === m.user_id}><UserCheck className="h-3.5 w-3.5" /> Aprovar</Button>
+                    <Button size="sm" variant="outline" onClick={() => void reject(m)} disabled={busy === m.user_id} className="text-[var(--color-error)]"><UserX className="h-3.5 w-3.5" /> Recusar</Button>
+                  </>
+                ) : <span className="text-xs text-[var(--color-text-muted)]">Aguardando</span>}
+              </div>
+            ) : (
+            <div className="relative flex justify-end gap-1">
+              <Button size="sm" variant="outline" onClick={() => onEdit(m)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
+              <button type="button" onClick={() => setMenu(menu === m.user_id ? null : m.user_id)} disabled={busy === m.user_id}
+                aria-label="Mais ações" className="rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {menu === m.user_id && (
+                <>
+                  <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setMenu(null)} />
+                  <div className="absolute right-0 top-[calc(100%+4px)] z-[calc(var(--z-dropdown)+1)] w-56 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
+                    <MenuItem icon={Pencil} label="Editar / alterar perfil" onClick={() => { setMenu(null); onEdit(m); }} />
+                    {perms.isAdmin && !me && !m.role_is_admin && <MenuItem icon={KeyRound} label="Alterar permissões" onClick={() => { setMenu(null); onEdit(m); }} />}
+                    {canManage && m.invite_pending && m.status === 'active' && perms.can('users.create') &&
+                      <MenuItem icon={Mail} label="Reenviar convite" onClick={() => void act(m, 'resend_invite')} />}
+                    {canManage && !m.invite_pending && perms.can('users.reset_password') &&
+                      <MenuItem icon={KeyRound} label="Resetar senha" onClick={() => void act(m, 'reset_password')} />}
+                    {canManage && perms.can('users.deactivate') && (m.status === 'active'
+                      ? <MenuItem icon={UserX} label="Desativar" danger onClick={() => void act(m, 'deactivate')} />
+                      : <MenuItem icon={UserCheck} label="Reativar" onClick={() => void act(m, 'reactivate')} />)}
+                    {perms.can('audit.view') && <MenuItem icon={History} label="Ver histórico" onClick={() => { setMenu(null); onHistory(m); }} />}
+                  </div>
+                </>
+              )}
+            </div>
+            );
+        }} />
       {approving && (
         <ApproveSignupDialog
           member={approving}

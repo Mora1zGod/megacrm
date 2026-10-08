@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ import { CONTACT_SOURCE_LABEL } from '@/types/crm';
 import { TRAFFIC_LABEL } from '@/lib/dashboard';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { formatPhone } from '@/lib/format';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 1000] as const;
 
@@ -133,22 +134,7 @@ export default function ContactsPage() {
     });
   };
 
-  const allOnPageSelected = useMemo(
-    () => contacts.length > 0 && contacts.every((c) => selected.has(c.id)),
-    [contacts, selected],
-  );
-
-  const toggleSelectAllOnPage = () => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (allOnPageSelected) {
-        contacts.forEach((c) => next.delete(c.id));
-      } else {
-        contacts.forEach((c) => next.add(c.id));
-      }
-      return next;
-    });
-  };
+  // Marcar todos da página: feito pela própria tabela (DataGrid).
 
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -181,6 +167,20 @@ export default function ContactsPage() {
     }
   };
 
+  // Colunas móveis/redimensionáveis; a ordenação vale para a página que está na tela.
+  const grid = useGrid<ContactWithTags>('megacrm_grid_contacts', [
+    { id: 'name', label: 'Nome', width: 240, minWidth: 120, sortValue: (c) => c.name ?? '', render: (c) => <Link to={`/contacts/${c.id}`} className="block truncate font-medium text-[var(--color-text-primary)] hover:text-[var(--accent-primary)]">{c.name || <span className="opacity-40">— ver ficha</span>}</Link> },
+    { id: 'phone', label: 'Telefone', width: 160, sortValue: (c) => c.phone ?? '', exportValue: (c) => formatPhone(c.phone), render: (c) => <span className="font-mono text-xs text-[var(--color-text-secondary)]">{formatPhone(c.phone) || <span className="opacity-40">—</span>}</span> },
+    { id: 'source', label: 'Canal', width: 120, sortValue: (c) => (c.source ? CONTACT_SOURCE_LABEL[c.source] ?? c.source : ''), render: (c) => (c.source ? <span className="inline-flex rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-xs">{CONTACT_SOURCE_LABEL[c.source] ?? c.source}</span> : <span className="opacity-40">—</span>) },
+    { id: 'traffic', label: 'Origem', width: 130, sortValue: (c) => (c.traffic_type ? TRAFFIC_LABEL[c.traffic_type] ?? c.traffic_type : ''), render: (c) => (c.traffic_type ? <span className="text-xs text-[var(--color-text-secondary)]">{TRAFFIC_LABEL[c.traffic_type] ?? c.traffic_type}</span> : <span className="opacity-40">—</span>) },
+    { id: 'first', label: 'Primeiro registro', width: 140, sortValue: (c) => c.first_seen_at ?? c.created_at, exportValue: (c) => fmtDate(c.first_seen_at ?? c.created_at), render: (c) => <span className="text-xs text-[var(--color-text-secondary)]">{fmtDate(c.first_seen_at ?? c.created_at)}</span> },
+    { id: 'tags', label: 'Tags', width: 240, sortValue: (c) => c.tags.map((t) => t.name).join(', '), render: (c) => (
+      <div className="flex flex-wrap gap-1">
+        {c.tags.slice(0, 3).map((t) => <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-xs"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />{t.name}</span>)}
+        {c.tags.length > 3 && <span className="text-xs text-[var(--color-text-secondary)] opacity-60">+{c.tags.length - 3}</span>}
+      </div>
+    ) },
+  ], contacts);
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -396,129 +396,14 @@ export default function ContactsPage() {
         </div>
 
         {/* Desktop (md+): tabela. */}
-        <div className="hidden md:block rounded-lg border border-[var(--color-border-card)] overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
-            <thead>
-              <tr className="bg-[var(--color-fill-subtle)] text-left">
-                <th className="p-3 w-10">
-                  <input
-                    type="checkbox"
-                    checked={allOnPageSelected}
-                    onChange={toggleSelectAllOnPage}
-                    className="accent-[var(--accent-primary)]"
-                    aria-label="Selecionar todos da página"
-                  />
-                </th>
-                <th className="p-3 text-label">Nome</th>
-                <th className="p-3 text-label">Telefone</th>
-                <th className="p-3 text-label">Canal</th>
-                <th className="p-3 text-label">Origem</th>
-                <th className="p-3 text-label">Primeiro registro</th>
-                <th className="p-3 text-label">Tags</th>
-                <th className="p-3 w-20" />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i} className="border-t border-[var(--color-border-soft)]">
-                    <td className="p-3"><Skeleton className="h-4 w-4" /></td>
-                    <td className="p-3"><Skeleton className="h-4 w-32" /></td>
-                    <td className="p-3"><Skeleton className="h-4 w-24" /></td>
-                    <td className="p-3"><Skeleton className="h-4 w-16" /></td>
-                    <td className="p-3"><Skeleton className="h-4 w-16" /></td>
-                    <td className="p-3"><Skeleton className="h-4 w-20" /></td>
-                    <td className="p-3"><Skeleton className="h-4 w-20" /></td>
-                    <td className="p-3" />
-                  </tr>
-                ))
-              ) : contacts.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-[var(--color-text-secondary)] opacity-60">
-                    {search || tagFilter || sourceFilter || leadTypeFilter
-                      ? 'Nenhum contato encontrado com estes filtros.'
-                      : 'Nenhum contato ainda — crie um manualmente ou importe CSV/XLSX.'}
-                  </td>
-                </tr>
-              ) : (
-                contacts.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="border-t border-[var(--color-border-card)] hover:bg-[var(--color-fill-subtle)]"
-                  >
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(c.id)}
-                        onChange={() => toggleSelect(c.id)}
-                        className="accent-[var(--accent-primary)]"
-                      />
-                    </td>
-                    <td className="p-3">
-                      <Link
-                        to={`/contacts/${c.id}`}
-                        className="font-medium text-[var(--color-text-primary)] hover:text-[var(--accent-primary)]"
-                      >
-                        {c.name || <span className="opacity-40">— ver ficha</span>}
-                      </Link>
-                    </td>
-                    <td className="p-3 font-mono text-xs text-[var(--color-text-secondary)]">
-                      {formatPhone(c.phone) || <span className="opacity-40">—</span>}
-                    </td>
-                    <td className="p-3 text-[var(--color-text-secondary)]">
-                      {c.source ? (
-                        <span className="inline-flex rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-xs">
-                          {CONTACT_SOURCE_LABEL[c.source] ?? c.source}
-                        </span>
-                      ) : (
-                        <span className="opacity-40">—</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-[var(--color-text-secondary)]">
-                      {c.traffic_type ? (
-                        <span className="text-xs">{TRAFFIC_LABEL[c.traffic_type] ?? c.traffic_type}</span>
-                      ) : (
-                        <span className="opacity-40">—</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-xs text-[var(--color-text-secondary)]">
-                      {fmtDate(c.first_seen_at ?? c.created_at)}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1">
-                        {c.tags.slice(0, 3).map((t) => (
-                          <span
-                            key={t.id}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-[var(--color-fill-subtle)]"
-                          >
-                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />
-                            {t.name}
-                          </span>
-                        ))}
-                        {c.tags.length > 3 && (
-                          <span className="text-xs text-[var(--color-text-secondary)] opacity-60">
-                            +{c.tags.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3 text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditing(c);
-                          setShowForm(true);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="hidden md:block">
+          {loading ? (
+            <div className="space-y-2 rounded-lg border border-[var(--color-border-card)] p-3">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
+          ) : (
+            <DataGrid grid={grid} rowKey={(c) => c.id} selection={{ selected, onChange: setSelected }} actionsWidth={90} actionsLabel=""
+              emptyText={search || tagFilter || sourceFilter || leadTypeFilter ? 'Nenhum contato encontrado com estes filtros.' : 'Nenhum contato ainda — crie um manualmente ou importe CSV/XLSX.'}
+              actions={(c) => <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setShowForm(true); }}>Editar</Button>} />
+          )}
         </div>
 
         <div className="flex items-center justify-between pt-1">

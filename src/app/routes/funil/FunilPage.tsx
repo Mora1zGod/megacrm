@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 import { useSearchParams } from 'react-router-dom';
 import { Archive, ArchiveRestore, ChevronDown, Clock, GitBranchPlus, KanbanSquare, LineChart, List, Plus, RefreshCw, Settings2, X, MessageSquare, Phone, UserX } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
@@ -622,37 +623,16 @@ export type { Stage };
 // ---------------------------------------------------------------------------
 function FunilListView({ deals, stages, onOpen }: { deals: Deal[]; stages: Stage[]; onOpen: (id: string) => void }) {
   const stageName = (id: string | null) => stages.find((s) => s.id === id)?.name ?? '—';
+  const grid = useGrid<Deal>('megacrm_grid_funil', [
+    { id: 'title', label: 'Negócio', width: 320, minWidth: 140, sortValue: (d) => d.title ?? '', render: (d) => <span className="block truncate text-[var(--color-text-primary)]">{d.title}</span> },
+    { id: 'stage', label: 'Etapa', width: 180, sortValue: (d) => stages.findIndex((s) => s.id === d.stage_id), exportValue: (d) => stageName(d.stage_id), render: (d) => <span className="text-[var(--color-text-secondary)]">{stageName(d.stage_id)}</span> },
+    { id: 'value', label: 'Valor', width: 130, align: 'right', sortValue: (d) => Number(d.value) || 0, render: (d) => <span className="font-semibold text-[var(--accent-secondary)]">{brl(Number(d.value) || 0)}</span> },
+    { id: 'temp', label: 'Temperatura', width: 130, sortValue: (d) => d.temperature ?? '', render: (d) => <span className="text-[var(--color-text-secondary)]">{d.temperature ?? '—'}</span> },
+  ], deals);
   if (deals.length === 0) {
     return <div className="glass-card p-6 text-sm text-[var(--color-text-secondary)]">Nenhum negócio com os filtros atuais.</div>;
   }
-  return (
-    <div className="glass-card overflow-hidden p-0">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--color-border-card)] text-left text-xs text-[var(--color-text-secondary)]">
-            <th className="px-4 py-2 font-medium">Negócio</th>
-            <th className="px-4 py-2 font-medium">Etapa</th>
-            <th className="px-4 py-2 font-medium">Valor</th>
-            <th className="px-4 py-2 font-medium">Temperatura</th>
-          </tr>
-        </thead>
-        <tbody>
-          {deals.map((d) => (
-            <tr
-              key={d.id}
-              onClick={() => onOpen(d.id)}
-              className="cursor-pointer border-b border-[var(--color-border-card)] last:border-0 hover:bg-[var(--color-fill-subtle)]"
-            >
-              <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{d.title}</td>
-              <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{stageName(d.stage_id)}</td>
-              <td className="px-4 py-2.5 font-semibold text-[var(--accent-secondary)]">{brl(Number(d.value) || 0)}</td>
-              <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{d.temperature ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <DataGrid grid={grid} rowKey={(d) => d.id} onRowClick={(d) => onOpen(d.id)} />;
 }
 
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import {
 } from './data';
 import { SupplierForm } from './SupplierForm';
 import { Badge, Card, EmptyRow, Field, inputCls, KV, Metric, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, useDebounced } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 interface Dash {
   can_finance: boolean; can_purchases: boolean;
@@ -65,6 +66,17 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
   const totals = useMemo(() => (rows ?? []).reduce((a, r) => ({ open: a.open + (r.open_payable_cents ?? 0), overdue: a.overdue + (r.overdue_cents ?? 0), y: a.y + (r.invoices_12m_cents ?? 0) }), { open: 0, overdue: 0, y: 0 }), [rows]);
   const changed = async () => { await lookups.reload(); await load(); };
 
+  const grid = useGrid('megacrm_grid_pur_suppliers', [
+    { id: 'name', label: 'Fornecedor', width: 260, minWidth: 140, sortValue: (s: Supplier) => s.trade_name || s.name, render: (s: Supplier) => <div className="min-w-0"><div className="truncate font-semibold">{s.trade_name || s.name}</div>{s.trade_name && <div className="truncate text-xs text-[var(--color-text-muted)]">{s.name}</div>}{!s.is_active && <Badge tone="muted">inativo</Badge>}</div> },
+    { id: 'doc', label: 'CNPJ/CPF', width: 150, sortValue: (s: Supplier) => s.doc ?? '', exportValue: (s: Supplier) => formatDoc(s.doc), render: (s: Supplier) => <span className="whitespace-nowrap tabular-nums">{formatDoc(s.doc)}</span> },
+    { id: 'cat', label: 'Categoria', width: 140, sortValue: (s: Supplier) => s.category ?? '', render: (s: Supplier) => <span className="block truncate">{s.category ?? '—'}</span> },
+    { id: 'city', label: 'Cidade', width: 140, sortValue: (s: Supplier) => s.city ?? '', render: (s: Supplier) => <span className="block truncate">{s.city ? `${s.city}${s.state ? `/${s.state}` : ''}` : '—'}</span> },
+    { id: 'contact', label: 'Contato', width: 170, sortValue: (s: Supplier) => s.contact_name ?? '', render: (s: Supplier) => <div className="min-w-0"><div className="truncate">{s.contact_name ?? ''}</div><div className="truncate text-xs text-[var(--color-text-muted)]">{formatPhone(s.whatsapp || s.phone) || s.email || ''}</div></div> },
+    { id: 'buy', label: 'Compras 12m', width: 120, align: 'right' as const, sortValue: (s: Supplier) => s.invoices_12m_cents ?? 0, exportValue: (s: Supplier) => (s.invoices_12m_cents ?? 0) / 100, render: (s: Supplier) => <span className="tabular-nums">{formatBRL(s.invoices_12m_cents ?? 0)}</span> },
+    { id: 'last', label: 'Última nota', width: 105, sortValue: (s: Supplier) => s.last_invoice_date ?? '', render: (s: Supplier) => fmtDate(s.last_invoice_date) },
+    { id: 'orders', label: 'Pedidos abertos', width: 140, align: 'right' as const, sortValue: (s: Supplier) => s.open_orders_cents ?? 0, render: (s: Supplier) => <span className="tabular-nums">{s.open_orders_count ? `${s.open_orders_count} · ${formatBRL(s.open_orders_cents ?? 0)}` : '—'}</span> },
+    { id: 'pay', label: 'A pagar', width: 115, align: 'right' as const, sortValue: (s: Supplier) => s.open_payable_cents ?? 0, exportValue: (s: Supplier) => (s.open_payable_cents ?? 0) / 100, render: (s: Supplier) => <span className="tabular-nums">{s.open_payable_cents ? <span className={s.overdue_cents ? 'text-[var(--color-error)]' : ''}>{formatBRL(s.open_payable_cents)}</span> : '—'}</span> },
+  ], rows ?? []);
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-4">
@@ -90,28 +102,7 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
         {canEditSuppliers(perms.can) && <Button onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Novo fornecedor</Button>}
       </div>
       {!rows ? <Spinner /> : (
-        <TableWrap minWidth={1100}>
-          <thead><tr className="border-b border-[var(--color-border-card)]">
-            <th className={thCls}>Fornecedor</th><th className={thCls}>CNPJ/CPF</th><th className={thCls}>Categoria</th><th className={thCls}>Cidade</th><th className={thCls}>Contato</th>
-            <th className={`${thCls} text-right`}>Compras 12m</th><th className={thCls}>Última nota</th><th className={`${thCls} text-right`}>Pedidos abertos</th><th className={`${thCls} text-right`}>A pagar</th>
-          </tr></thead>
-          <tbody>
-            {rows.length === 0 && <EmptyRow cols={9} text="Nenhum fornecedor." />}
-            {rows.map((s) => (
-              <tr key={s.id} onClick={() => onOpen('supplier', s.id)} className="cursor-pointer border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]">
-                <td className={tdCls}><div className="font-semibold">{s.trade_name || s.name}</div>{s.trade_name && <div className="text-xs text-[var(--color-text-muted)]">{s.name}</div>}{!s.is_active && <Badge tone="muted">inativo</Badge>}</td>
-                <td className={tdCls}>{formatDoc(s.doc)}</td>
-                <td className={tdCls}>{s.category ?? '—'}</td>
-                <td className={tdCls}>{s.city ? `${s.city}${s.state ? `/${s.state}` : ''}` : '—'}</td>
-                <td className={tdCls}><div>{s.contact_name ?? ''}</div><div className="text-xs text-[var(--color-text-muted)]">{formatPhone(s.whatsapp || s.phone) || s.email || ''}</div></td>
-                <td className={`${tdCls} text-right tabular-nums`}>{formatBRL(s.invoices_12m_cents ?? 0)}</td>
-                <td className={tdCls}>{fmtDate(s.last_invoice_date)}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{s.open_orders_count ? `${s.open_orders_count} · ${formatBRL(s.open_orders_cents ?? 0)}` : '—'}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{s.open_payable_cents ? <span className={s.overdue_cents ? 'text-[var(--color-error)]' : ''}>{formatBRL(s.open_payable_cents)}</span> : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
+        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('supplier', r.id)} emptyText="Nenhum fornecedor." />
       )}
       {creating && <SupplierForm lookups={lookups} supplier={null} categories={categories} onClose={() => setCreating(false)} onSaved={async (id) => { setCreating(false); await changed(); onOpen('supplier', id); }} />}
       {current && !creating && <SupplierDetail supplier={current} lookups={lookups} categories={categories} onClose={onCloseDoc} onOpen={onOpen} onChanged={changed} />}

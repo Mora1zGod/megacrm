@@ -8,7 +8,8 @@ import { getSupabase } from '@/lib/supabase';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { formatBRL } from '@/lib/money';
 import { addDays, fmtDate, friendlyError, rpc, todaySP, type Account, type Lookups } from './data';
-import { CompanySelect, EmptyRow, Field, inputCls, MoneyInput, ReasonDialog, TableWrap, tdCls, thCls } from './ui';
+import { CompanySelect, EmptyRow, Field, inputCls, MoneyInput, ReasonDialog, tdCls, thCls } from './ui';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 
 interface Transfer {
   id: string; from_account_id: string; to_account_id: string; amount_cents: number; transfer_date: string;
@@ -40,6 +41,13 @@ export function BanksTab({ lookups }: { lookups: Lookups }) {
   const accName = (id: string) => lookups.accounts.find((a) => a.id === id)?.name ?? '—';
   const shownTransfers = transfers.filter((t) => !company || lookups.accounts.some((a) => (a.id === t.from_account_id || a.id === t.to_account_id) && a.company_id === company));
 
+  const grid = useGrid('megacrm_grid_fin_transfers', [
+    { id: 'date', label: 'Data', width: 105, sortValue: (t: Transfer) => t.transfer_date, render: (t: Transfer) => fmtDate(t.transfer_date) },
+    { id: 'from', label: 'De', width: 180, sortValue: (t: Transfer) => accName(t.from_account_id), render: (t: Transfer) => <span className="block truncate">{accName(t.from_account_id)}</span> },
+    { id: 'to', label: 'Para', width: 180, sortValue: (t: Transfer) => accName(t.to_account_id), render: (t: Transfer) => <span className="block truncate">{accName(t.to_account_id)}</span> },
+    { id: 'desc', label: 'Descrição', width: 300, sortValue: (t: Transfer) => t.description ?? '', render: (t: Transfer) => <span className="block truncate">{t.description ?? '—'}{t.reversal_of && <span className="ml-1 rounded bg-[rgba(239,68,68,0.1)] px-1 text-[10px] font-semibold text-[var(--color-error)]">ESTORNO</span>}</span> },
+    { id: 'amount', label: 'Valor', width: 120, align: 'right' as const, sortValue: (t: Transfer) => t.amount_cents, exportValue: (t: Transfer) => t.amount_cents / 100, render: (t: Transfer) => <span className="font-semibold tabular-nums">{formatBRL(t.amount_cents)}</span> },
+  ], shownTransfers);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -65,33 +73,10 @@ export function BanksTab({ lookups }: { lookups: Lookups }) {
       </div>
 
       <h3 className="pt-2 text-sm font-semibold text-[var(--color-text-primary)]">Transferências</h3>
-      <TableWrap minWidth={820}>
-        <thead><tr className="border-b border-[var(--color-border-card)]">
-          <th className={thCls}>Data</th><th className={thCls}>De</th><th className={thCls}>Para</th><th className={thCls}>Descrição</th>
-          <th className={cn(thCls, 'text-right')}>Valor</th><th className={cn(thCls, 'text-right')}>Ações</th>
-        </tr></thead>
-        <tbody>
-          {shownTransfers.length === 0 && <EmptyRow cols={6} text="Nenhuma transferência." />}
-          {shownTransfers.map((t) => (
-            <tr key={t.id} className={cn('border-b border-[var(--color-border-soft)] last:border-0', (t.reversed_at || t.reversal_of) && 'text-[var(--color-text-muted)]')}>
-              <td className={tdCls}>{fmtDate(t.transfer_date)}</td>
-              <td className={tdCls}>{accName(t.from_account_id)}</td>
-              <td className={tdCls}>{accName(t.to_account_id)}</td>
-              <td className={tdCls}>
-                {t.description ?? '—'}
-                {t.reversal_of && <span className="ml-1 rounded bg-[rgba(239,68,68,0.1)] px-1 text-[10px] font-semibold text-[var(--color-error)]">ESTORNO</span>}
-              </td>
-              <td className={cn(tdCls, 'text-right font-semibold tabular-nums')}>{formatBRL(t.amount_cents)}</td>
-              <td className={cn(tdCls, 'text-right text-xs')}>
-                {t.reversed_at ? <span title={t.reverse_reason ?? ''}>Estornada</span>
-                  : !t.reversal_of && perms.can('financial.ledger_reverse') && (
-                    <Button size="sm" variant="outline" onClick={() => setReversing(t)}><Undo2 className="h-3.5 w-3.5" /> Estornar</Button>
-                  )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
+      <DataGrid grid={grid} rowKey={(t) => t.id} emptyText="Nenhuma transferência." actionsWidth={130}
+        rowClassName={(t) => (t.reversed_at || t.reversal_of) && 'text-[var(--color-text-muted)]'}
+        actions={(t) => (t.reversed_at ? <span className="text-xs" title={t.reverse_reason ?? ''}>Estornada</span>
+          : !t.reversal_of && perms.can('financial.ledger_reverse') ? <Button size="sm" variant="outline" onClick={() => setReversing(t)}><Undo2 className="h-3.5 w-3.5" /> Estornar</Button> : null)} />
 
       {creating && <TransferDialog lookups={lookups} onClose={() => setCreating(false)} onDone={() => { setCreating(false); void load(); void lookups.reload(); }} />}
       {reversing && (

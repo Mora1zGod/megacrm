@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Pencil, Plus, Search, Star } from 'lucide-react';
@@ -358,6 +359,13 @@ function Parties({ lookups }: { lookups: Lookups }) {
   const t = q.trim().toLowerCase();
   const digits = t.replace(/\D/g, '');
   const list = lookups.parties.filter((p) => !t || p.name.toLowerCase().includes(t) || (digits && (p.doc ?? '').includes(digits)));
+  const grid = useGrid<Party>('megacrm_grid_fin_parties', [
+    { id: 'name', label: 'Nome', width: 280, minWidth: 140, sortValue: (p) => p.name, render: (p) => <b className="block truncate">{p.name}</b> },
+    { id: 'kind', label: 'Tipo', width: 150, sortValue: (p) => p.kind, exportValue: (p) => ({ supplier: 'Fornecedor', customer: 'Cliente', both: 'Fornecedor e cliente' }[p.kind]), render: (p) => <span className="text-xs">{{ supplier: 'Fornecedor', customer: 'Cliente', both: 'Fornecedor e cliente' }[p.kind]}</span> },
+    { id: 'doc', label: 'CPF/CNPJ', width: 160, sortValue: (p) => p.doc ?? '', exportValue: (p) => formatDoc(p.doc), render: (p) => <span className="tabular-nums">{formatDoc(p.doc)}</span> },
+    { id: 'contact', label: 'Contato', width: 260, sortValue: (p) => p.email ?? p.phone ?? '', exportValue: (p) => [p.email, formatPhone(p.phone)].filter(Boolean).join(' · '), render: (p) => <span className="block truncate text-xs text-[var(--color-text-secondary)]">{[p.email, formatPhone(p.phone)].filter(Boolean).join(' · ') || '—'}</span> },
+    { id: 'active', label: 'Situação', width: 100, sortValue: (p) => (p.is_active ? 1 : 0), exportValue: (p) => (p.is_active ? 'Ativo' : 'Inativo'), render: (p) => <Active on={p.is_active} /> },
+  ], list.slice(0, 1000));
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -367,24 +375,8 @@ function Parties({ lookups }: { lookups: Lookups }) {
         </label>
         {can && <Button onClick={() => setEdit('new')}><Plus className="h-4 w-4" /> Novo</Button>}
       </div>
-      <TableWrap minWidth={760}>
-        <thead><tr className="border-b border-[var(--color-border-card)]">
-          <th className={thCls}>Nome</th><th className={thCls}>Tipo</th><th className={thCls}>CPF/CNPJ</th><th className={thCls}>Contato</th><th className={thCls}>Situação</th><th className={thCls} />
-        </tr></thead>
-        <tbody>
-          {list.length === 0 && <EmptyRow cols={6} text="Ninguém encontrado." />}
-          {list.slice(0, 500).map((p) => (
-            <tr key={p.id} className="border-b border-[var(--color-border-soft)] last:border-0">
-              <td className={tdCls}><b>{p.name}</b></td>
-              <td className={cn(tdCls, 'text-xs')}>{{ supplier: 'Fornecedor', customer: 'Cliente', both: 'Fornecedor e cliente' }[p.kind]}</td>
-              <td className={cn(tdCls, 'tabular-nums')}>{formatDoc(p.doc)}</td>
-              <td className={cn(tdCls, 'text-xs text-[var(--color-text-secondary)]')}>{[p.email, formatPhone(p.phone)].filter(Boolean).join(' · ') || '—'}</td>
-              <td className={tdCls}><Active on={p.is_active} /></td>
-              <td className={cn(tdCls, 'text-right')}>{can && <Button size="sm" variant="outline" onClick={() => setEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </TableWrap>
+      <DataGrid grid={grid} rowKey={(p) => p.id} emptyText="Ninguém encontrado." actionsWidth={60}
+        actions={can ? (p) => <Button size="sm" variant="outline" onClick={() => setEdit(p)} aria-label="Editar"><Pencil className="h-3.5 w-3.5" /></Button> : undefined} />
       {edit && <SupplierFormDialog supplierId={edit === 'new' ? null : edit.id} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void lookups.reload(); }} />}
     </>
   );

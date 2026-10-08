@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Bell, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, List, MessageSquare, Pencil, Plus, Trash2, User, Users, X } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { DataGrid, useGrid } from '@/components/ui/GridTable';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { Dialog } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -822,6 +823,15 @@ function ReagendarDialog({ visit, onClose, onSaved }: { visit: Visit; onClose: (
 // ---------------------------------------------------------------------------
 function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit) => void }) {
   const sorted = [...visits].sort((a, b) => (a.visit_date + a.visit_time).localeCompare(b.visit_date + b.visit_time));
+  const label = (v: Visit) => { const nome = (v.contact?.name ?? '').trim(); return /\p{L}/u.test(nome) ? nome : (formatPhone(v.contact?.phone) || 'Sem nome'); };
+  const grid = useGrid<Visit>('megacrm_grid_visits', [
+    { id: 'date', label: 'Data', width: 110, sortValue: (v) => v.visit_date + v.visit_time, exportValue: (v) => new Date(`${v.visit_date}T00:00:00`).toLocaleDateString('pt-BR'), render: (v) => <span className="text-[var(--color-text-secondary)]">{new Date(`${v.visit_date}T00:00:00`).toLocaleDateString('pt-BR')}</span> },
+    { id: 'time', label: 'Horário', width: 90, sortValue: (v) => v.visit_time, render: (v) => <span className="text-[var(--color-text-secondary)]">{v.visit_time.slice(0, 5)}</span> },
+    { id: 'contact', label: 'Contato', width: 240, sortValue: (v) => label(v), render: (v) => <span className="block truncate text-[var(--color-text-primary)]">{label(v)}</span> },
+    { id: 'phone', label: 'Telefone', width: 160, sortValue: (v) => v.contact?.phone ?? '', exportValue: (v) => formatPhone(v.contact?.phone), render: (v) => <span className="font-mono text-xs text-[var(--color-text-secondary)]">{formatPhone(v.contact?.phone) || '—'}</span> },
+    { id: 'size', label: 'Pessoas', width: 90, align: 'right', sortValue: (v) => v.party_size ?? 0, render: (v) => <span className="tabular-nums text-[var(--color-text-secondary)]">{v.party_size}</span> },
+    { id: 'status', label: 'Status', width: 140, sortValue: (v) => STATUS_STYLE[v.status].label, render: (v) => <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', STATUS_STYLE[v.status].className)}>{STATUS_STYLE[v.status].label}</span> },
+  ], sorted);
   if (sorted.length === 0) {
     return (
       <div className="glass-card p-6 text-center">
@@ -830,42 +840,7 @@ function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit
       </div>
     );
   }
-  return (
-    <div className="glass-card overflow-hidden p-0">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--color-border-card)] text-left text-xs text-[var(--color-text-secondary)]">
-            <th className="px-4 py-2 font-medium">Data</th>
-            <th className="px-4 py-2 font-medium">Horário</th>
-            <th className="px-4 py-2 font-medium">Contato</th>
-            <th className="px-4 py-2 font-medium">Telefone</th>
-            <th className="px-4 py-2 font-medium">Pessoas</th>
-            <th className="px-4 py-2 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((v) => {
-            const nome = (v.contact?.name ?? '').trim();
-            const rotulo = /\p{L}/u.test(nome) ? nome : (formatPhone(v.contact?.phone) || 'Sem nome');
-            return (
-              <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[var(--color-border-card)] last:border-0 hover:bg-[var(--color-fill-subtle)]">
-                <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{new Date(`${v.visit_date}T00:00:00`).toLocaleDateString('pt-BR')}</td>
-                <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{v.visit_time.slice(0, 5)}</td>
-                <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{rotulo}</td>
-                <td className="px-4 py-2.5 text-[var(--color-text-secondary)] font-mono text-xs">{formatPhone(v.contact?.phone) || '—'}</td>
-                <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{v.party_size}</td>
-                <td className="px-4 py-2.5">
-                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', STATUS_STYLE[v.status].className)}>
-                    {STATUS_STYLE[v.status].label}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <DataGrid grid={grid} rowKey={(v) => v.id} onRowClick={onOpen} />;
 }
 
 const dlgInput = 'h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
