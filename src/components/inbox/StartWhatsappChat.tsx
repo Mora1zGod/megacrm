@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { getSupabase } from '@/lib/supabase';
+import { maskPhoneInput } from '@/lib/format';
 
 interface StartWhatsappChatProps {
   onClose: () => void;
@@ -94,7 +95,8 @@ export function StartWhatsappChat({ onClose, onOpenConversation }: StartWhatsapp
             <input
               id="swc-phone"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => setInput(maskPhoneInput(e.target.value))}
+              inputMode="tel"
               onKeyDown={(e) => { if (e.key === 'Enter') void buscar(); }}
               placeholder="(68) 99975-5247"
               className="flex-1 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)]"

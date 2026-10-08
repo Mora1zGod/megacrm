@@ -39,13 +39,11 @@ export function maskPhoneBR(raw: string | null | undefined): string {
   return `(${ddd}) ${rest.slice(0, split)}-${rest.slice(split)}`;
 }
 
-// Exibição: +5568999238046 → +55 68 99923-8046 (BR). Outros formatos ficam como estão.
+// Exibição: número BR (com ou sem +55) → "(68) 99923-8046"; estrangeiro fica como está.
 export function formatPhoneDisplay(phone: string | null | undefined): string {
   if (!phone) return '';
   const d = phone.replace(/\D/g, '');
-  if (d.startsWith('55') && (d.length === 12 || d.length === 13)) {
-    const rest = d.slice(4);
-    return `+55 ${d.slice(2, 4)} ${rest.slice(0, rest.length - 4)}-${rest.slice(-4)}`;
-  }
+  const br = (d.length === 12 || d.length === 13) && d.startsWith('55') ? d.slice(2) : d;
+  if ((br.length === 10 || br.length === 11) && (!phone.trim().startsWith('+') || d.startsWith('55'))) return maskPhoneBR(br);
   return phone;
 }

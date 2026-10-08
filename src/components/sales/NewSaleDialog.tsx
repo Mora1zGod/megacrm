@@ -21,6 +21,7 @@ import {
   type PaymentType,
 } from '@/lib/sales';
 import type { Pipeline } from '@/types/crm';
+import { formatPhone, maskPhoneInput } from '@/lib/format';
 
 const inputCls =
   'w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
@@ -199,7 +200,7 @@ export function NewSaleDialog({
         contactId: c.id,
         existingDealId: existingDealId || null,
         pipelineId,
-        title: title.trim() || `${autoTitle} — ${c.name || c.phone}`,
+        title: title.trim() || `${autoTitle} — ${c.name || formatPhone(c.phone)}`,
         total,
         ownerId: ownerId || null,
         products: productIds.map((id, i) => ({ id, value: productValues[i] })),
@@ -208,7 +209,7 @@ export function NewSaleDialog({
         paymentMethod: method,
         schedule,
       });
-      toast.success('Venda registrada! 🎉', { description: `${formatBRL(total)} — ${c.name || c.phone}` });
+      toast.success('Venda registrada! 🎉', { description: `${formatBRL(total)} — ${c.name || formatPhone(c.phone)}` });
       onClose();
     } catch (e) {
       toast.error('Não foi possível registrar a venda', { description: e instanceof Error ? e.message : String(e) });
@@ -227,7 +228,7 @@ export function NewSaleDialog({
             <div className="flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 py-2">
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-[var(--color-text-primary)]">{contactName}</div>
-                {contact.phone && contact.name && <div className="text-xs text-[var(--color-text-muted)]">{contact.phone}</div>}
+                {contact.phone && contact.name && <div className="text-xs text-[var(--color-text-muted)]">{formatPhone(contact.phone)}</div>}
               </div>
               <button type="button" onClick={() => setContact(null)} aria-label="Trocar cliente" className="rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
                 <X className="h-4 w-4" />
@@ -236,7 +237,7 @@ export function NewSaleDialog({
           ) : newMode ? (
             <div className="grid gap-2 sm:grid-cols-2">
               <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do cliente" className={inputCls} />
-              <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="WhatsApp com DDD" inputMode="tel" className={inputCls} />
+              <input value={newPhone} onChange={(e) => setNewPhone(maskPhoneInput(e.target.value))} placeholder="(68) 99999-9999" inputMode="tel" className={inputCls} />
               <button type="button" onClick={() => setNewMode(false)} className="text-left text-xs text-[var(--accent-primary)] hover:underline">Buscar cliente existente</button>
             </div>
           ) : (
@@ -248,8 +249,8 @@ export function NewSaleDialog({
                   {searching && <div className="flex items-center gap-2 px-2 py-2 text-xs text-[var(--color-text-muted)]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando…</div>}
                   {hits.map((h) => (
                     <button key={h.id} type="button" onClick={() => { setContact(h); setHits([]); }} className="flex w-full items-center justify-between rounded px-2 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)]">
-                      <span className="truncate text-[var(--color-text-primary)]">{h.name || h.phone}</span>
-                      <span className="ml-2 shrink-0 text-xs text-[var(--color-text-muted)]">{h.phone}</span>
+                      <span className="truncate text-[var(--color-text-primary)]">{h.name || formatPhone(h.phone)}</span>
+                      <span className="ml-2 shrink-0 text-xs text-[var(--color-text-muted)]">{formatPhone(h.phone)}</span>
                     </button>
                   ))}
                   {!searching && hits.length === 0 && <div className="px-2 py-2 text-xs text-[var(--color-text-muted)]">Nenhum cliente encontrado.</div>}

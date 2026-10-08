@@ -15,6 +15,7 @@ import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
 import { formatNextDue, isRecurring, RECURRENCE_LABELS, setTaskDone } from '@/lib/tasks';
 import { REMINDER_COLORS, toLocalInput, useReminders, type Reminder, type ReminderColor } from '@/hooks/useReminders';
+import { formatPhone } from '@/lib/format';
 
 interface AgendaTask {
   id: string;
@@ -402,7 +403,7 @@ export default function VisitsPage() {
                     // o único identificador útil pro operador.
                     const nome = (v.contact?.name ?? '').trim();
                     const temLetra = /\p{L}/u.test(nome);
-                    const rotulo = temLetra ? nome : (v.contact?.phone ?? 'Sem nome');
+                    const rotulo = temLetra ? nome : (formatPhone(v.contact?.phone) || 'Sem nome');
                     return (
                       <button
                         key={v.id}
@@ -486,7 +487,7 @@ export default function VisitsPage() {
             <div><span className="text-label">Data</span> {new Date(`${detailVisit.visit_date}T00:00:00`).toLocaleDateString('pt-BR')}</div>
             <div><span className="text-label">Horário</span> {detailVisit.visit_time.slice(0, 5)}</div>
             <div><span className="text-label">Pessoas</span> {detailVisit.party_size}</div>
-            <div><span className="text-label">Telefone</span> {detailVisit.contact?.phone ?? '—'}</div>
+            <div><span className="text-label">Telefone</span> {formatPhone(detailVisit.contact?.phone) || '—'}</div>
             {detailVisit.notes && <div><span className="text-label">Observações</span> {detailVisit.notes}</div>}
             <div>
               <span className="text-label">Status</span>{' '}
@@ -669,7 +670,7 @@ function CreateVisitDialog({ onClose, onCreated }: { onClose: () => void; onCrea
             <Label>Contato</Label>
             {selected ? (
               <div className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-sm">
-                <span>{selected.name ?? selected.phone}</span>
+                <span>{selected.name ?? formatPhone(selected.phone)}</span>
                 <button type="button" onClick={() => setSelected(null)}><X className="h-4 w-4" /></button>
               </div>
             ) : (
@@ -689,7 +690,7 @@ function CreateVisitDialog({ onClose, onCreated }: { onClose: () => void; onCrea
                         onClick={() => { setSelected(c); setResults([]); setQuery(''); }}
                         className="block w-full text-left px-3 py-2 text-sm hover:bg-[var(--color-accent-subtle)]"
                       >
-                        {c.name ?? 'Sem nome'} — {c.phone}
+                        {c.name ?? 'Sem nome'} — {formatPhone(c.phone)}
                       </button>
                     ))}
                   </div>
@@ -845,13 +846,13 @@ function VisitsListView({ visits, onOpen }: { visits: Visit[]; onOpen: (v: Visit
         <tbody>
           {sorted.map((v) => {
             const nome = (v.contact?.name ?? '').trim();
-            const rotulo = /\p{L}/u.test(nome) ? nome : (v.contact?.phone ?? 'Sem nome');
+            const rotulo = /\p{L}/u.test(nome) ? nome : (formatPhone(v.contact?.phone) || 'Sem nome');
             return (
               <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[var(--color-border-card)] last:border-0 hover:bg-[var(--color-fill-subtle)]">
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{new Date(`${v.visit_date}T00:00:00`).toLocaleDateString('pt-BR')}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{v.visit_time.slice(0, 5)}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{rotulo}</td>
-                <td className="px-4 py-2.5 text-[var(--color-text-secondary)] font-mono text-xs">{v.contact?.phone ?? '—'}</td>
+                <td className="px-4 py-2.5 text-[var(--color-text-secondary)] font-mono text-xs">{formatPhone(v.contact?.phone) || '—'}</td>
                 <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{v.party_size}</td>
                 <td className="px-4 py-2.5">
                   <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', STATUS_STYLE[v.status].className)}>

@@ -15,6 +15,8 @@ import { ProximaAcao } from '@/components/crm/ProximaAcao';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type Deal } from '@/types/crm';
+import { maskPhoneInput } from '@/lib/format';
+import { normalizePhone } from '@/lib/phone';
 
 type ProfileTab = 'geral' | 'conversas' | 'negocios' | 'visitas' | 'tarefas' | 'campanhas' | 'arquivos' | 'atividades';
 
@@ -189,7 +191,12 @@ export default function ContactDetailPage() {
             <>
               <div className="glass-card p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InlineField label="Nome" value={contact.name ?? ''} onSave={(v) => saveField({ name: v || null })} />
-                <InlineField label="Telefone" value={contact.phone ?? ''} onSave={(v) => saveField({ phone: v || null })} />
+                <InlineField label="Telefone" value={contact.phone ?? ''} mask={maskPhoneInput} onSave={(v) => {
+                  if (!v) return saveField({ phone: null });
+                  const n = normalizePhone(v);
+                  if (!n.ok) { toast.error('Telefone inválido. Use DDD + número, ex.: (68) 99999-9999.'); return; }
+                  return saveField({ phone: n.e164 });
+                }} />
                 <InlineField label="E-mail" value={contact.email ?? ''} onSave={(v) => saveField({ email: v || null })} />
                 <InlineField label="Empresa" value={company} onSave={saveCompany} />
                 <div>
@@ -296,20 +303,21 @@ export default function ContactDetailPage() {
   );
 }
 
-function InlineField({ label, value, onSave }: { label: string; value: string; onSave: (v: string) => void | Promise<void> }) {
-  const [local, setLocal] = useState(value);
+function InlineField({ label, value, onSave, mask }: { label: string; value: string; onSave: (v: string) => void | Promise<void>; mask?: (v: string) => string }) {
+  const shown = mask ? mask(value) : value;
+  const [local, setLocal] = useState(shown);
   const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => setLocal(value), [value]);
-  const commit = () => { if (local !== value) void onSave(local); };
+  useEffect(() => setLocal(shown), [shown]);
+  const commit = () => { if (local !== shown) void onSave(local); };
   return (
     <div>
       <div className="mb-1 text-[0.65rem] uppercase tracking-[0.1em] text-[var(--color-text-secondary)]">{label}</div>
       <input
         ref={ref}
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => setLocal(mask ? mask(e.target.value) : e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') { commit(); ref.current?.blur(); } if (e.key === 'Escape') setLocal(value); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { commit(); ref.current?.blur(); } if (e.key === 'Escape') setLocal(shown); }}
         placeholder="—"
         className={inputCls}
       />
@@ -452,16 +460,20 @@ function LinkChannelModal({
           </div>
           <div>
             <div className="mb-1 text-[0.65rem] uppercase tracking-[0.1em] text-[var(--color-text-secondary)]">
-              {channel === 'instagram' ? '@usuário ou ID' : 'Número (E.164)'}
+              {channel === 'instagram' ? '@usuário ou ID' : 'Número do WhatsApp'}
             </div>
-            <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder={channel === 'instagram' ? '@fulano' : '+5511999999999'} className={inputCls} autoFocus />
+            <input value={identifier} onChange={(e) => setIdentifier(channel === 'whatsapp' ? maskPhoneInput(e.target.value) : e.target.value)} placeholder={channel === 'instagram' ? '@fulano' : '(68) 99999-9999'} className={inputCls} autoFocus />
           </div>
         </div>
         <div className="mt-5 flex gap-2">
           <Button
             className="flex-1"
             disabled={busy || !identifier.trim()}
-            onClick={async () => { setBusy(true); await onLink(channel, identifier); setBusy(false); }}
+            onClick={async () => {
+              let id = identifier.trim();
+              if (channel === 'whatsapp') { const n = normalizePhone(id); if (!n.ok) { toast.error('Número inválido. Use DDD + número.'); return; } id = n.e164; }
+              setBusy(true); await onLink(channel, id); setBusy(false);
+            }}
           >
             Vincular
           </Button>

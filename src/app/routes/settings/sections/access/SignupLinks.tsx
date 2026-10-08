@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { getSupabase } from '@/lib/supabase';
 import { Field, inputCls } from './ui';
 import { invokeManage, memberLabel, type AccessRole, type Member, type Team } from './useAccessData';
+import { formatPhone } from '@/lib/format';
 
 interface SignupLink {
   id: string;
@@ -198,7 +199,7 @@ export function ApproveSignupDialog({ member, roles, teams, canGrantAdmin, onClo
         <div className="font-semibold text-[var(--color-text-primary)]">{memberLabel(member)}</div>
         <div className="text-[var(--color-text-secondary)]">{member.email}</div>
         {(member.phone || member.job_title) && (
-          <div className="text-xs text-[var(--color-text-muted)]">{[member.job_title, member.phone].filter(Boolean).join(' · ')}</div>
+          <div className="text-xs text-[var(--color-text-muted)]">{[member.job_title, formatPhone(member.phone)].filter(Boolean).join(' · ')}</div>
         )}
       </div>
       <div className="space-y-3">

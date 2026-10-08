@@ -12,6 +12,7 @@ import { getSupabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import type { AudienceFilter, VariableSource } from '@/types/campaigns';
 import type { Pipeline, Stage } from '@/types/crm';
+import { formatPhone } from '@/lib/format';
 
 interface CampaignWizardProps {
   open: boolean;
@@ -338,7 +339,7 @@ export function CampaignWizard({ open, onClose, onSaved }: CampaignWizardProps) 
               >
                 {zernioChannels.map((ch) => (
                   <option key={ch.id} value={ch.id}>
-                    {ch.label}{ch.phone ? ` · ${ch.phone}` : ''}
+                    {ch.label}{ch.phone ? ` · ${formatPhone(ch.phone)}` : ''}
                   </option>
                 ))}
               </select>

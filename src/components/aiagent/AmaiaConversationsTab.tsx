@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import { getSupabase } from '@/lib/supabase';
+import { formatPhone } from '@/lib/format';
 
 interface ConvRow {
   id: string;
@@ -56,7 +57,7 @@ export function AmaiaConversationsTab() {
         <tbody>
           {rows.map((c) => (
             <tr key={c.id} className="border-b border-[var(--color-border-card)] last:border-0">
-              <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{c.contact?.name || c.contact?.phone || '—'}</td>
+              <td className="px-4 py-2.5 text-[var(--color-text-primary)]">{c.contact?.name || formatPhone(c.contact?.phone) || '—'}</td>
               <td className="px-4 py-2.5 text-[var(--color-text-secondary)] capitalize">{c.channel}</td>
               <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">{STATUS_LABEL[c.status] ?? c.status}</td>
               <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">

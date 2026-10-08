@@ -21,13 +21,14 @@ import {
   type Stage,
   type Temperature,
 } from '@/types/crm';
+import { formatPhone, maskPhoneInput } from '@/lib/format';
+import { normalizePhone } from '@/lib/phone';
 
 const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (s: string | null) =>
   s ? new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-const isE164ish = (v: string) => /^\+?\d{8,15}$/.test(v.replace(/[\s()-]/g, ''));
 
 interface DealDrawerProps {
   deal: Deal;
@@ -285,7 +286,9 @@ export function DealDrawer({ deal, stages, pipelines, isAdmin, onClose, onStageC
               <div className="grid gap-2">
                 <div className="flex items-center gap-2">
                   <Phone className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />
-                  <InlineText value={contact?.phone ?? ''} placeholder="Telefone" validate={(v) => (v && !isE164ish(v) ? 'Telefone inválido (use E.164).' : null)} onSave={(v) => saveContactField({ phone: v || null })} className="text-sm text-[var(--color-text-primary)]" />
+                  <InlineText value={contact?.phone ?? ''} placeholder="Telefone" type="tel" mask={maskPhoneInput} render={formatPhone}
+                    validate={(v) => (v && !normalizePhone(v).ok ? 'Telefone inválido. Use DDD + número, ex.: (68) 99999-9999.' : null)}
+                    onSave={(v) => { const n = v ? normalizePhone(v) : null; return saveContactField({ phone: n && n.ok ? n.e164 : null }); }} className="text-sm text-[var(--color-text-primary)]" />
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />
@@ -514,7 +517,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // Edição inline: clica → vira input; Enter/blur salva (com validação); Esc cancela.
 function InlineText({
-  value, onSave, type = 'text', placeholder, validate, render, className,
+  value, onSave, type = 'text', placeholder, validate, render, mask, className,
 }: {
   value: string;
   onSave: (value: string) => void | Promise<void>;
@@ -522,6 +525,7 @@ function InlineText({
   placeholder?: string;
   validate?: (v: string) => string | null;
   render?: (v: string) => string;
+  mask?: (v: string) => string;
   className?: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -529,7 +533,7 @@ function InlineText({
   const [err, setErr] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setLocal(value), [value]);
+  useEffect(() => setLocal(mask ? mask(value) : value), [value, mask]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
 
   const commit = () => {
@@ -537,7 +541,7 @@ function InlineText({
     if (problem) { setErr(problem); return; }
     setErr(null);
     setEditing(false);
-    if (local !== value) void onSave(local);
+    if (local !== (mask ? mask(value) : value)) void onSave(local);
   };
 
   if (!editing) {
@@ -560,9 +564,9 @@ function InlineText({
         ref={ref}
         type={type}
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => setLocal(mask ? mask(e.target.value) : e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setLocal(value); setErr(null); setEditing(false); } }}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setLocal(mask ? mask(value) : value); setErr(null); setEditing(false); } }}
         placeholder={placeholder}
         className="w-full rounded border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]"
       />

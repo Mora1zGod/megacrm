@@ -19,6 +19,9 @@ export interface Supplier {
   city: string | null; state: string | null; bank_name: string | null; bank_agency: string | null; bank_account: string | null;
   pix_key: string | null; payment_terms: string | null; default_chart_account_id: string | null; notes: string | null;
   created_at: string;
+  legal_status?: string | null; legal_status_date?: string | null; founded_on?: string | null; main_activity?: string | null;
+  company_size?: string | null; legal_nature?: string | null; simples_nacional?: boolean | null; mei?: boolean | null;
+  share_capital_cents?: number | null; headquarters?: string | null; cnpj_data?: CnpjData | null; cnpj_checked_at?: string | null;
   // pur_suppliers_v
   invoices_count?: number; invoices_12m_cents?: number; last_invoice_date?: string | null;
   open_orders_count?: number; open_orders_cents?: number; last_order_at?: string | null;
@@ -176,4 +179,14 @@ export interface TabProps {
   openId: string | null;
   onOpen: (kind: string, id: string) => void;
   onCloseDoc: () => void;
+}
+
+// Resposta da BrasilAPI (/api/cnpj/v1) — só os campos usados.
+export interface CnpjData {
+  cnpj?: string; razao_social?: string; nome_fantasia?: string; descricao_situacao_cadastral?: string; data_situacao_cadastral?: string;
+  data_inicio_atividade?: string; cnae_fiscal?: number; cnae_fiscal_descricao?: string; cnaes_secundarios?: Array<{ codigo: number; descricao: string }>;
+  porte?: string; descricao_porte?: string; natureza_juridica?: string; opcao_pelo_simples?: boolean | null; opcao_pelo_mei?: boolean | null;
+  capital_social?: number; descricao_identificador_matriz_filial?: string; email?: string | null; ddd_telefone_1?: string; ddd_telefone_2?: string;
+  cep?: string; descricao_tipo_de_logradouro?: string; logradouro?: string; numero?: string; complemento?: string; bairro?: string; municipio?: string; uf?: string;
+  qsa?: Array<{ nome_socio: string; qualificacao_socio?: string; data_entrada_sociedade?: string }>;
 }

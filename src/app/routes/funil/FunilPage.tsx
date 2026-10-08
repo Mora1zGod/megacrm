@@ -14,6 +14,7 @@ import { FunilManager } from '@/components/funil/FunilManager';
 import { applyFunilFilters, EMPTY_FILTERS, FunilFilters, sortFunilDeals, type FunilFilterState, type FunilSort } from '@/components/funil/FunilFilters';
 import type { ContactConvInfo } from '@/components/funil/funilFilterLogic';
 import { DUE_TONE_STYLE, dueTone, getDealOrigin, TEMPERATURE_STYLE, TRAFFIC_TYPE_STYLE, type ContactLite, type Deal, type Stage } from '@/types/crm';
+import { formatPhone } from '@/lib/format';
 
 type FunilView = 'kanban' | 'lista' | 'forecast';
 
@@ -595,7 +596,7 @@ function AddDealForm({
       <select value={contactId} onChange={(e) => setContactId(e.target.value)} className={inputCls}>
         <option value="">Contato (lead)…</option>
         {contacts.map((c) => (
-          <option key={c.id} value={c.id}>{c.name ?? c.phone}</option>
+          <option key={c.id} value={c.id}>{c.name ?? formatPhone(c.phone)}</option>
         ))}
       </select>
       <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do negócio" className={inputCls} />

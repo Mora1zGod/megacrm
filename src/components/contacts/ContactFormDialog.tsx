@@ -9,6 +9,7 @@ import { useTags } from '@/hooks/useTags';
 import { useContacts } from '@/hooks/useContacts';
 import { normalizePhone } from '@/lib/phone';
 import type { ContactWithTags } from '@/types/db';
+import { formatPhone, maskPhoneInput } from '@/lib/format';
 
 interface ContactFormDialogProps {
   open: boolean;
@@ -52,7 +53,7 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
   useEffect(() => {
     if (!open) return;
     setName(contact?.name ?? '');
-    setPhone(contact?.phone ?? '');
+    setPhone(maskPhoneInput(contact?.phone ?? ''));
     setEmail(contact?.email ?? '');
     setBirthdayDate(contact?.birthday_date ?? '');
     setSelectedTags(new Set((contact?.tags ?? []).map((t) => t.id)));
@@ -129,14 +130,15 @@ export function ContactFormDialog({ open, onClose, contact, onSaved }: ContactFo
             <Input
               id="contact_phone"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+55 11 99999-9999"
+              onChange={(e) => setPhone(maskPhoneInput(e.target.value))}
+              inputMode="tel"
+              placeholder="(68) 99999-9999"
               required
               disabled={saving}
             />
             {phonePreview && (
               <div className={`text-xs ${phonePreview.ok ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>
-                {phonePreview.ok ? `E.164: ${phonePreview.e164}` : phonePreview.error}
+                {phonePreview.ok ? `✓ Número válido: ${formatPhone(phonePreview.e164)}` : phonePreview.error}
               </div>
             )}
           </div>

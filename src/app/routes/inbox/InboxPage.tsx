@@ -42,6 +42,7 @@ import { ForwardMessageDialog } from '@/components/inbox/ForwardMessageDialog';
 import { EditMessageDialog } from '@/components/inbox/EditMessageDialog';
 import { useSlaConfig } from '@/hooks/useSlaConfig';
 import { useNow } from '@/lib/sla';
+import { formatPhone } from '@/lib/format';
 
 function copyText(text: string, okMsg: string) {
   void navigator.clipboard?.writeText(text).then(
@@ -407,7 +408,7 @@ export default function InboxPage() {
                 <Avatar src={selected.contact?.profile_pic_url} name={selected.contact?.name || selected.contact?.phone} size="lg" className="!h-12 !w-12 sm:!h-16 sm:!w-16" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-lg font-bold text-[var(--color-text-primary)]">
-                    {selected.contact?.name?.trim() || selected.contact?.phone || '—'}
+                    {selected.contact?.name?.trim() || formatPhone(selected.contact?.phone) || '—'}
                   </div>
                   <div className="mt-0.5 flex items-center gap-1.5 text-[15px] text-[var(--color-text-secondary)]">
                     <span className="truncate">{selectedIsGroup ? 'Grupo do WhatsApp' : formatPhoneDisplay(selected.contact?.phone)}</span>
@@ -691,7 +692,7 @@ export default function InboxPage() {
           open={showForward}
           onClose={() => setShowForward(false)}
           conversationId={selected.id}
-          contactLabel={selected.contact?.name?.trim() || selected.contact?.phone || 'contato'}
+          contactLabel={selected.contact?.name?.trim() || formatPhone(selected.contact?.phone) || 'contato'}
         />
       )}
 

@@ -9,6 +9,8 @@ import { usePermission } from '@/app/providers/PermissionsProvider';
 import { formatBRL } from '@/lib/money';
 import { chartTree, friendlyError, NATURE_LABEL, type Account, type ChartAccount, type Company, type CostCenter, type Lookups, type Nature, type Party } from './data';
 import { EmptyRow, Field, inputCls, MoneyInput, SubTabs, TableWrap, tdCls, thCls } from './ui';
+import { formatDoc, formatPhone, maskCNPJ, maskDoc, onlyDigits } from '@/lib/format';
+import { maskPhoneBR } from '@/lib/phone';
 
 type Sec = 'empresas' | 'bancos' | 'plano' | 'centros' | 'pessoas';
 
@@ -76,7 +78,7 @@ function Companies({ lookups }: { lookups: Lookups }) {
           {lookups.companies.map((c) => (
             <tr key={c.id} className="border-b border-[var(--color-border-soft)] last:border-0">
               <td className={tdCls}><b>{c.name}</b>{c.is_default && <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-primary)]"><Star className="h-3 w-3" /> padrão</span>}</td>
-              <td className={tdCls}>{c.cnpj ? c.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '—'}</td>
+              <td className={tdCls}>{formatDoc(c.cnpj)}</td>
               <td className={tdCls}><Active on={c.is_active} /></td>
               <td className={cn(tdCls, 'text-right')}>{can && <Button size="sm" variant="outline" onClick={() => setEdit(c)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>}</td>
             </tr>
@@ -90,18 +92,18 @@ function Companies({ lookups }: { lookups: Lookups }) {
 
 function CompanyForm({ company, onClose, onSaved }: { company: Company | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(company?.name ?? '');
-  const [cnpj, setCnpj] = useState(company?.cnpj ?? '');
+  const [cnpj, setCnpj] = useState(maskCNPJ(company?.cnpj));
   const [active, setActive] = useState(company?.is_active ?? true);
   const [isDefault, setIsDefault] = useState(company?.is_default ?? false);
   return (
     <FormDialog title={company ? 'Editar empresa' : 'Nova empresa'} onClose={onClose}
       onSave={async () => {
-        const ok = await save('fin_companies', company?.id ?? null, { name: name.trim(), cnpj: cnpj || null, is_active: active, is_default: isDefault });
+        const ok = await save('fin_companies', company?.id ?? null, { name: name.trim(), cnpj: onlyDigits(cnpj) || null, is_active: active, is_default: isDefault });
         if (ok) onSaved();
         return ok;
       }}>
       <Field label="Nome" htmlFor="co-name"><input id="co-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} /></Field>
-      <Field label="CNPJ" htmlFor="co-cnpj"><input id="co-cnpj" value={cnpj} onChange={(e) => setCnpj(e.target.value)} className={inputCls} placeholder="00.000.000/0000-00" /></Field>
+      <Field label="CNPJ" htmlFor="co-cnpj"><input id="co-cnpj" value={cnpj} inputMode="numeric" onChange={(e) => setCnpj(maskCNPJ(e.target.value))} className={inputCls} placeholder="00.000.000/0000-00" /></Field>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Ativa</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} disabled={company?.is_default} onChange={(e) => setIsDefault(e.target.checked)} /> Empresa padrão</label>
     </FormDialog>
@@ -361,7 +363,7 @@ function Parties({ lookups }: { lookups: Lookups }) {
               <td className={tdCls}><b>{p.name}</b></td>
               <td className={cn(tdCls, 'text-xs')}>{{ supplier: 'Fornecedor', customer: 'Cliente', both: 'Fornecedor e cliente' }[p.kind]}</td>
               <td className={cn(tdCls, 'tabular-nums')}>{formatDoc(p.doc)}</td>
-              <td className={cn(tdCls, 'text-xs text-[var(--color-text-secondary)]')}>{[p.email, p.phone].filter(Boolean).join(' · ') || '—'}</td>
+              <td className={cn(tdCls, 'text-xs text-[var(--color-text-secondary)]')}>{[p.email, formatPhone(p.phone)].filter(Boolean).join(' · ') || '—'}</td>
               <td className={tdCls}><Active on={p.is_active} /></td>
               <td className={cn(tdCls, 'text-right')}>{can && <Button size="sm" variant="outline" onClick={() => setEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>}</td>
             </tr>
@@ -373,26 +375,21 @@ function Parties({ lookups }: { lookups: Lookups }) {
   );
 }
 
-export function formatDoc(doc: string | null): string {
-  if (!doc) return '—';
-  if (doc.length === 11) return doc.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-  if (doc.length === 14) return doc.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  return doc;
-}
+export { formatDoc };
 
 function PartyForm({ item, lookups, onClose }: { item: Party | null; lookups: Lookups; onClose: () => void }) {
   const [name, setName] = useState(item?.name ?? '');
   const [kind, setKind] = useState<Party['kind']>(item?.kind ?? 'supplier');
-  const [doc, setDoc] = useState(item?.doc ?? '');
+  const [doc, setDoc] = useState(maskDoc(item?.doc));
   const [email, setEmail] = useState(item?.email ?? '');
-  const [phone, setPhone] = useState(item?.phone ?? '');
+  const [phone, setPhone] = useState(maskPhoneBR(item?.phone));
   const [active, setActive] = useState(item?.is_active ?? true);
   return (
     <FormDialog title={item ? 'Editar pessoa' : 'Novo fornecedor/cliente'} onClose={onClose}
       onSave={async () => {
         const d = doc.replace(/\D/g, '');
         if (d && d.length !== 11 && d.length !== 14) { toast.error('CPF deve ter 11 números e CNPJ 14.'); return false; }
-        const ok = await save('fin_parties', item?.id ?? null, { name: name.trim(), kind, doc: d || null, email: email.trim() || null, phone: phone.trim() || null, is_active: active });
+        const ok = await save('fin_parties', item?.id ?? null, { name: name.trim(), kind, doc: d || null, email: email.trim() || null, phone: onlyDigits(phone) || null, is_active: active });
         if (ok) void lookups.reload();
         return ok;
       }}>
@@ -403,11 +400,11 @@ function PartyForm({ item, lookups, onClose }: { item: Party | null; lookups: Lo
             <option value="supplier">Fornecedor</option><option value="customer">Cliente</option><option value="both">Fornecedor e cliente</option>
           </select>
         </Field>
-        <Field label="CPF/CNPJ" htmlFor="pt-doc"><input id="pt-doc" value={doc} onChange={(e) => setDoc(e.target.value)} className={inputCls} /></Field>
+        <Field label="CPF/CNPJ" htmlFor="pt-doc"><input id="pt-doc" inputMode="numeric" value={doc} onChange={(e) => setDoc(maskDoc(e.target.value))} className={inputCls} placeholder="000.000.000-00 ou 00.000.000/0000-00" /></Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="E-mail" htmlFor="pt-email"><input id="pt-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} /></Field>
-        <Field label="Telefone" htmlFor="pt-phone"><input id="pt-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} /></Field>
+        <Field label="Telefone" htmlFor="pt-phone"><input id="pt-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(maskPhoneBR(e.target.value))} className={inputCls} placeholder="(68) 99999-9999" /></Field>
       </div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Ativo</label>
     </FormDialog>

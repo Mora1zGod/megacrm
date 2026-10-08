@@ -4,6 +4,7 @@ import { FileText, Film, Image as ImageIcon, Music, Paperclip, Search } from 'lu
 import { getSupabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ContentType } from '@/types/inbox';
+import { formatPhone } from '@/lib/format';
 
 interface FileRow {
   id: string;
@@ -216,7 +217,7 @@ export default function FilesPage() {
                       onClick={(e) => e.stopPropagation()}
                       className="hover:underline"
                     >
-                      {contact?.name || contact?.phone || 'Conversa'}
+                      {contact?.name || formatPhone(contact?.phone) || 'Conversa'}
                     </Link>
                     <span>·</span>
                     <span>{new Date(r.created_at).toLocaleString('pt-BR')}</span>

@@ -9,6 +9,7 @@ import { useAppUser } from '@/app/providers/AppUserProvider';
 import { formatBRL, splitInstallments } from '@/lib/money';
 import { addMonths, chartAllowed, chartTree, fmtDate, friendlyError, rpc, todaySP, type Entry, type EntryKind, type Lookups } from './data';
 import { CompanySelect, Field, inputCls, MoneyInput } from './ui';
+import { formatDoc, maskDoc } from '@/lib/format';
 
 const SUGGESTIONS: Record<EntryKind, Array<{ label: string; description: string; code: string }>> = {
   payable: [
@@ -170,7 +171,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
             {newParty ? (
               <div className="flex gap-1.5">
                 <input autoFocus value={newParty.name} onChange={(e) => setNewParty({ ...newParty, name: e.target.value })} placeholder="Nome" className={inputCls} />
-                <input value={newParty.doc} onChange={(e) => setNewParty({ ...newParty, doc: e.target.value })} placeholder="CPF/CNPJ" className={cn(inputCls, 'w-40')} />
+                <input value={newParty.doc} inputMode="numeric" onChange={(e) => setNewParty({ ...newParty, doc: maskDoc(e.target.value) })} placeholder="CPF/CNPJ" className={cn(inputCls, 'w-40')} />
                 <Button size="sm" onClick={() => void createParty()} className="h-10">Salvar</Button>
                 <Button size="sm" variant="outline" onClick={() => setNewParty(null)} className="h-10">×</Button>
               </div>
@@ -178,7 +179,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
               <div className="flex gap-1.5">
                 <select id="ef-party" value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputCls}>
                   <option value="">— sem {kind === 'payable' ? 'fornecedor' : 'cliente'} —</option>
-                  {parties.map((p) => <option key={p.id} value={p.id}>{p.name}{p.doc ? ` · ${p.doc}` : ''}</option>)}
+                  {parties.map((p) => <option key={p.id} value={p.id}>{p.name}{p.doc ? ` · ${formatDoc(p.doc)}` : ''}</option>)}
                 </select>
                 <Button type="button" size="sm" variant="outline" className="h-10" onClick={() => setNewParty({ name: '', doc: '' })} title="Cadastrar novo">
                   <Plus className="h-4 w-4" />

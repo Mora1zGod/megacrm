@@ -27,6 +27,7 @@ import type { ContactWithTags } from '@/types/db';
 import { CONTACT_SOURCE_LABEL } from '@/types/crm';
 import { TRAFFIC_LABEL } from '@/lib/dashboard';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
+import { formatPhone } from '@/lib/format';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 1000] as const;
 
@@ -349,14 +350,14 @@ export default function ContactsPage() {
                     checked={selected.has(c.id)}
                     onChange={() => toggleSelect(c.id)}
                     className="accent-[var(--accent-primary)] mt-1 shrink-0"
-                    aria-label={`Selecionar ${c.name || c.phone || 'contato'}`}
+                    aria-label={`Selecionar ${c.name || formatPhone(c.phone) || 'contato'}`}
                   />
                   <div className="min-w-0 flex-1">
                     <Link to={`/contacts/${c.id}`} className="block truncate font-medium text-[var(--color-text-primary)] hover:text-[var(--accent-primary)]">
                       {c.name || '— ver ficha'}
                     </Link>
                     <div className="truncate font-mono text-xs text-[var(--color-text-secondary)]">
-                      {c.phone || '—'}
+                      {formatPhone(c.phone) || '—'}
                     </div>
                   </div>
                   <Button
@@ -462,7 +463,7 @@ export default function ContactsPage() {
                       </Link>
                     </td>
                     <td className="p-3 font-mono text-xs text-[var(--color-text-secondary)]">
-                      {c.phone || <span className="opacity-40">—</span>}
+                      {formatPhone(c.phone) || <span className="opacity-40">—</span>}
                     </td>
                     <td className="p-3 text-[var(--color-text-secondary)]">
                       {c.source ? (

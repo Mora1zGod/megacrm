@@ -22,6 +22,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { getSupabase } from '@/lib/supabase';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { ImportHistoryModal } from './ImportHistoryModal';
+import { formatPhone } from '@/lib/format';
 
 // Configurações → Canais. Multi-número: cada linha de whatsapp_hub.channels é
 // um número de WhatsApp da organização —
@@ -739,7 +740,7 @@ export function ChannelsSettings() {
               ) : (
                 <>
                   <Phone className="h-3 w-3 shrink-0" />
-                  <span className="font-mono">{channel.phone ?? 'número não identificado'}</span>
+                  <span className="font-mono">{formatPhone(channel.phone) || 'número não identificado'}</span>
                 </>
               )}
             </div>

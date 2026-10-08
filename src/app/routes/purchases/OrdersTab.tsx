@@ -7,7 +7,7 @@ import { getSupabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { AuditList } from '../finance/AuditList';
-import { formatDoc } from '../finance/SetupTab';
+import { formatCEP, formatDoc, formatPhone } from '@/lib/format';
 import {
   fmtDate, fmtDateTime, ORDER_STATUS, purError, qtyFmt, RECEIPT_STATUS, rpc, todaySP,
   type Order, type OrderItem, type OrderStatus, type PurLookups, type Receipt, type TabProps,
@@ -204,11 +204,11 @@ function printOrder(order: Order, items: OrderItem[], lookups: PurLookups) {
   const sup = lookups.suppliers.find((s) => s.id === order.party_id);
   const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
   const rows = items.map((i) => `<tr><td>${esc(i.description)}</td><td class="r">${qtyFmt(i.qty)} ${esc(i.unit)}</td><td class="r">${formatBRL(i.unit_cents)}</td><td class="r">${formatBRL(Math.round(Number(i.qty) * i.unit_cents))}</td></tr>`).join('');
-  const addr = sup ? [sup.street, sup.street_number, sup.district, sup.city && `${sup.city}/${sup.state ?? ''}`].filter(Boolean).join(', ') : '';
+  const addr = sup ? [sup.street, sup.street_number, sup.district, sup.city && `${sup.city}/${sup.state ?? ''}`, sup.zip_code && `CEP ${formatCEP(sup.zip_code)}`].filter(Boolean).join(', ') : '';
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido ${esc(order.number)}</title>
 <style>body{font-family:Arial,sans-serif;color:#111;margin:32px;font-size:13px}h1{font-size:20px;margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border-bottom:1px solid #ddd;padding:6px;text-align:left}.r{text-align:right}.g{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.box{border:1px solid #ccc;border-radius:6px;padding:10px}.t{font-size:15px;font-weight:bold}small{color:#555}</style></head>
 <body><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1>Pedido de compra ${esc(order.number)}</h1><small>${order.revision ? `Revisão ${order.revision} · ` : ''}Emitido em ${esc(fmtDateTime(order.issued_at))}</small></div><div style="text-align:right"><b>${esc(comp?.name)}</b><br><small>${esc(formatDoc(comp?.cnpj ?? null))}</small></div></div>
-<div class="g"><div class="box"><b>Fornecedor</b><br>${esc(sup?.name ?? order.party_name)}<br><small>${esc(formatDoc(sup?.doc ?? order.party_doc))}</small><br><small>${esc(addr)}</small><br><small>${esc([sup?.phone, sup?.email].filter(Boolean).join(' · '))}</small></div>
+<div class="g"><div class="box"><b>Fornecedor</b><br>${esc(sup?.name ?? order.party_name)}<br><small>${esc(formatDoc(sup?.doc ?? order.party_doc))}</small><br><small>${esc(addr)}</small><br><small>${esc([formatPhone(sup?.whatsapp || sup?.phone), sup?.email].filter(Boolean).join(' · '))}</small></div>
 <div class="box"><b>Condições</b><br>Previsão de entrega: ${esc(fmtDate(order.expected_date))}<br>Pagamento: ${esc(order.payment_terms ?? '—')}<br>Frete: ${formatBRL(order.freight_cents)}</div></div>
 <table><thead><tr><th>Descrição</th><th class="r">Qtd.</th><th class="r">Preço un.</th><th class="r">Total</th></tr></thead><tbody>${rows}</tbody>
 <tfoot><tr><td colspan="3" class="r">Mercadorias</td><td class="r">${formatBRL(order.goods_cents)}</td></tr><tr><td colspan="3" class="r">Frete</td><td class="r">${formatBRL(order.freight_cents)}</td></tr><tr><td colspan="3" class="r t">Total</td><td class="r t">${formatBRL(order.total_cents)}</td></tr></tfoot></table>

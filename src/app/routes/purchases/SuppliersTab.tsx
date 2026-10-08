@@ -6,16 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { getSupabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/money';
-import { maskPhoneBR } from '@/lib/phone';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { AuditList } from '../finance/AuditList';
-import { formatDoc } from '../finance/SetupTab';
-import { chartAllowed, chartTree, type InstallmentRow } from '../finance/data';
+import { formatCEP, formatDoc, formatPhone } from '@/lib/format';
+import { type InstallmentRow } from '../finance/data';
 import { StatusBadge } from '../finance/ui';
 import {
   fmtDate, fmtDateTime, INVOICE_STATUS, ORDER_STATUS, purError, qtyFmt, rpc,
   type Invoice, type Order, type PurLookups, type Supplier, type TabProps,
 } from './data';
+import { SupplierForm } from './SupplierForm';
 import { Badge, Card, EmptyRow, Field, inputCls, KV, Metric, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, useDebounced } from './ui';
 
 interface Dash {
@@ -103,7 +103,7 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
                 <td className={tdCls}>{formatDoc(s.doc)}</td>
                 <td className={tdCls}>{s.category ?? '—'}</td>
                 <td className={tdCls}>{s.city ? `${s.city}${s.state ? `/${s.state}` : ''}` : '—'}</td>
-                <td className={tdCls}><div>{s.contact_name ?? ''}</div><div className="text-xs text-[var(--color-text-muted)]">{maskPhoneBR(s.whatsapp || s.phone) || s.email || ''}</div></td>
+                <td className={tdCls}><div>{s.contact_name ?? ''}</div><div className="text-xs text-[var(--color-text-muted)]">{formatPhone(s.whatsapp || s.phone) || s.email || ''}</div></td>
                 <td className={`${tdCls} text-right tabular-nums`}>{formatBRL(s.invoices_12m_cents ?? 0)}</td>
                 <td className={tdCls}>{fmtDate(s.last_invoice_date)}</td>
                 <td className={`${tdCls} text-right tabular-nums`}>{s.open_orders_count ? `${s.open_orders_count} · ${formatBRL(s.open_orders_cents ?? 0)}` : '—'}</td>
@@ -116,112 +116,6 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
       {creating && <SupplierForm lookups={lookups} supplier={null} categories={categories} onClose={() => setCreating(false)} onSaved={async (id) => { setCreating(false); await changed(); onOpen('supplier', id); }} />}
       {current && !creating && <SupplierDetail supplier={current} lookups={lookups} categories={categories} onClose={onCloseDoc} onOpen={onOpen} onChanged={changed} />}
     </div>
-  );
-}
-
-export function SupplierForm({ lookups, supplier, categories, onClose, onSaved }: { lookups: PurLookups; supplier: Supplier | null; categories: string[]; onClose: () => void; onSaved: (id: string) => void }) {
-  const s = supplier;
-  const [f, setF] = useState({
-    name: s?.name ?? '', trade_name: s?.trade_name ?? '', doc: s?.doc ?? '', kind: s?.kind ?? 'supplier', category: s?.category ?? '',
-    state_registration: s?.state_registration ?? '', municipal_registration: s?.municipal_registration ?? '', contact_name: s?.contact_name ?? '',
-    phone: s?.phone ?? '', whatsapp: s?.whatsapp ?? '', email: s?.email ?? '', website: s?.website ?? '',
-    zip_code: s?.zip_code ?? '', street: s?.street ?? '', street_number: s?.street_number ?? '', complement: s?.complement ?? '', district: s?.district ?? '',
-    city: s?.city ?? '', state: s?.state ?? '', bank_name: s?.bank_name ?? '', bank_agency: s?.bank_agency ?? '', bank_account: s?.bank_account ?? '',
-    pix_key: s?.pix_key ?? '', payment_terms: s?.payment_terms ?? '', default_chart_account_id: s?.default_chart_account_id ?? '', notes: s?.notes ?? '',
-    is_active: s?.is_active ?? true,
-  });
-  const [busy, setBusy] = useState(false);
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
-  const tree = useMemo(() => chartTree(lookups.chart).filter((c) => chartAllowed(c, 'payable')), [lookups.chart]);
-  const input = (k: keyof typeof f, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
-    <Field label={label} htmlFor={`sf-${String(k)}`}>
-      <input id={`sf-${String(k)}`} value={String(f[k] ?? '')} onChange={(e) => set(k, e.target.value as never)} className={inputCls} {...props} />
-    </Field>
-  );
-  const save = async () => {
-    const doc = f.doc.replace(/\D/g, '');
-    if (f.name.trim().length < 2) { toast.error('Informe a razão social / nome.'); return; }
-    if (doc && doc.length !== 11 && doc.length !== 14) { toast.error('CPF deve ter 11 números e CNPJ 14.'); return; }
-    if (f.state && !/^[A-Za-z]{2}$/.test(f.state.trim())) { toast.error('UF com 2 letras (ex.: AC).'); return; }
-    setBusy(true);
-    const row: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(f)) row[k] = typeof v === 'string' ? (v.trim() || null) : v;
-    row.name = f.name.trim(); row.doc = doc || null;
-    row.phone = f.phone.replace(/\D/g, '') || null; row.whatsapp = f.whatsapp.replace(/\D/g, '') || null;
-    const sb = getSupabase();
-    const res = s ? await sb.from('fin_parties').update(row).eq('id', s.id).select('id').single() : await sb.from('fin_parties').insert(row).select('id').single();
-    setBusy(false);
-    if (res.error) { toast.error('Não foi possível salvar', { description: purError(res.error) }); return; }
-    toast.success(s ? 'Cadastro atualizado.' : 'Fornecedor cadastrado.');
-    onSaved(res.data.id as string);
-  };
-  return (
-    <Dialog open onClose={onClose} widthClass="max-w-4xl" opaque title={s ? `Editar ${s.trade_name || s.name}` : 'Novo fornecedor'} description="O mesmo cadastro vale para Compras, Notas de entrada e Contas a pagar.">
-      <div className="space-y-5">
-        <section>
-          <h4 className="mb-2 text-sm font-semibold">Identificação</h4>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="sm:col-span-2">{input('name', 'Razão social / nome')}</div>
-            {input('trade_name', 'Nome fantasia')}
-            {input('doc', 'CNPJ / CPF', { inputMode: 'numeric' })}
-            {input('state_registration', 'Inscrição estadual')}
-            {input('municipal_registration', 'Inscrição municipal')}
-            <Field label="Categoria" htmlFor="sf-category">
-              <input id="sf-category" list="sf-cats" value={f.category} onChange={(e) => set('category', e.target.value)} className={inputCls} placeholder="Ex.: Produtos químicos" />
-              <datalist id="sf-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
-            </Field>
-            <Field label="Tipo" htmlFor="sf-kind">
-              <select id="sf-kind" value={f.kind} onChange={(e) => set('kind', e.target.value as Supplier['kind'])} className={inputCls}>
-                <option value="supplier">Fornecedor</option><option value="both">Fornecedor e cliente</option><option value="customer">Só cliente</option>
-              </select>
-            </Field>
-            <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_active} onChange={(e) => set('is_active', e.target.checked)} /> Ativo</label>
-          </div>
-        </section>
-        <section>
-          <h4 className="mb-2 text-sm font-semibold">Contato</h4>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {input('contact_name', 'Pessoa de contato')}
-            <Field label="Telefone" htmlFor="sf-phone"><input id="sf-phone" value={maskPhoneBR(f.phone) || f.phone} onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 13))} className={inputCls} placeholder="(68) 3222-0000" /></Field>
-            <Field label="WhatsApp" htmlFor="sf-wa"><input id="sf-wa" value={maskPhoneBR(f.whatsapp) || f.whatsapp} onChange={(e) => set('whatsapp', e.target.value.replace(/\D/g, '').slice(0, 13))} className={inputCls} placeholder="(68) 99999-0000" /></Field>
-            {input('email', 'E-mail', { type: 'email' })}
-            {input('website', 'Site')}
-          </div>
-        </section>
-        <section>
-          <h4 className="mb-2 text-sm font-semibold">Endereço</h4>
-          <div className="grid gap-3 sm:grid-cols-4">
-            {input('zip_code', 'CEP', { inputMode: 'numeric' })}
-            <div className="sm:col-span-2">{input('street', 'Rua')}</div>
-            {input('street_number', 'Número')}
-            {input('complement', 'Complemento')}
-            {input('district', 'Bairro')}
-            {input('city', 'Cidade')}
-            {input('state', 'UF', { maxLength: 2 })}
-          </div>
-        </section>
-        <section>
-          <h4 className="mb-2 text-sm font-semibold">Pagamento</h4>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {input('bank_name', 'Banco')}
-            {input('bank_agency', 'Agência')}
-            {input('bank_account', 'Conta')}
-            {input('pix_key', 'Chave Pix')}
-            {input('payment_terms', 'Condição habitual', { placeholder: 'Ex.: 28 dias' })}
-            <Field label="Conta do plano (padrão)" htmlFor="sf-chart" hint="Sugerida ao criar a conta a pagar das notas.">
-              <select id="sf-chart" value={f.default_chart_account_id} onChange={(e) => set('default_chart_account_id', e.target.value)} className={inputCls}>
-                <option value="">—</option>{tree.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
-              </select>
-            </Field>
-          </div>
-        </section>
-        <Field label="Observações" htmlFor="sf-notes"><textarea id="sf-notes" rows={3} value={f.notes} onChange={(e) => set('notes', e.target.value.slice(0, 4000))} className={`${inputCls} h-auto py-2`} /></Field>
-      </div>
-      <div className="flex justify-end gap-2 pt-5">
-        <Button variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button disabled={busy} onClick={save}>Salvar</Button>
-      </div>
-    </Dialog>
   );
 }
 
@@ -256,7 +150,7 @@ function SupplierDetail({ supplier: s, lookups, categories, onClose, onOpen, onC
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--color-text-secondary)]">
           {!s.is_active && <Badge tone="muted">inativo</Badge>}
-          {(s.whatsapp || s.phone) && <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {maskPhoneBR(s.whatsapp || s.phone)}</span>}
+          {(s.whatsapp || s.phone) && <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {formatPhone(s.whatsapp || s.phone)}</span>}
           {s.email && <a href={`mailto:${s.email}`} className="inline-flex items-center gap-1 hover:underline"><Mail className="h-3.5 w-3.5" /> {s.email}</a>}
           {s.city && <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> {s.city}{s.state ? `/${s.state}` : ''}</span>}
           <div className="flex-1" />
@@ -319,12 +213,27 @@ function SupplierDetail({ supplier: s, lookups, categories, onClose, onOpen, onC
               <KV label="Inscr. estadual">{s.state_registration}</KV><KV label="Inscr. municipal">{s.municipal_registration}</KV>
               <KV label="Tipo">{s.kind === 'both' ? 'Fornecedor e cliente' : s.kind === 'customer' ? 'Cliente' : 'Fornecedor'}</KV><KV label="Desde">{fmtDateTime(s.created_at)}</KV>
             </div></Card>
+            {(s.legal_status || s.main_activity || s.founded_on) && (
+              <Card title={<span className="flex items-center gap-2">Receita Federal {s.legal_status && <Badge tone={/ATIVA/i.test(s.legal_status) ? 'success' : 'error'}>{s.legal_status}</Badge>}</span>}>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <KV label="Abertura">{fmtDate(s.founded_on)}</KV><KV label="Atividade principal">{s.main_activity}</KV>
+                  <KV label="Porte">{s.company_size}</KV><KV label="Natureza jurídica">{s.legal_nature}</KV>
+                  <KV label="Simples / MEI">{s.simples_nacional === null || s.simples_nacional === undefined ? '—' : `${s.simples_nacional ? 'Optante do Simples' : 'Fora do Simples'}${s.mei ? ' · MEI' : ''}`}</KV>
+                  <KV label="Capital social">{s.share_capital_cents !== null && s.share_capital_cents !== undefined ? formatBRL(s.share_capital_cents) : null}</KV>
+                  <KV label="Matriz / filial">{s.headquarters}</KV><KV label="Consultado em">{s.cnpj_checked_at ? fmtDateTime(s.cnpj_checked_at) : null}</KV>
+                </div>
+                {(s.cnpj_data?.qsa?.length ?? 0) > 0 && (
+                  <div className="mt-3 text-sm"><span className="text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">Sócios: </span>
+                    {s.cnpj_data!.qsa!.map((q) => `${q.nome_socio}${q.qualificacao_socio ? ` (${q.qualificacao_socio})` : ''}`).join(' · ')}</div>
+                )}
+              </Card>
+            )}
             <Card title="Contato"><div className="grid gap-3 sm:grid-cols-4">
-              <KV label="Contato">{s.contact_name}</KV><KV label="Telefone">{maskPhoneBR(s.phone) || null}</KV><KV label="WhatsApp">{maskPhoneBR(s.whatsapp) || null}</KV><KV label="E-mail">{s.email}</KV>
+              <KV label="Contato">{s.contact_name}</KV><KV label="Telefone">{formatPhone(s.phone) || null}</KV><KV label="WhatsApp">{formatPhone(s.whatsapp) || null}</KV><KV label="E-mail">{s.email}</KV>
               <KV label="Site">{s.website}</KV>
             </div></Card>
             <Card title="Endereço"><div className="grid gap-3 sm:grid-cols-4">
-              <KV label="Endereço">{addr || null}</KV><KV label="Cidade">{s.city ? `${s.city}${s.state ? `/${s.state}` : ''}` : null}</KV><KV label="CEP">{s.zip_code ? s.zip_code.replace(/^(\d{5})(\d{3})$/, '$1-$2') : null}</KV>
+              <KV label="Endereço">{addr || null}</KV><KV label="Cidade">{s.city ? `${s.city}${s.state ? `/${s.state}` : ''}` : null}</KV><KV label="CEP">{s.zip_code ? formatCEP(s.zip_code) : null}</KV>
             </div></Card>
             <Card title="Pagamento"><div className="grid gap-3 sm:grid-cols-4">
               <KV label="Banco">{s.bank_name}</KV><KV label="Agência / conta">{[s.bank_agency, s.bank_account].filter(Boolean).join(' / ') || null}</KV><KV label="Pix">{s.pix_key}</KV>

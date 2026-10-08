@@ -720,3 +720,10 @@ Regras:
   - Vários shapes de payload do Zernio (webhook inbound/status, `upload-direct`,
     corpo do send message, endpoint de registro de webhook) estão marcados
     `ASSUMIDO` no código — confirmar contra a API real no 1º teste de integração.
+## Formatos BR (08/10/2026) — `src/lib/format.ts`
+- Exibição: `formatPhone` (= `formatPhoneDisplay`, "(68) 99942-8493"), `formatDoc` (CPF/CNPJ), `formatCEP`; datas com
+  `fmtDate`/`fmtDateTime` (finance/data). Digitação: `maskPhoneBR` (campos que guardam só dígitos),
+  `maskPhoneInput` (campos que guardam +55 via `normalizePhone`), `maskDoc`, `maskCNPJ`, `maskCEP`. Banco guarda só dígitos/E.164.
+- Fornecedor: `purchases/SupplierForm.tsx` consulta a BrasilAPI no navegador (`/api/cnpj/v1/{cnpj}`, `/api/cep/v1/{cep}`) e grava
+  situação, abertura, CNAE, porte, natureza, Simples/MEI, capital, matriz/filial e o JSON completo em `fin_parties.cnpj_data`
+  (`20261008180000_suppliers_cnpj.sql`).
