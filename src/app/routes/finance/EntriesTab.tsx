@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Ban, CheckCircle2, Printer, ChevronDown, Download, Eye, FileSpreadsheet, FileText, ListChecks, Pencil, Plus, Search, Trash2, Undo2 } from 'lucide-react';
+import { Ban, CheckCircle2, MessageCircle, Printer, ChevronDown, Download, Eye, FileSpreadsheet, FileText, ListChecks, Pencil, Plus, Search, Trash2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -204,6 +204,37 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     }, mode);
   };
 
+  // Envia o resumo das contas pelo WhatsApp do usuário: monta o texto (marcadas ou, sem marcação, as da lista),
+  // copia para a área de transferência e abre o WhatsApp para escolher a pessoa ou o grupo.
+  const sendWhatsApp = async () => {
+    const base = (chosen.length ? chosen : rowsView).filter((r) => r.status !== 'canceled');
+    if (!base.length) { toast.info('Nenhuma conta para enviar.'); return; }
+    const icon: Record<string, string> = { overdue: '🔴', open: '🟡', partial: '🟠', paid: '✅' };
+    const short = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+    const sum = (f: (r: InstallmentRow) => number) => base.reduce((a, r) => a + f(r), 0);
+    const comp = company ? lookups.companies.find((c) => c.id === company)?.name : null;
+    const lines = [
+      `*${title}* — ${from ? fmtDate(from) : '—'} a ${to ? fmtDate(to) : '—'}${comp ? `\n${comp}` : ''}`,
+      `${base.length} parcela(s) · Total ${formatBRL(sum((r) => r.amount_cents))}`,
+      `Em aberto *${formatBRL(sum((r) => r.remaining_cents))}* · Vencidas *${formatBRL(sum((r) => (r.status === 'overdue' ? r.remaining_cents : 0)))}*`,
+      '',
+      ...base.map((r) => {
+        const st = r.is_partial && r.status !== 'paid' ? 'partial' : r.status;
+        return `${icon[st] ?? '▫️'} ${fmtDate(r.due_date).slice(0, 5)} · ${short(partyLabel(r) || '—', 32)} · *${formatBRL(r.remaining_cents || r.amount_cents)}*\n      ${short(r.description, 48)}`;
+      }),
+      '',
+      `🔴 vencida · 🟡 em aberto · 🟠 parcial · ✅ paga`,
+    ];
+    const text = lines.join('\n');
+    let copied = false;
+    try { await navigator.clipboard.writeText(text); copied = true; } catch { /* sem permissão de cópia */ }
+    // Link muito grande o WhatsApp corta: aí abre vazio e o texto vai colado.
+    const url = text.length <= 3500 ? `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}` : 'https://web.whatsapp.com/';
+    window.open(url, '_blank', 'noopener');
+    if (text.length > 3500) toast.success(copied ? 'Texto copiado. Escolha a conversa ou o grupo no WhatsApp e cole (Ctrl+V).' : 'Lista grande demais para o link. Marque menos contas e tente de novo.');
+    else toast.success(`${base.length} conta(s) prontas no WhatsApp — escolha a pessoa ou o grupo.`, { description: copied ? 'O texto também foi copiado, se precisar colar.' : undefined });
+  };
+
   const barBtn = 'flex h-10 items-center gap-1.5 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50';
   const menuItem = 'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40';
 
@@ -281,6 +312,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
         </div>
         <div className="relative ml-auto flex items-center gap-2">
           <GridReset grid={grid} />
+          <Button variant="outline" onClick={() => void sendWhatsApp()} disabled={!rowsView.length} title={chosen.length ? 'Envia as contas marcadas' : 'Envia as contas da lista'}><MessageCircle className="h-4 w-4 text-[#16a34a]" /> WhatsApp{chosen.length ? ` (${chosen.length})` : ''}</Button>
           <Button variant="outline" onClick={() => doReport('print')} disabled={!rowsView.length}><Printer className="h-4 w-4" /> Imprimir</Button>
           <Button variant="outline" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'} disabled={!rowsView.length}>
             <Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" />
