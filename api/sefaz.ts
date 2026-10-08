@@ -332,6 +332,10 @@ async function saveCert(ctx: Ctx, b: Record<string, unknown>) {
   docFor(cert, comp); // confere CNPJ da empresa x certificado
   await setCredential(ctx.orgId, `sefaz_cert_pfx:${comp.id}`, pfx);
   await setCredential(ctx.orgId, `sefaz_cert_pass:${comp.id}`, password);
+  // Empresa sem CNPJ: assume o do certificado (as notas passam a cair na empresa certa).
+  if (!(comp.cnpj ?? '').replace(/\D/g, '') && cert.cnpj) {
+    await ctx.sys.schema('whatsapp_hub').from('fin_companies').update({ cnpj: cert.cnpj }).eq('id', comp.id).eq('org_id', ctx.orgId);
+  }
   await setState(ctx, comp.id, { enabled: true, cert_cnpj: cert.cnpj, cert_subject: cert.subject.slice(0, 200), cert_valid_until: cert.validUntil.toISOString(), last_status: 'Certificado salvo.' });
   return { ok: true, cnpj: cert.cnpj, subject: cert.subject, valid_until: cert.validUntil.toISOString() };
 }

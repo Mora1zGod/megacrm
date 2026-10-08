@@ -69,7 +69,7 @@ function SefazSettings() {
               {c.has_cert && c.enabled && <Button size="sm" disabled={busy === `s${c.id}`} onClick={() => run(`s${c.id}`, 'sync', { company_id: c.id })}>{busy === `s${c.id}` && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Buscar agora</Button>}
             </>}>
             <div className="grid gap-3 text-sm sm:grid-cols-4">
-              <div><div className="text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">CNPJ da empresa</div>{c.cnpj ? formatDoc(c.cnpj) : <span className="text-[var(--color-error)]">não cadastrado</span>}</div>
+              <div><div className="text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">CNPJ da empresa</div>{c.cnpj ? formatDoc(c.cnpj) : c.cert_cnpj ? <span className="text-[var(--inbox-warn-text,#B45309)]">não cadastrado — usando o do certificado</span> : <span className="text-[var(--color-error)]">não cadastrado</span>}</div>
               <div><div className="text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">Certificado</div>
                 {c.has_cert ? <span className="inline-flex items-center gap-1"><ShieldCheck className="h-4 w-4 text-[var(--color-success)]" /> {c.cert_cnpj ? formatDoc(c.cert_cnpj) : 'enviado'}</span> : <span className="text-[var(--color-text-muted)]">não enviado</span>}
               </div>
