@@ -759,3 +759,13 @@ Regras:
   título da coluna arrasta para reordenar (`boards.position` renumerado 1000, 2000…). `useBoardContent` aceita 1 id ou vários.
 - Posições: `card_checklists.position` é **integer** — nunca `Date.now()`; usar maior posição + 1000.
 - `DataGrid` cabe na largura da tela (larguras viram proporções, com mínimo por coluna) e tem menu "Colunas" (mostrar/esconder, padrão).
+
+## Notificações WhatsApp (08/10/2026) — `20261008200000_wa_notifications.sql`
+- Avisos internos saem por UM número UAZAPI (sem janela de 24 h): `wa_notify_settings` (1 linha por org, `channel_id`) +
+  `wa_notify_recipients` (nome, `phone` = dígitos com DDI ou JID `…@g.us`, `topics`, `is_active`). Leitura: membros da org;
+  escrita: `settings.channels`. Tela: Configurações → Comunicação e integrações → Notificações WhatsApp (teste por destinatário).
+- Edge Function `send-wa-notification` (`financial.ledger_view` ou `settings.channels`): `{recipient_ids, text?, images_base64?}` —
+  PNGs vão para `whatsapp-hub-media/<org>/notificacoes/` e saem por `/send/media` (legenda na 1ª). Não grava no Atendimento.
+- Contas a pagar/receber → WhatsApp: `SendBillsDialog` desenha o resumo em PNG no navegador (`lib/wa-summary-image.ts`,
+  1ª imagem com indicadores + 8 contas, depois 10 por imagem, até 5) e envia; alternativas: conversa do Atendimento
+  (`SendTextToConversations`) ou o WhatsApp do próprio usuário.

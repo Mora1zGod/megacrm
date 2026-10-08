@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  Activity, ArrowLeft, Bot, Building2, Cake, ChevronRight, Clock, GitBranchPlus, KeyRound, ListOrdered, Lock, Mail, MessagesSquare, Moon,
+  Activity, BellRing, ArrowLeft, Bot, Building2, Cake, ChevronRight, Clock, GitBranchPlus, KeyRound, ListOrdered, Lock, Mail, MessagesSquare, Moon,
   Package, Palette, Plug, ScrollText, Server, Settings as SettingsIcon, ShieldCheck, Sun, Timer, UserCircle2, Users, UsersRound, Wallet,
   Webhook, Workflow, Zap, type LucideIcon,
 } from 'lucide-react';
@@ -23,6 +23,7 @@ import { AccessSettings } from './sections/access/AccessSettings';
 import { CompaniesSection } from './companies/CompaniesSection';
 import { CompanyEditor } from './companies/CompanyEditor';
 import { ChannelsStatus, ExternalServices, IntegrationsHub, WebhooksPanel } from './integrations/IntegrationsHub';
+import { WaNotifySettings } from './integrations/WaNotifySettings';
 import { SettingsTab as AsaasSettings } from '../finance/SettingsTab';
 
 const AuditLogPage = lazy(() => import('../admin/AuditLogPage'));
@@ -63,6 +64,7 @@ const SECTIONS: SectionDef[] = [
     render: () => <IntegrationsHub />,
     items: [
       { id: 'canais', title: 'WhatsApp e Instagram', desc: 'Números, contas e conexões', icon: MessagesSquare, perm: 'settings.channels', render: () => <ChannelsSettings /> },
+      { id: 'avisos', title: 'Notificações WhatsApp', desc: 'Número que envia os avisos e quem recebe', icon: BellRing, anyPerm: ['settings.channels', 'financial.ledger_view'], render: () => <WaNotifySettings /> },
       { id: 'status', title: 'Status dos canais', desc: 'Conectado, desconectado e última mensagem', icon: Activity, perm: 'settings.channels', render: () => <ChannelsStatus /> },
       { id: 'api', title: 'APIs', desc: 'Chaves de integração', icon: KeyRound, perm: 'settings.integrations', render: () => <ApiKeysSettings /> },
       { id: 'webhooks', title: 'Webhooks', desc: 'Endereços e últimos avisos', icon: Webhook, anyPerm: ['settings.integrations', 'settings.channels'], render: () => <WebhooksPanel /> },
