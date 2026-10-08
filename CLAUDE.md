@@ -634,6 +634,38 @@ Regras:
 - ASAAS: Edge `fin-asaas` (config, emitir/cancelar/devolver) e `fin-asaas-webhook` (`?org=`, header
   `asaas-access-token`; CONFIRMED/RECEIVED → `fin_charge_paid`, REFUNDED → `fin_charge_refunded`).
   Credenciais por org: `asaas_api_key`, `asaas_env`, `asaas_webhook_token`.
+- Plano de contas AMAI Park (`20261008160000_chart_amai_park.sql`): `fin_replace_chart_amai(org)`
+  troca o plano (contas antigas COM lançamento vão para 98/99 inativas; o resto é apagado). Aplicado a
+  todas as orgs menos "BELA/BELLA CENTER". `fin_seed_org` agora semeia este plano. Grupo 10
+  RESULTADOS é só referência (sintético, o DRE calcula); 1.1.7 Cortesias nasce inativa.
+
+## Compras (08/10/2026) — `20261008150000_purchases_module.sql` + `20261008170000_suppliers.sql`, rota `/compras`
+
+- Fluxo: `pur_requisitions(+items)` → `pur_quotations(+items/suppliers/prices)` → `pur_orders(+items,
+  revisions)` → `pur_receipts(+items)` → `pur_invoices(+items/dues/links)`. Numeração `pur_next_number`
+  (REQ/COT/PED/REC). Base de estoque: `inv_locations`, `inv_items`, `inv_movements`, `inv_balances_v`
+  (o módulo Estoque completo ainda vai ser pedido).
+- Status/número/aprovação só mudam por RPC `pur_*` (flag de sessão `whatsapp_hub.pur_rpc` libera os
+  guards `_pur_header_guard`/`_pur_child_guard`/`_pur_quote_open_guard`/`_pur_invoice_item_guard`/
+  `_pur_ref_guard` — este último trava vínculos, contadores e referências de outra org nas edições da tela).
+  Rascunho a tela edita direto (RLS por permissão `purchases.*`). Exclusão só de rascunho; nota só antes
+  de lançar. Auditoria em `fin_audit_log` (tabelas `pur_%`/`inv_%` visíveis com `purchases.view`).
+- Alçadas `pur_approval_bands` (faixa → perfil). Quem pede não aprova; quem monta a cotação não aprova o
+  estouro; cotação acima do teto da requisição vira `pending_approval`.
+- Recebimento: estoque entra só com a quantidade ACEITA; recusa exige divergência; item com lote exige lote.
+  Nota ligada a pedido/recebimento NÃO lança estoque de novo (`pur_invoice_post`).
+- Nota → Financeiro: `pur_invoice_fin_create` (conta a pagar com as duplicatas via
+  `fin_create_entry_schedule`) ou `pur_invoice_fin_link` (diferença exige aceite). Uma nota = uma conta.
+- Fornecedor = `fin_parties` (campos completos no `20261008170000_suppliers.sql`), CNPJ único por org,
+  permissão `purchases.suppliers`; lista `pur_suppliers_v`; painel `pur_supplier_dashboard(party)`.
+  Aba Fornecedores em Compras e no Financeiro (mesmo componente `purchases/SuppliersTab.tsx`).
+- SEFAZ: rota Vercel `api/sefaz.ts` (Node; `node-forge` + `fast-xml-parser`; parser em `src/lib/nfe.ts`).
+  Certificado A1 cifrado em `org_settings` (`sefaz_cert_pfx:<empresa>`, `sefaz_cert_pass:<empresa>`).
+  NFeDistribuicaoDFe por NSU (cUFAutor 12; 137/656 → espera 1 h em `pur_sefaz_state.next_sync_after`),
+  ciência 210210 assinada (XMLDSig C14N/RSA-SHA1) e consChNFe para baixar o XML completo. Gravação das
+  notas com a SESSÃO do usuário (Authorization do usuário + apikey service). XML em
+  `whatsapp-hub-purchases/<org>/nfe/<chave>.xml`. Sem `SEFAZ_CA_PEM` (cadeia ICP-Brasil) a conexão não
+  confere o certificado do servidor da SEFAZ — configurar na Vercel para validação estrita.
 
 ## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
 

@@ -29,6 +29,7 @@ const SettingsPage = lazy(() => import('./routes/settings/SettingsPage'));
 const AdminPage = lazy(() => import('./routes/admin/AdminPage'));
 const TasksPage = lazy(() => import('./routes/tasks/TasksPage'));
 const FinancePage = lazy(() => import('./routes/finance/FinancePage'));
+const PurchasesPage = lazy(() => import('./routes/purchases/PurchasesPage'));
 const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
 const IntegrationsPage = lazy(() => import('./routes/integrations/IntegrationsPage'));
 const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
@@ -241,6 +242,7 @@ export function AppRouter() {
           <Route path="/settings/profile" element={<SettingsPage />} />
           <Route path="/admin" element={<RequireSuperAdmin><AdminPage /></RequireSuperAdmin>} />
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
+          <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
           <Route path="/tasks" element={<RequirePermission perm="tasks.view" area="Tarefas"><TasksPage /></RequirePermission>} />
           <Route path="/relatorios" element={<RequirePermission perm="reports.view" area="Relatórios"><ReportsPage /></RequirePermission>} />
           <Route path="/integracoes" element={<RequirePermission perm="settings.integrations" area="Integrações"><IntegrationsPage /></RequirePermission>} />

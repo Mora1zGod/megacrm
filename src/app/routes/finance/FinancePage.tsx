@@ -1,4 +1,5 @@
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePermission } from '@/app/providers/PermissionsProvider';
@@ -10,8 +11,10 @@ import { ClosingTab } from './ClosingTab';
 import { SetupTab } from './SetupTab';
 import { SettingsTab } from './SettingsTab';
 import { AuditList } from './AuditList';
+import { SuppliersTab } from '../purchases/SuppliersTab';
+import { usePurLookups } from '../purchases/data';
 
-type Tab = 'pagar' | 'receber' | 'bancos' | 'relatorios' | 'fechamento' | 'cadastros' | 'config' | 'auditoria';
+type Tab = 'pagar' | 'receber' | 'bancos' | 'fornecedores' | 'relatorios' | 'fechamento' | 'cadastros' | 'config' | 'auditoria';
 
 // Financeiro do grupo (várias empresas na mesma organização).
 export default function FinancePage() {
@@ -22,6 +25,7 @@ export default function FinancePage() {
     ['pagar', 'Contas a pagar', true],
     ['receber', 'Contas a receber', true],
     ['bancos', 'Bancos e transferências', true],
+    ['fornecedores', 'Fornecedores', true],
     ['relatorios', 'Relatórios', perms.can('financial.ledger_reports')],
     ['fechamento', 'Fechamento', true],
     ['cadastros', 'Cadastros', true],
@@ -60,6 +64,7 @@ export default function FinancePage() {
         {tab === 'pagar' && <EntriesTab key="payable" kind="payable" lookups={lookups} />}
         {tab === 'receber' && <EntriesTab key="receivable" kind="receivable" lookups={lookups} />}
         {tab === 'bancos' && <BanksTab lookups={lookups} />}
+        {tab === 'fornecedores' && <FinanceSuppliers />}
         {tab === 'relatorios' && <ReportsTab lookups={lookups} />}
         {tab === 'fechamento' && <ClosingTab lookups={lookups} />}
         {tab === 'cadastros' && <SetupTab lookups={lookups} />}
@@ -67,5 +72,17 @@ export default function FinancePage() {
         {tab === 'auditoria' && <AuditList />}
       </div>
     </div>
+  );
+}
+
+// Mesma ficha de fornecedor de Compras (notas, pedidos, contas a pagar, painel).
+const PUR_TAB: Record<string, string> = { invoice: 'notas', order: 'pedidos', receipt: 'recebimentos', requisition: 'requisicoes', quotation: 'cotacoes' };
+function FinanceSuppliers() {
+  const lookups = usePurLookups();
+  const navigate = useNavigate();
+  const [doc, setDoc] = useState<string | null>(null);
+  return (
+    <SuppliersTab lookups={lookups} openId={doc} onCloseDoc={() => setDoc(null)}
+      onOpen={(kind, id) => { if (kind === 'supplier') setDoc(id); else if (PUR_TAB[kind]) navigate(`/compras?tab=${PUR_TAB[kind]}&doc=${id}`); }} />
   );
 }

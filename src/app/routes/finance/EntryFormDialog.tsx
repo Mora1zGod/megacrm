@@ -12,16 +12,18 @@ import { CompanySelect, Field, inputCls, MoneyInput } from './ui';
 
 const SUGGESTIONS: Record<EntryKind, Array<{ label: string; description: string; code: string }>> = {
   payable: [
-    { label: 'Energia', description: 'Conta de energia elétrica', code: '4.01' },
-    { label: 'Água', description: 'Conta de água e esgoto', code: '4.02' },
-    { label: 'Internet', description: 'Internet e telefonia', code: '4.03' },
-    { label: 'Manutenção', description: 'Manutenção do parque', code: '3.01' },
+    { label: 'Energia', description: 'Conta de energia elétrica', code: '3.4.1' },
+    { label: 'Água', description: 'Conta de água', code: '3.4.2' },
+    { label: 'Internet', description: 'Internet e telefonia', code: '4.2.2' },
+    { label: 'Químicos', description: 'Produtos químicos da piscina', code: '3.2.2' },
+    { label: 'Manutenção', description: 'Manutenção de brinquedos', code: '5.3' },
+    { label: 'Tráfego pago', description: 'Anúncios / tráfego pago', code: '6.1' },
   ],
   receivable: [
-    { label: 'Evento', description: 'Evento', code: '1.1.02' },
-    { label: 'Excursão', description: 'Excursão', code: '1.1.03' },
-    { label: 'Área VIP', description: 'Locação de área VIP', code: '1.1.04' },
-    { label: 'Patrocínio', description: 'Patrocínio', code: '1.1.05' },
+    { label: 'Evento', description: 'Evento / aniversário', code: '1.3.5' },
+    { label: 'Excursão', description: 'Excursão / escola', code: '1.3.6' },
+    { label: 'Área VIP', description: 'Locação de área VIP / bangalô', code: '1.3.4' },
+    { label: 'Patrocínio', description: 'Patrocínio', code: '1.4.3' },
   ],
 };
 

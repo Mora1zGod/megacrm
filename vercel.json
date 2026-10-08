@@ -8,9 +8,15 @@
     "api/bootstrap.ts": {
       "includeFiles": "supabase/**",
       "maxDuration": 300
+    },
+    "api/sefaz.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
-    { "source": "/:path((?!assets/).*)", "destination": "/index.html" }
+    {
+      "source": "/:path((?!assets/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
