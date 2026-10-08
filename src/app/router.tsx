@@ -14,6 +14,7 @@ const SetupPage = lazy(() => import('./routes/setup/SetupPage'));
 const LoginPage = lazy(() => import('./routes/auth/LoginPage'));
 const SignupPage = lazy(() => import('./routes/auth/SignupPage'));
 const InvitePage = lazy(() => import('./routes/invite/InvitePage'));
+const SelfSignupPage = lazy(() => import('./routes/auth/SelfSignupPage'));
 const DashboardPage = lazy(() => import('./routes/dashboard/DashboardPage'));
 const InboxPage = lazy(() => import('./routes/inbox/InboxPage'));
 const CampaignsPage = lazy(() => import('./routes/campaigns/CampaignsPage'));
@@ -158,6 +159,15 @@ export function AppRouter() {
               <RedirectIfAuthenticated>
                 <SignupPage />
               </RedirectIfAuthenticated>
+            </RequireSetup>
+          }
+        />
+        {/* Cadastro pelo link do administrador (fica aguardando aprovação). */}
+        <Route
+          path="/cadastro/:token"
+          element={
+            <RequireSetup>
+              <SelfSignupPage />
             </RequireSetup>
           }
         />

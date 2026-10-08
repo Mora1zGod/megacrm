@@ -50,7 +50,9 @@ export function Drawer({ open, title, subtitle, onClose, children, footer, wide 
 }
 
 export function StatusPill({ m }: { m: Pick<Member, 'status' | 'invite_pending'> }) {
-  const s = m.status !== 'active'
+  const s = m.status === 'pending'
+    ? { label: 'Aguardando aprovação', dot: 'bg-[#F59E0B]', text: 'text-[var(--inbox-warn-text,#B45309)]' }
+    : m.status !== 'active'
     ? m.status === 'blocked'
       ? { label: 'Bloqueado', dot: 'bg-[var(--color-error)]', text: 'text-[var(--color-error)]' }
       : { label: 'Inativo', dot: 'bg-[var(--color-text-muted)]', text: 'text-[var(--color-text-muted)]' }

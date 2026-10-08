@@ -599,6 +599,17 @@ Regras:
   de senha (`must_change_password` → `clear_my_password_flag()`); login/logout com IP e
   dispositivo pela Edge Function `log-access` (fallback RPC `log_access_event`).
 
+## Cadastro por link + aprovação (08/10/2026)
+
+- `signup_links` (token secreto por org, perfil/equipe sugeridos, validade/limite opcionais) —
+  RLS só para quem tem `users.create`. Página pública `/cadastro/:token` → Edge Function
+  `public-signup` (deploy `--no-verify-jwt`): cria a conta via `auth.admin.createUser` com o
+  mesmo metadata do convite (`invited_org_id` + `invited_role:'operator'`), **banida** e com
+  `app_users.status = 'pending'`. Nada de perfil/org vem do navegador.
+- Aprovação em Usuários e acessos (`manage-team-member` `approve` / `reject`): aprovar define
+  perfil+equipe, tira o ban e põe `status='active'`; recusar apaga a linha e a conta.
+- `list_operators()` esconde pendentes; `status='pending'` já não passa no `current_org_active()`.
+
 ## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
 
 - `messages.reply_to_id` / `platform_message_id` ("wamid", do webhook Zernio) /

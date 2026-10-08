@@ -10,6 +10,9 @@
 //   reactivate    { user_id }   → users.deactivate
 //   reset_password{ user_id }   → users.reset_password (e-mail de redefinição)
 //   resend_invite { user_id }   → users.create (convite ainda não aceito)
+//   approve       { user_id, access_role_id, team_id? } → users.create
+//                 (cadastro feito pelo link: libera o acesso com o perfil escolhido)
+//   reject        { user_id }   → users.create (recusa e apaga o cadastro pendente)
 //
 // Regras: ninguém age sobre si mesmo; super admin só por super admin; dar
 // perfil com acesso total exige ser administrador. Tudo vai para a auditoria.
@@ -21,7 +24,7 @@ import { getCredential } from '../_shared/credentials.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 
 type OrgCaller = Caller & { orgId: string };
-type Action = 'invite' | 'deactivate' | 'reactivate' | 'reset_password' | 'resend_invite';
+type Action = 'invite' | 'deactivate' | 'reactivate' | 'reset_password' | 'resend_invite' | 'approve' | 'reject';
 
 const PERM: Record<Action, string> = {
   invite: 'users.create',
@@ -29,6 +32,8 @@ const PERM: Record<Action, string> = {
   reactivate: 'users.deactivate',
   reset_password: 'users.reset_password',
   resend_invite: 'users.create',
+  approve: 'users.create',
+  reject: 'users.create',
 };
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -176,6 +181,56 @@ Deno.serve(async (req) => {
     const { data: authUser } = await authAdmin.auth.admin.getUserById(userId);
     const email = authUser?.user?.email ?? null;
     const label = member.display_name || email || userId;
+
+    // ------------------------------------------- cadastro pelo link (pendente)
+    if (action === 'approve' || action === 'reject') {
+      if (member.status !== 'pending') {
+        return jsonResponse({ ok: false, error: 'Este usuário não está aguardando aprovação.' }, { status: 400 });
+      }
+      if (action === 'reject') {
+        // Mesmo padrão do delete-team-member: a linha da equipe primeiro.
+        const { error: rowErr } = await db.from('app_users').delete().eq('user_id', userId).eq('org_id', caller.orgId);
+        if (rowErr) return jsonResponse({ ok: false, error: rowErr.message }, { status: 500 });
+        const { error: delErr } = await authAdmin.auth.admin.deleteUser(userId);
+        if (delErr) return jsonResponse({ ok: false, error: delErr.message }, { status: 400 });
+        await stampActor(db, caller, userId);
+        return jsonResponse({ ok: true });
+      }
+
+      const roleId = clean(body.access_role_id, 36);
+      if (!roleId || !UUID_RE.test(roleId)) return jsonResponse({ ok: false, error: 'Escolha o perfil de acesso.' }, { status: 400 });
+      const { data: roleRow } = await db
+        .from('access_roles').select('id, org_id, name, is_admin').eq('id', roleId).maybeSingle();
+      const role = roleRow as { id: string; org_id: string; name: string; is_admin: boolean } | null;
+      if (!role || role.org_id !== caller.orgId) return jsonResponse({ ok: false, error: 'Perfil inválido.' }, { status: 400 });
+      if (role.is_admin && !isFullAdmin) {
+        return jsonResponse({ ok: false, error: 'Só um administrador pode aprovar alguém como administrador.' }, { status: 403 });
+      }
+      const teamId = clean(body.team_id, 36);
+      if (teamId) {
+        const { data: team } = await db.from('teams').select('id, org_id').eq('id', teamId).maybeSingle();
+        if (!team || (team as { org_id: string }).org_id !== caller.orgId) {
+          return jsonResponse({ ok: false, error: 'Equipe inválida.' }, { status: 400 });
+        }
+      }
+
+      // Perfil primeiro (ainda pendente = sem acesso), depois libera.
+      const { error: roleErr } = await db.from('app_users')
+        .update({ access_role_id: role.id, team_id: teamId })
+        .eq('user_id', userId).eq('org_id', caller.orgId);
+      if (roleErr) return jsonResponse({ ok: false, error: roleErr.message }, { status: 500 });
+      const { error: banErr } = await authAdmin.auth.admin.updateUserById(userId, { ban_duration: 'none' });
+      if (banErr) return jsonResponse({ ok: false, error: banErr.message }, { status: 400 });
+      const { error: stErr } = await db.from('app_users').update({ status: 'active', accepted_at: new Date().toISOString() })
+        .eq('user_id', userId).eq('org_id', caller.orgId);
+      if (stErr) return jsonResponse({ ok: false, error: stErr.message }, { status: 500 });
+      await stampActor(db, caller, userId);
+      return jsonResponse({ ok: true });
+    }
+
+    if (member.status === 'pending') {
+      return jsonResponse({ ok: false, error: 'Este cadastro ainda aguarda aprovação. Aprove ou recuse primeiro.' }, { status: 400 });
+    }
 
     if (action === 'deactivate' || action === 'reactivate') {
       const active = action === 'reactivate';

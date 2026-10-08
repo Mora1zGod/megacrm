@@ -14,7 +14,7 @@ export interface Member {
   access_role_id: string | null;
   role_name: string | null;
   role_is_admin: boolean;
-  status: 'active' | 'inactive' | 'blocked';
+  status: 'active' | 'inactive' | 'blocked' | 'pending';
   is_super_admin: boolean;
   must_change_password: boolean;
   invite_pending: boolean;

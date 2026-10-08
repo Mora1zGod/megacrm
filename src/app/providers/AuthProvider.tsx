@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       // Usuário desativado na tela "Usuários e acessos" fica banido no Auth.
       if (/banned/i.test(error.message)) {
-        return { error: 'Seu acesso foi desativado. Fale com o administrador.' };
+        return { error: 'Seu acesso ainda não foi liberado (aguardando aprovação) ou foi desativado. Fale com o administrador.' };
       }
       return { error: error.message };
     }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Copy, History, KeyRound, Mail, MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, UserCheck, UserPlus, UserX, Users,
+  Copy, History, KeyRound, Link2, Mail, MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, UserCheck, UserPlus, UserX, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -12,6 +12,7 @@ import { maskPhoneBR } from '@/lib/phone';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { UserDrawer } from './UserDrawer';
+import { ApproveSignupDialog, SignupLinkDialog } from './SignupLinks';
 import { RoleEditor } from './RoleEditor';
 import { formatWhen, inputCls, StatusPill } from './ui';
 import { invokeManage, memberLabel, MODULE_LABELS, useAccessData, type AccessRole, type Member } from './useAccessData';
@@ -26,6 +27,7 @@ export function AccessSettings() {
   const [editing, setEditing] = useState<Member | 'new' | null>(null);
   const [editingRole, setEditingRole] = useState<AccessRole | 'new' | null>(null);
   const [historyUser, setHistoryUser] = useState<Member | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
 
   const tabs: [Tab, string, boolean][] = [
     ['users', 'Usuários', true],
@@ -42,7 +44,10 @@ export function AccessSettings() {
           <p className="text-sm text-[var(--color-text-secondary)]">Gerencie sua equipe, perfis e permissões.</p>
         </div>
         {tab === 'users' && perms.can('users.create') && (
-          <Button onClick={() => setEditing('new')}><UserPlus className="h-4 w-4" /> Novo usuário</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setLinkOpen(true)}><Link2 className="h-4 w-4" /> Link de cadastro</Button>
+            <Button onClick={() => setEditing('new')}><UserPlus className="h-4 w-4" /> Novo usuário</Button>
+          </div>
         )}
         {tab === 'roles' && perms.isAdmin && (
           <Button onClick={() => setEditingRole('new')}><Plus className="h-4 w-4" /> Novo perfil</Button>
@@ -85,6 +90,7 @@ export function AccessSettings() {
           onSaved={() => { setEditing(null); void data.reload(); }}
         />
       )}
+      {linkOpen && <SignupLinkDialog roles={data.roles} teams={data.teams} onClose={() => setLinkOpen(false)} />}
       {editingRole && (
         <RoleEditor
           role={editingRole === 'new' ? null : editingRole}
@@ -105,7 +111,8 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
   const perms = usePermission();
   const { userId } = useAppUser();
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
+  const [status, setStatus] = useState<'all' | 'active' | 'inactive' | 'pending' | 'approval'>('all');
+  const [approving, setApproving] = useState<Member | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -113,7 +120,8 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
     const t = q.trim().toLowerCase();
     return data.members.filter((m) => {
       if (status === 'active' && (m.status !== 'active' || m.invite_pending)) return false;
-      if (status === 'inactive' && m.status === 'active') return false;
+      if (status === 'inactive' && (m.status === 'active' || m.status === 'pending')) return false;
+      if (status === 'approval' && m.status !== 'pending') return false;
       if (status === 'pending' && !(m.invite_pending && m.status === 'active')) return false;
       if (!t) return true;
       return `${m.display_name ?? ''} ${m.email} ${m.job_title ?? ''} ${m.role_name ?? ''} ${m.team_name ?? ''}`.toLowerCase().includes(t);
@@ -136,22 +144,41 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
     void data.reload();
   };
 
+  const reject = async (m: Member) => {
+    if (!window.confirm(`Recusar o cadastro de ${memberLabel(m)}? A conta criada pelo link será apagada.`)) return;
+    setBusy(m.user_id);
+    const err = await invokeManage({ action: 'reject', user_id: m.user_id });
+    setBusy(null);
+    if (err) { toast.error('Não foi possível recusar', { description: err }); return; }
+    toast.success(`Cadastro de ${memberLabel(m)} recusado.`);
+    void data.reload();
+  };
+
   const counts = {
     all: data.members.length,
+    approval: data.members.filter((m) => m.status === 'pending').length,
     active: data.members.filter((m) => m.status === 'active' && !m.invite_pending).length,
     pending: data.members.filter((m) => m.status === 'active' && m.invite_pending).length,
-    inactive: data.members.filter((m) => m.status !== 'active').length,
+    inactive: data.members.filter((m) => m.status !== 'active' && m.status !== 'pending').length,
   };
 
   return (
     <div className="space-y-3">
+      {counts.approval > 0 && status !== 'approval' && perms.can('users.create') && (
+        <button type="button" onClick={() => setStatus('approval')}
+          className="flex w-full items-center gap-2 rounded-[var(--radius-card)] border border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.08)] px-4 py-2.5 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[rgba(245,158,11,0.14)]">
+          <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
+          {counts.approval === 1 ? '1 cadastro aguardando aprovação' : `${counts.approval} cadastros aguardando aprovação`}
+          <span className="ml-auto text-xs font-semibold text-[var(--accent-primary)]">Ver e aprovar</span>
+        </button>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome, e-mail, cargo ou perfil" aria-label="Buscar usuário" className={cn(inputCls, 'pl-9')} />
         </label>
         <div className="flex gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-1">
-          {([['all', 'Todos'], ['active', 'Ativos'], ['pending', 'Convite pendente'], ['inactive', 'Inativos']] as const).map(([k, l]) => (
+          {([['all', 'Todos'], ['active', 'Ativos'], ['approval', 'Aguardando aprovação'], ['pending', 'Convite pendente'], ['inactive', 'Inativos']] as const).map(([k, l]) => (
             <button key={k} type="button" onClick={() => setStatus(k)}
               className={cn('rounded-[8px] px-3 py-1.5 text-xs font-semibold', status === k ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]')}>
               {l} <span className="opacity-70">{counts[k]}</span>
@@ -181,7 +208,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
               const me = m.user_id === userId;
               const canManage = !me && (!m.is_super_admin || false);
               return (
-                <tr key={m.user_id} className={cn('border-b border-[var(--color-border-soft)] last:border-0', m.status !== 'active' && 'opacity-60')}>
+                <tr key={m.user_id} className={cn('border-b border-[var(--color-border-soft)] last:border-0', m.status !== 'active' && m.status !== 'pending' && 'opacity-60')}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar src={m.avatar_url} name={memberLabel(m)} size="sm" className="!h-9 !w-9" />
@@ -206,6 +233,16 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
                   <td className="px-3 py-3"><StatusPill m={m} /></td>
                   <td className="px-3 py-3 text-xs text-[var(--color-text-secondary)]">{formatWhen(m.last_sign_in_at)}</td>
                   <td className="px-3 py-3">
+                    {m.status === 'pending' ? (
+                      <div className="flex justify-end gap-1">
+                        {perms.can('users.create') ? (
+                          <>
+                            <Button size="sm" onClick={() => setApproving(m)} disabled={busy === m.user_id}><UserCheck className="h-3.5 w-3.5" /> Aprovar</Button>
+                            <Button size="sm" variant="outline" onClick={() => void reject(m)} disabled={busy === m.user_id} className="text-[var(--color-error)]"><UserX className="h-3.5 w-3.5" /> Recusar</Button>
+                          </>
+                        ) : <span className="text-xs text-[var(--color-text-muted)]">Aguardando</span>}
+                      </div>
+                    ) : (
                     <div className="relative flex justify-end gap-1">
                       <Button size="sm" variant="outline" onClick={() => onEdit(m)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
                       <button type="button" onClick={() => setMenu(menu === m.user_id ? null : m.user_id)} disabled={busy === m.user_id}
@@ -230,6 +267,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
                         </>
                       )}
                     </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -237,6 +275,16 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
           </tbody>
         </table>
       </div>
+      {approving && (
+        <ApproveSignupDialog
+          member={approving}
+          roles={data.roles}
+          teams={data.teams}
+          canGrantAdmin={perms.isAdmin}
+          onClose={() => setApproving(null)}
+          onDone={() => { setApproving(null); void data.reload(); }}
+        />
+      )}
     </div>
   );
 }
