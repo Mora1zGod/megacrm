@@ -100,7 +100,7 @@ export function CardModal({
     const { error } = await supabase.from('board_labels').insert({
       board_id: boardId,
       color,
-      position: Date.now(),
+      position: Math.max(0, ...labels.map((l) => Number(l.position) || 0)) + 1000,
     });
     if (error) { toast.error('Não consegui criar a etiqueta.', { description: error.message }); return; }
     await onReload();
@@ -133,7 +133,7 @@ export function CardModal({
 
   // ---- Checklists ---------------------------------------------------------
   const addChecklist = async () => {
-    const { error } = await supabase.from('card_checklists').insert({ card_id: card.id, title: 'Checklist', position: Date.now() });
+    const { error } = await supabase.from('card_checklists').insert({ card_id: card.id, title: 'Checklist', position: Math.max(0, ...card.checklists.map((c) => Number(c.position) || 0)) + 1000 });
     if (error) { toast.error('Não consegui criar o checklist.', { description: error.message }); return; }
     await onReload();
   };
@@ -154,7 +154,7 @@ export function CardModal({
 
   const addItem = async (checklistId: string, text: string) => {
     if (!text.trim()) return;
-    const { error } = await supabase.from('card_checklist_items').insert({ checklist_id: checklistId, text: text.trim(), position: Date.now() });
+    const { error } = await supabase.from('card_checklist_items').insert({ checklist_id: checklistId, text: text.trim(), position: Math.max(0, ...(card.checklists.find((c) => c.id === checklistId)?.items ?? []).map((i) => Number(i.position) || 0)) + 1000 });
     if (error) { toast.error('Não consegui adicionar.', { description: error.message }); return; }
     await onReload();
   };
@@ -276,7 +276,8 @@ export function CardModal({
   const moverPara = async (listId: string) => {
     setMovePickerOpen(false);
     if (listId === card.list_id) return;
-    await onPatch({ list_id: listId, position: Date.now() });
+    // Vai para o fim da lista. Segundos (não milissegundos): cabe em coluna integer.
+    await onPatch({ list_id: listId, position: Math.floor(Date.now() / 1000) });
     await supabase.from('card_activity').insert({
       card_id: card.id, user_id: currentUserId, kind: 'move',
       content: `Movido para "${lists.find((l) => l.id === listId)?.name ?? '—'}"`,

@@ -124,7 +124,9 @@ export function useBoards() {
   return { boards, archivedBoards, loading, error, reload: load, setBoards: setAll };
 }
 
-export function useBoardContent(boardId: string | null) {
+// Um quadro (id) ou vários (lista de ids — tela "Todos os quadros").
+export function useBoardContent(boardRef: string | string[] | null) {
+  const idsKey = boardRef == null ? '' : Array.isArray(boardRef) ? boardRef.join(',') : boardRef;
   const [lists, setLists] = useState<BoardList[]>([]);
   const [cards, setCards] = useState<BoardCard[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
@@ -132,16 +134,17 @@ export function useBoardContent(boardId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!boardId) { setLists([]); setCards([]); setLabels([]); return; }
+    const boardIds = idsKey ? idsKey.split(',') : [];
+    if (boardIds.length === 0) { setLists([]); setCards([]); setLabels([]); setLoading(false); return; }
     setLoading(true);
     setError(null);
     const supabase = getSupabase();
 
     const [lRes, labRes] = await Promise.all([
       supabase.from('board_lists').select('id, board_id, name, position, archived')
-        .eq('board_id', boardId).eq('archived', false).order('position'),
+        .in('board_id', boardIds).eq('archived', false).order('position'),
       supabase.from('board_labels').select('id, board_id, name, color, position')
-        .eq('board_id', boardId).order('position'),
+        .in('board_id', boardIds).order('position'),
     ]);
     if (lRes.error) { setError(lRes.error.message); setLoading(false); return; }
     const listas = (lRes.data ?? []) as BoardList[];
@@ -214,7 +217,7 @@ export function useBoardContent(boardId: string | null) {
     }));
     setCards(merged);
     setLoading(false);
-  }, [boardId]);
+  }, [idsKey]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -274,7 +277,7 @@ export function useBoardMembers(boardId: string | null) {
       .eq('board_id', boardId);
     setMemberIds(((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
     setLoading(false);
-  }, [boardId]);
+  }, [idsKey]);
 
   useEffect(() => { void load(); }, [load]);
 

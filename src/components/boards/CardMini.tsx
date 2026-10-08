@@ -12,6 +12,8 @@ interface CardMiniProps {
   onOpen: () => void;
   onDragStart: () => void;
   dragging?: boolean;
+  // Nome da lista (A fazer, Em andamento…) — usado na tela "Todos os quadros", onde a coluna é o quadro.
+  listName?: string;
 }
 
 // Situação do prazo, como no Trello: vencido (vermelho), vence em 24 h (âmbar), concluído (verde).
@@ -30,7 +32,7 @@ export const DUE_CLS = {
   ok: 'text-[var(--color-text-secondary)]',
 } as const;
 
-export function CardMini({ card, labels, operators, currentUserId, onOpen, onDragStart, dragging }: CardMiniProps) {
+export function CardMini({ card, labels, operators, currentUserId, onOpen, onDragStart, dragging, listName }: CardMiniProps) {
   const cardLabels = card.labelIds.map((id) => labels.find((l) => l.id === id)).filter(Boolean) as Label[];
   const checklistTotal = card.checklists.reduce((s, cl) => s + cl.items.length, 0);
   const checklistDone = card.checklists.reduce((s, cl) => s + cl.items.filter((i) => i.done).length, 0);
@@ -67,6 +69,7 @@ export function CardMini({ card, labels, operators, currentUserId, onOpen, onDra
             ))}
           </div>
         )}
+        {listName && <span className="inline-block rounded bg-[var(--board-hover,rgba(9,30,66,0.08))] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--board-card-muted,#44546F)]">{listName}</span>}
         <div className={cn('break-words text-sm leading-snug', card.done && 'text-[var(--board-card-muted,#626F86)] line-through')}>{card.title}</div>
 
         {hasBadges && (

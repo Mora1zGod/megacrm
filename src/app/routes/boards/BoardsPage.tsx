@@ -20,26 +20,16 @@ import { ListColumn } from '@/components/boards/ListColumn';
 import { CardModal } from '@/components/boards/CardModal';
 import { ShareBoardDialog } from '@/components/boards/ShareBoardDialog';
 import { dueState, DUE_CLS } from '@/components/boards/CardMini';
+import { AllBoardsView } from './AllBoardsView';
+import { BOARD_BG, boardBg } from './boardBg';
+export { BOARD_BG, boardBg };
 import { positionBetween, useAllBoardMembers, useBoardContent, useBoards, type Board, type BoardCard } from '@/hooks/useBoards';
 
 const TasksPage = lazy(() => import('../tasks/TasksPage'));
 
-const STORAGE_KEY = 'amai_board_atual';
+// Quadro aberto: ALL = tela inicial com todos os quadros lado a lado (como o quadro principal do Trello).
+const ALL = 'todos';
 type Mode = 'quadro' | 'caixa' | 'planejador';
-
-// Fundos de quadro (boards.color guarda a chave; cor hex antiga também funciona).
-export const BOARD_BG: Record<string, string> = {
-  noite: 'linear-gradient(160deg,#0c1a33 0%,#1d3557 45%,#3a506b 100%)',
-  oceano: 'linear-gradient(135deg,#0c66e4 0%,#09326c 100%)',
-  lagoa: 'linear-gradient(135deg,#1f845a 0%,#0b4f6c 100%)',
-  por_do_sol: 'linear-gradient(135deg,#f87168 0%,#a54800 100%)',
-  uva: 'linear-gradient(135deg,#6e5dc6 0%,#352c63 100%)',
-  rosa: 'linear-gradient(135deg,#e774bb 0%,#943d73 100%)',
-  grafite: 'linear-gradient(135deg,#596773 0%,#22272b 100%)',
-  ceu: 'linear-gradient(135deg,#579dff 0%,#9f8fef 100%)',
-};
-export const boardBg = (b: Pick<Board, 'color'> | null | undefined) =>
-  !b?.color ? BOARD_BG.noite : BOARD_BG[b.color] ?? (/^#[0-9a-f]{6}$/i.test(b.color) ? b.color : BOARD_BG.noite);
 
 // Tarefas e Quadros juntos: o quadro (Trello), a caixa de entrada (tarefas), o planejador (semana) e a troca de quadros.
 export default function BoardsPage() {
@@ -64,14 +54,10 @@ export default function BoardsPage() {
     if (!m || m.length === 0 || role === 'admin') return true;
     return userId ? m.includes(userId) : false;
   }), [boards, boardMembersByBoard, role, userId]);
-  const [boardId, setBoardId] = useState<string | null>(null);
+  const [boardId, setBoardId] = useState<string>(ALL);
   useEffect(() => {
-    if (visibleBoards.length === 0) { setBoardId(null); return; }
-    const salvo = (() => { try { return localStorage.getItem(STORAGE_KEY); } catch { return null; } })();
-    setBoardId((atual) => (atual && visibleBoards.some((b) => b.id === atual) ? atual
-      : salvo && visibleBoards.some((b) => b.id === salvo) ? salvo : visibleBoards[0].id));
-  }, [visibleBoards]);
-  useEffect(() => { if (boardId) try { localStorage.setItem(STORAGE_KEY, boardId); } catch { /* sem storage */ } }, [boardId]);
+    if (boardId !== ALL && !visibleBoards.some((b) => b.id === boardId) && !loadingBoards) setBoardId(ALL);
+  }, [visibleBoards, boardId, loadingBoards]);
   const board = visibleBoards.find((b) => b.id === boardId) ?? null;
   const [openCardFromPlanner, setOpenCardFromPlanner] = useState<string | null>(null);
 
@@ -82,9 +68,10 @@ export default function BoardsPage() {
       <div className="min-h-0 flex-1">
         {mode === 'quadro' && (
           loadingBoards ? <div className="p-6"><Skeleton className="h-96" /></div>
-            : !board ? <EmptyBoards onCreate={() => setSwitcher(true)} archived={archivedBoards.length} />
+            : visibleBoards.length === 0 ? <EmptyBoards onCreate={() => setSwitcher(true)} archived={archivedBoards.length} />
+            : !board ? <AllBoardsView boards={visibleBoards} onBoardsChanged={reloadBoards} onOpenBoard={setBoardId} onSwitch={() => setSwitcher(true)} />
             : <BoardView key={board.id} board={board} members={boardMembersByBoard.get(board.id) ?? []} onBoardsChanged={reloadBoards}
-                onMembersChanged={reloadBoardMembers} onSwitch={() => setSwitcher(true)} openCardId={openCardFromPlanner} onCardOpened={() => setOpenCardFromPlanner(null)} />
+                onMembersChanged={reloadBoardMembers} onSwitch={() => setSwitcher(true)} onAll={() => setBoardId(ALL)} openCardId={openCardFromPlanner} onCardOpened={() => setOpenCardFromPlanner(null)} />
         )}
         {mode === 'caixa' && (
           <div className="h-full overflow-y-auto p-4 pb-24 md:p-6 md:pb-24">
@@ -143,8 +130,8 @@ function EmptyBoards({ onCreate, archived }: { onCreate: () => void; archived: n
 }
 
 // ============================================================================ QUADRO
-function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch, openCardId, onCardOpened }: {
-  board: Board; members: string[]; onBoardsChanged: () => Promise<void>; onMembersChanged: () => Promise<void>; onSwitch: () => void;
+function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch, onAll, openCardId, onCardOpened }: {
+  board: Board; members: string[]; onBoardsChanged: () => Promise<void>; onMembersChanged: () => Promise<void>; onSwitch: () => void; onAll: () => void;
   openCardId: string | null; onCardOpened: () => void;
 }) {
   const { lists, cards, labels, loading, error, reload, setCards, moveCard, moveList } = useBoardContent(board.id);
@@ -239,6 +226,9 @@ function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch
     <div className="board-canvas flex h-full min-h-0 flex-col" style={{ background: boardBg(board) }}>
       {/* Barra do quadro */}
       <div className="flex flex-wrap items-center gap-2 bg-black/25 px-4 py-2.5 text-white backdrop-blur-sm">
+        <button type="button" onClick={onAll} className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-white/85 hover:bg-white/15" title="Voltar para todos os quadros">
+          <ChevronLeft className="h-4 w-4" /> Todos os quadros
+        </button>
         <button type="button" onClick={onSwitch} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-lg font-bold hover:bg-white/15" title="Mudar de quadro">
           {board.name} <ChevronDown className="h-4 w-4 opacity-80" />
         </button>
@@ -416,7 +406,7 @@ function BoardSwitcher({ boards, archived, currentId, onPick, onClose, onChanged
     if (!n) { toast.error('Dê um nome ao quadro.'); return; }
     setBusy(true);
     const sb = getSupabase();
-    const { data, error } = await sb.from('boards').insert({ name: n, position: Date.now(), color: 'oceano' }).select('id').single();
+    const { data, error } = await sb.from('boards').insert({ name: n, position: Math.max(0, ...[...boards, ...archived].map((b) => Number(b.position) || 0)) + 1000, color: 'oceano' }).select('id').single();
     if (error) { setBusy(false); toast.error('Não consegui criar.', { description: error.message }); return; }
     const id = (data as { id: string }).id;
     await sb.from('board_lists').insert([{ board_id: id, name: 'A fazer', position: 1000 }, { board_id: id, name: 'Em andamento', position: 2000 }, { board_id: id, name: 'Concluído', position: 3000 }]);
@@ -436,7 +426,7 @@ function BoardSwitcher({ boards, archived, currentId, onPick, onClose, onChanged
     setBusy(true);
     const sb = getSupabase();
     try {
-      const { data: nb, error: e1 } = await sb.from('boards').insert({ name: n, position: Date.now(), color: 'noite' }).select('id').single();
+      const { data: nb, error: e1 } = await sb.from('boards').insert({ name: n, position: Math.max(0, ...[...boards, ...archived].map((b) => Number(b.position) || 0)) + 1000, color: 'noite' }).select('id').single();
       if (e1) throw e1;
       const newId = (nb as { id: string }).id;
       const allBoards = [...boards, ...archived];
@@ -484,6 +474,14 @@ function BoardSwitcher({ boards, archived, currentId, onPick, onClose, onChanged
       description={merge ? 'Marque os quadros na ordem em que as listas devem aparecer. Cada quadro vira uma lista do quadro novo.' : 'Escolha o quadro para abrir.'}>
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {!merge && (
+            <button type="button" onClick={() => onPick(ALL)}
+              className={cn('relative flex h-24 flex-col justify-between rounded-lg p-3 text-left text-white shadow-sm transition-transform hover:-translate-y-0.5', currentId === ALL && 'ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--color-surface)]')}
+              style={{ background: BOARD_BG.noite }}>
+              <span className="font-bold drop-shadow">Todos os quadros</span>
+              <span className="text-xs text-white/85">{boards.length} quadro(s) lado a lado · {[...counts.entries()].filter(([k]) => boards.some((b) => b.id === k)).reduce((s, [, v]) => s + v, 0)} cartão(ões)</span>
+            </button>
+          )}
           {boards.map(tile)}
           {!merge && (creating ? (
             <div className="flex h-24 flex-col gap-2 rounded-lg border border-[var(--color-border-card)] p-2">
