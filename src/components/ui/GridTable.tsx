@@ -34,12 +34,20 @@ export function useGrid<T>(storageKey: string, columns: GridColumn<T>[], rows: T
   const ids = columns.map((c) => c.id);
   const [order, setOrder] = useState<string[]>(() => {
     const o = (saved.order ?? []).filter((id) => ids.includes(id));
-    return [...o, ...ids.filter((id) => !o.includes(id))];
+    // Coluna nova (que não existia quando a pessoa salvou): entra logo depois da vizinha do padrão.
+    for (const id of ids) {
+      if (o.includes(id)) continue;
+      const prev = ids.slice(0, ids.indexOf(id)).reverse().find((x) => o.includes(x));
+      o.splice(prev ? o.indexOf(prev) + 1 : 0, 0, id);
+    }
+    return o;
   });
   const [widths, setWidths] = useState<Record<string, number>>(saved.widths ?? {});
   const [sort, setSort] = useState<Saved['sort']>(saved.sort === undefined ? defaultSort : saved.sort);
   const defHidden = columns.filter((c) => c.defaultHidden).map((c) => c.id);
-  const [hidden, setHidden] = useState<string[]>(saved.hidden ?? defHidden);
+  // Colunas novas com defaultHidden começam escondidas mesmo para quem já tinha salvo a tabela.
+  const [hidden, setHidden] = useState<string[]>(() => !saved.hidden ? defHidden
+    : [...saved.hidden, ...defHidden.filter((id) => !(saved.order ?? []).includes(id) && !saved.hidden!.includes(id))]);
   const persist = (p: Partial<Saved>) => write(storageKey, { order, widths, sort, hidden, ...p });
 
   const allCols = order.map((id) => columns.find((c) => c.id === id)).filter(Boolean) as GridColumn<T>[];

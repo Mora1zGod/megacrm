@@ -64,7 +64,8 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
 
   // Nome fantasia do fornecedor/cliente (cai na razão social quando não tem).
   const fantasy = useMemo(() => new Map(lookups.parties.map((p) => [p.id, p.trade_name?.trim() || p.name])), [lookups.parties]);
-  const partyLabel = useCallback((r: InstallmentRow) => (r.party_id ? fantasy.get(r.party_id) : null) ?? r.party_name ?? '', [fantasy]);
+  // Sempre em maiúsculas, no padrão dos demais nomes da lista.
+  const partyLabel = useCallback((r: InstallmentRow) => ((r.party_id ? fantasy.get(r.party_id) : null) ?? r.party_name ?? '').toLocaleUpperCase('pt-BR'), [fantasy]);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return rows ?? [];
@@ -82,6 +83,9 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       render: (r) => <button type="button" onClick={() => setDetail(r.entry_id)} className="block w-full truncate text-left font-medium text-[var(--color-text-primary)] hover:underline" title={r.description}>{r.description}</button> },
     { id: 'party', label: pay ? 'Fornecedor' : 'Cliente', width: 180, sortValue: (r) => partyLabel(r),
       render: (r) => <span className="block truncate text-[var(--color-text-secondary)]" title={r.party_name ?? ''}>{partyLabel(r) || '—'}</span> },
+    // Razão social (escondida por padrão — liga em "Colunas").
+    { id: 'party_legal', label: 'Razão social', width: 200, defaultHidden: true, sortValue: (r) => (r.party_name ?? '').toLocaleUpperCase('pt-BR'),
+      render: (r) => <span className="block truncate text-[var(--color-text-secondary)]" title={r.party_name ?? ''}>{(r.party_name ?? '—').toLocaleUpperCase('pt-BR')}</span> },
     { id: 'inst', label: 'Parcela', width: 92, align: 'center', sortValue: (r) => r.number, exportValue: (r) => `${r.number}/${r.installments_count}`,
       render: (r) => <span className="tabular-nums text-[var(--color-text-secondary)]">{r.number}/{r.installments_count}</span> },
     { id: 'company', label: 'Empresa', width: 120, sortValue: (r) => r.company_name,
@@ -187,7 +191,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       ['Empresa', company ? (comp?.name ?? '') : lookups.companies.length > 1 ? 'Todas as empresas' : (comp?.name ?? orgName ?? '')],
     ];
     if (status) meta.push(['Status', STATUS_LABEL[status] ?? status]);
-    if (party) meta.push([pay ? 'Fornecedor' : 'Cliente', fantasy.get(party) ?? '']);
+    if (party) meta.push([pay ? 'Fornecedor' : 'Cliente', (fantasy.get(party) ?? '').toLocaleUpperCase('pt-BR')]);
     void openReport({
       title, subtitle: pay ? 'Relatório financeiro de vencimentos' : 'Relatório financeiro de recebimentos', meta,
       kpis: [
@@ -265,7 +269,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={cn(inputCls, 'w-36')} /></label>
         <select value={party} onChange={(e) => setParty(e.target.value)} className={cn(inputCls, 'w-44')} aria-label={pay ? 'Fornecedor' : 'Cliente'}>
           <option value="">{pay ? 'Todos os fornecedores' : 'Todos os clientes'}</option>
-          {[...partyOptions].sort((a, b) => (a.trade_name?.trim() || a.name).localeCompare(b.trade_name?.trim() || b.name)).map((p) => <option key={p.id} value={p.id}>{p.trade_name?.trim() || p.name}</option>)}
+          {[...partyOptions].sort((a, b) => (a.trade_name?.trim() || a.name).localeCompare(b.trade_name?.trim() || b.name)).map((p) => <option key={p.id} value={p.id}>{(p.trade_name?.trim() || p.name).toLocaleUpperCase('pt-BR')}</option>)}
         </select>
         <select value={chart} onChange={(e) => setChart(e.target.value)} className={cn(inputCls, 'w-44')} aria-label="Conta">
           <option value="">Todas as contas</option>
