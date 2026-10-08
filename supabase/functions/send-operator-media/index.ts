@@ -13,7 +13,7 @@
 import { requirePermission, AuthError } from '../_shared/auth.ts';
 import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
-import { ZernioError, uploadMediaDirect } from '../_shared/zernio.ts';
+import { ZERNIO_PRESIGN_TYPES, ZernioError, uploadMediaDirect, uploadMediaPresigned } from '../_shared/zernio.ts';
 import { loadOrgZernioContext } from '../_shared/channels.ts';
 import { friendlySendError, sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
 
@@ -89,7 +89,47 @@ function resolveForwardMime(bytes: Uint8Array, headerMime: string, url: string):
   return EXT_MIME[ext] ?? 'application/pdf';
 }
 
-type QuotedMsg ={ id: string; zernio_message_id: string | null; platform_message_id: string | null };
+// Publica o arquivo numa URL pública para o WhatsApp baixar (attachmentUrl
+// no Zernio, URL direta no UAZAPI). Ordem:
+//  1. Zernio presign (fluxo documentado) — imagem, vídeo, áudio e PDF;
+//  2. nosso Storage público `whatsapp-hub-media` — qualquer tipo (Word, Excel…);
+//  3. Zernio upload-direct (legado).
+async function hostOutboundMedia(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  apiKey: string,
+  bytes: Uint8Array,
+  filename: string,
+  mime: string,
+): Promise<string> {
+  const errors: string[] = [];
+  if (ZERNIO_PRESIGN_TYPES.has(mime)) {
+    try {
+      return await uploadMediaPresigned({ apiKey, bytes, filename, contentType: mime });
+    } catch (e) {
+      errors.push(`presign: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  try {
+    const safe = filename.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_').slice(-100) || 'arquivo';
+    const path = `${orgId}/enviadas/${crypto.randomUUID()}/${safe}`;
+    const { error } = await admin.storage.from('whatsapp-hub-media').upload(path, bytes, { contentType: mime, upsert: false });
+    if (error) throw new Error(error.message);
+    const { data } = admin.storage.from('whatsapp-hub-media').getPublicUrl(path);
+    return data.publicUrl;
+  } catch (e) {
+    errors.push(`storage: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  try {
+    return await uploadMediaDirect({ apiKey, bytes, filename, contentType: mime });
+  } catch (e) {
+    errors.push(`upload-direct: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  console.error(JSON.stringify({ event: 'outbound_media_host_failed', mime, errors }));
+  throw new ZernioError(`Não consegui subir o arquivo (${errors.join(' | ')})`, 502);
+}
+
+type QuotedMsg = { id: string; zernio_message_id: string | null; platform_message_id: string | null };
 
 Deno.serve(async (req) => {
   const pre = preflight(req);
@@ -238,7 +278,8 @@ Deno.serve(async (req) => {
 
     // 1. Sobe a mídia ao Zernio (host da URL usada no attachmentUrl, inclusive
     //    para conversas UAZAPI que enviam a URL direto pela instância).
-    const mediaUrl = await uploadMediaDirect({ apiKey: zernio.apiKey, bytes, filename, contentType: mime });
+    mime = mime.split(';')[0].trim();
+    const mediaUrl = await hostOutboundMedia(admin, caller.orgId, zernio.apiKey, bytes, filename, mime);
 
     // 2. Resolve a conversa 1:1 no Zernio (por canal) e envia a mídia, curando
     //    o id salvo se o Zernio o rejeitar.

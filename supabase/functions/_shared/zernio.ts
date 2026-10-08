@@ -577,10 +577,55 @@ export async function getNumberInfo(apiKey: string, accountId: string): Promise<
   };
 }
 
+// Tipos aceitos pelo POST /media/presign (docs.zernio.com/media/get-media-presigned-url).
+// Fora desta lista (ex.: .docx, .xlsx) o presign responde 400.
+export const ZERNIO_PRESIGN_TYPES = new Set([
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
+  'video/mp4', 'video/mpeg', 'video/quicktime', 'video/avi', 'video/x-msvideo', 'video/webm', 'video/x-m4v',
+  'application/pdf',
+  'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/x-m4a',
+]);
+
+// Fluxo OFICIAL de upload (documentado): POST /media/presign {filename,
+// contentType, size} → { uploadUrl, publicUrl }; depois PUT do binário no
+// uploadUrl (sem Authorization, Content-Type igual ao do presign).
+export async function uploadMediaPresigned(input: {
+  apiKey: string;
+  bytes: Uint8Array;
+  filename: string;
+  contentType: string;
+}): Promise<string> {
+  const contentType = input.contentType.split(';')[0].trim().toLowerCase();
+  if (!ZERNIO_PRESIGN_TYPES.has(contentType)) {
+    throw new ZernioError(`Tipo de arquivo não aceito pelo Zernio (${contentType}).`, 400);
+  }
+  const res = await zfetch(input.apiKey, '/media/presign', {
+    method: 'POST',
+    body: JSON.stringify({ filename: input.filename, contentType, size: input.bytes.byteLength }),
+  });
+  const root = (res ?? {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === 'object' ? root.data : root) as Record<string, unknown>;
+  const uploadUrl = pickString(data, ['uploadUrl', 'upload_url']);
+  const publicUrl = pickString(data, ['publicUrl', 'public_url', 'url']);
+  if (!uploadUrl || !publicUrl) throw new ZernioError('Zernio presign não retornou uploadUrl/publicUrl.');
+  let put: Response;
+  try {
+    put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: input.bytes as unknown as BodyInit });
+  } catch (err) {
+    throw new ZernioError(`Falha de rede ao subir mídia: ${err instanceof Error ? err.message : 'erro'}`);
+  }
+  if (!put.ok) {
+    const t = (await put.text().catch(() => '')).slice(0, 200);
+    throw new ZernioError(`Upload da mídia recusado (${put.status})${t ? `: ${t}` : ''}`);
+  }
+  return publicUrl;
+}
+
 // POST /media/upload-direct — sobe o binário (máx 25MB, auto-delete em 7 dias)
 // e devolve a `url` para usar no attachmentUrl do send message. NÃO usa zfetch
 // porque o corpo é binário (Content-Type = mime do arquivo), não JSON.
-// ASSUMIDO: binário cru no body + filename via query. Confirmar na doc real.
+// ASSUMIDO (não documentado): multipart com campo `file`. Usado só como último
+// recurso — o caminho principal é uploadMediaPresigned (documentado).
 export async function uploadMediaDirect(input: {
   apiKey: string;
   bytes: Uint8Array;
@@ -593,15 +638,16 @@ export async function uploadMediaDirect(input: {
   }
   let res: Response;
   try {
+    // O endpoint passou a responder "Invalid multipart form data" para o corpo
+    // binário cru (08/10/2026): agora vai como multipart (campo `file`).
+    const form = new FormData();
+    form.append('file', new Blob([input.bytes as unknown as BlobPart], { type: input.contentType }), input.filename);
     res = await fetch(
       `${ZERNIO_API_BASE_URL}/media/upload-direct?filename=${encodeURIComponent(input.filename)}`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${input.apiKey}`,
-          'Content-Type': input.contentType,
-        },
-        body: input.bytes,
+        headers: { Authorization: `Bearer ${input.apiKey}` },
+        body: form,
       },
     );
   } catch (err) {

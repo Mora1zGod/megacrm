@@ -400,8 +400,11 @@ service role key vêm de Vault entries (`whatsapp_hub_supabase_url`,
 - Layout 3 painéis (lista de conversas, thread, dados do contato).
 - Realtime via Supabase Realtime nos canais de `messages` e `conversations`,
   populados pelos webhooks do Zernio (`message.received` + status).
-- Mídia do operador: `send-operator-media` sobe o arquivo via Zernio
-  `/media/upload-direct` (máx 25MB) e envia com `attachmentUrl`.
+- Mídia do operador: `send-operator-media` publica o arquivo (`hostOutboundMedia`):
+  1º Zernio `POST /media/presign` + PUT (documentado; imagem/vídeo/áudio/PDF), 2º Storage
+  público `whatsapp-hub-media/<org>/enviadas/…` (qualquer tipo), 3º `/media/upload-direct`
+  (legado, multipart). Máx 25MB; envia com `attachmentUrl`. O upload-direct com corpo binário
+  cru passou a falhar com "Invalid multipart form data" em 08/10/2026.
 - Notas privadas (`is_private_note = true`) — fundo diferenciado, locais, nunca
   enviadas ao Zernio.
 - Atribuição automática, nesta ordem: (1) `channels.assigned_member` do número
