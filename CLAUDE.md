@@ -742,7 +742,8 @@ Regras:
 - Tabelas: `src/components/ui/GridTable.tsx` — `useGrid(chave, colunas, linhas)` + `<DataGrid>` (arrastar título = mover coluna, borda = largura,
   clique = ordenar; salvo no navegador por tabela; `GridReset`, `gridExportRows` + `lib/table-export.ts` p/ Excel/PDF). Usado em Contas a
   pagar/receber, Notas de entrada, Requisições, Cotações, Pedidos, Recebimentos, Fornecedores, Itens, Transferências, Pessoas, Contatos,
-  Usuários, Agenda (lista) e Funil (lista). Notas de entrada: botões $ e estoque abrem conciliações separadas (`pur_invoice_post` com só
+  Usuários, Agenda (lista) e Funil (lista). Relatório Imprimir/PDF no modelo profissional: `openReport()` em `lib/table-export.ts`
+  (logo da empresa/org, dados do período, indicadores, status em selo, total, rodapé "Página X de Y" via `@page`). Notas de entrada: botões $ e estoque abrem conciliações separadas (`pur_invoice_post` com só
   `p_finance` ou só `p_stock`).
 
 ## Tarefas e quadros (08/10/2026) — rota `/quadros` (`/tasks` redireciona para `?modo=caixa`)
@@ -753,4 +754,8 @@ Regras:
 - "Mudar de quadros": abrir, criar, restaurar arquivados e **Juntar quadros em um só** (cada quadro vira uma lista do quadro novo; move
   `board_cards.list_id` e `board_labels.board_id`; os antigos ficam arquivados vazios — nada é apagado).
 - Cartão (`CardModal`): duas colunas como o Trello (detalhes à esquerda, "Comentários e atividade" à direita).
+- Tela inicial = **Todos os quadros** (`routes/boards/AllBoardsView.tsx`): cada quadro é uma coluna com todos os cartões dele
+  (etiqueta com o nome da lista quando não é a primeira); arrastar para outra coluna leva à lista de mesmo nome (ou à primeira);
+  título da coluna arrasta para reordenar (`boards.position` renumerado 1000, 2000…). `useBoardContent` aceita 1 id ou vários.
+- Posições: `card_checklists.position` é **integer** — nunca `Date.now()`; usar maior posição + 1000.
 - `DataGrid` cabe na largura da tela (larguras viram proporções, com mínimo por coluna) e tem menu "Colunas" (mostrar/esconder, padrão).

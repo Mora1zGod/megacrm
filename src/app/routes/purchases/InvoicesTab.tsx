@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useMyDefaultCompany } from '@/hooks/useMyDefaultCompany';
-import { Ban, Boxes, CheckCircle2, CloudDownload, DollarSign, KeyRound, Download, Eye, FileSpreadsheet, FileText, FileUp, Link2, Loader2, PackagePlus, Pencil, Plus, RotateCcw, Save, Search, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
+import { Ban, Boxes, CheckCircle2, CloudDownload, DollarSign, KeyRound, Download, Eye, FileSpreadsheet, FileText, FileUp, Link2, Loader2, PackagePlus, Pencil, Plus, Printer, RotateCcw, Save, Search, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
 import { DataGrid, GridReset, gridExportRows, useGrid, type GridColumn } from '@/components/ui/GridTable';
-import { exportExcel, exportPdf } from '@/lib/table-export';
+import { exportExcel, openReport, reportNow } from '@/lib/table-export';
+import { useAppUser } from '@/app/providers/AppUserProvider';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -176,15 +177,31 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   ], [lookups.companies.length]);
   const grid = useGrid('megacrm_grid_nfe_entrada', columns, list);
 
-  const doExport = async (kind: 'xlsx' | 'pdf') => {
+  const { orgLogoUrl, orgName } = useAppUser();
+  const doExport = async (kind: 'xlsx' | 'pdf' | 'print') => {
     setExportOpen(false);
     const { header, rows: data } = gridExportRows(grid);
     const title = 'Notas de entrada';
-    const period = `${by === 'issue' ? 'Emissão' : by === 'created' ? 'Cadastro' : 'Entrada'} de ${from ? fmtDate(from) : '—'} até ${to ? fmtDate(to) : '—'} · ${list.length} nota(s)`;
+    const byTxt = by === 'issue' ? 'Emissão' : by === 'created' ? 'Cadastro' : 'Entrada';
     if (kind === 'xlsx') { try { await exportExcel(`notas-de-entrada-${todaySP()}`, title, header, data); } catch (e) { toast.error('Não foi possível gerar o Excel', { description: e instanceof Error ? e.message : String(e) }); } return; }
     const ti = grid.cols.findIndex((c) => c.id === 'total');
-    exportPdf(title, period, header, data.map((r) => r.map((c, i) => (i === ti && typeof c === 'number' ? formatBRL(Math.round(c * 100)) : c))),
-      { rightCols: ti >= 0 ? [ti] : [], footer: grid.cols.map((c, i) => (c.id === 'total' ? formatBRL(sumOf(list)) : i === 0 ? 'Total' : '')) });
+    const comp = lookups.companies.find((c) => c.id === companyId) ?? lookups.companies.find((c) => c.is_default);
+    void openReport({
+      title, subtitle: 'Relatório de notas fiscais de entrada',
+      meta: [['Período', `${from ? fmtDate(from) : '—'} a ${to ? fmtDate(to) : '—'} (${byTxt.toLowerCase()})`], ['Gerado em', reportNow()],
+        ['Empresa', companyId ? (comp?.name ?? '') : lookups.companies.length > 1 ? 'Todas as empresas' : (comp?.name ?? orgName ?? '')]],
+      kpis: [
+        { label: 'Total de entradas', value: String(list.length), hint: 'notas', icon: 'doc' },
+        { label: 'Valor total', value: formatBRL(sumOf(live)), icon: 'coins' },
+        { label: 'Pendente financeiro', value: formatBRL(sumOf(finPend)), hint: `${finPend.length} nota(s)`, icon: 'clock', tone: finPend.length ? 'warn' : undefined },
+        { label: 'Pendente estoque', value: formatBRL(sumOf(stockPend)), hint: `${stockPend.length} nota(s)`, icon: 'box', tone: stockPend.length ? 'warn' : undefined },
+      ],
+      header, rows: data.map((r) => r.map((c, i) => (i === ti && typeof c === 'number' ? formatBRL(Math.round(c * 100)) : c))),
+      footer: grid.cols.map((c, i) => (c.id === 'total' ? formatBRL(sumOf(list)) : i === 0 ? 'Total' : '')),
+      align: grid.cols.map((c) => c.align), statusCol: grid.cols.findIndex((c) => c.id === 'status'),
+      logoUrl: (comp as { logo_url?: string | null } | undefined)?.logo_url || orgLogoUrl, brand: comp?.name ?? orgName,
+      fileName: `notas-de-entrada-${todaySP()}`,
+    }, kind);
   };
 
   const iconBtn = 'inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--color-border-card)] text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--color-border-card)] disabled:hover:text-[var(--color-text-secondary)]';
@@ -213,6 +230,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <GridReset grid={grid} />
+          <Button variant="outline" disabled={!list.length} onClick={() => void doExport('print')}><Printer className="h-4 w-4" /> Imprimir</Button>
           <div className="relative">
             <Button variant="outline" disabled={!list.length} onClick={() => setExportOpen((o) => !o)} aria-expanded={exportOpen}><Download className="h-4 w-4" /> Exportar</Button>
             {exportOpen && (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Ban, CheckCircle2, ChevronDown, Download, Eye, FileSpreadsheet, FileText, ListChecks, Pencil, Plus, Search, Trash2, Undo2 } from 'lucide-react';
+import { Ban, CheckCircle2, Printer, ChevronDown, Download, Eye, FileSpreadsheet, FileText, ListChecks, Pencil, Plus, Search, Trash2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,8 @@ import { CompanySelect, inputCls, ReasonDialog, StatusBadge, SummaryCard } from 
 import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/app/routes/settings/sections/access/ui';
 import { DataGrid, GridReset, useGrid, type GridColumn } from '@/components/ui/GridTable';
-import { exportExcel, exportPdf } from '@/lib/table-export';
+import { exportExcel, openReport, reportNow } from '@/lib/table-export';
+import { useAppUser } from '@/app/providers/AppUserProvider';
 
 type StatusFilter = '' | InstStatus;
 
@@ -157,7 +158,6 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     const rows = rowsView.map((r) => grid.cols.map((c) => (c.exportValue ? c.exportValue(r) : c.sortValue ? c.sortValue(r) : '')));
     return { header, rows };
   };
-  const periodTxt = `Vencimento de ${from ? fmtDate(from) : '—'} até ${to ? fmtDate(to) : '—'} · ${rowsView.length} parcela(s)`;
   const title = pay ? 'Contas a pagar' : 'Contas a receber';
   const doExcel = async () => {
     setMenu(null);
@@ -165,14 +165,40 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     try { await exportExcel(`${pay ? 'contas-a-pagar' : 'contas-a-receber'}-${today}`, title, header, rows); }
     catch (e) { toast.error('Não foi possível gerar o Excel', { description: e instanceof Error ? e.message : String(e) }); }
   };
-  const doPdf = () => {
+  const { orgLogoUrl, orgName } = useAppUser();
+  // Relatório no modelo profissional (Imprimir ou PDF): colunas e ordem iguais às da tela.
+  const doReport = (mode: 'print' | 'pdf') => {
     setMenu(null);
-    const { header } = exportRows();
+    const header = grid.cols.map((c) => c.label);
     const rows = rowsView.map((r) => grid.cols.map((c) => (c.id === 'amount' ? formatBRL(r.amount_cents) : c.id === 'remaining' ? formatBRL(r.remaining_cents)
+      : c.id === 'status' ? (r.is_partial && r.status !== 'paid' ? 'Parcial' : STATUS_LABEL[r.status] ?? r.status)
       : c.exportValue ? c.exportValue(r) : c.sortValue ? c.sortValue(r) : '')));
-    const right = grid.cols.map((c, i) => (c.align === 'right' ? i : -1)).filter((i) => i >= 0);
     const footer = grid.cols.map((c, i) => (c.id === 'amount' ? formatBRL(totals.amount) : c.id === 'remaining' ? formatBRL(totals.remaining) : i === 0 ? 'Total' : ''));
-    exportPdf(title, periodTxt, header, rows, { rightCols: right, footer });
+    const live = rowsView.filter((r) => r.status !== 'canceled');
+    const sum = (f: (r: InstallmentRow) => number) => live.reduce((s, r) => s + f(r), 0);
+    const comp = lookups.companies.find((c) => c.id === company) ?? lookups.companies.find((c) => c.is_default);
+    const meta: Array<[string, string]> = [
+      ['Período', `${from ? fmtDate(from) : '—'} a ${to ? fmtDate(to) : '—'}`],
+      ['Gerado em', reportNow()],
+      ['Empresa', company ? (comp?.name ?? '') : lookups.companies.length > 1 ? 'Todas as empresas' : (comp?.name ?? orgName ?? '')],
+    ];
+    if (status) meta.push(['Status', STATUS_LABEL[status] ?? status]);
+    if (party) meta.push([pay ? 'Fornecedor' : 'Cliente', partyOptions.find((x) => x.id === party)?.name ?? '']);
+    void openReport({
+      title, subtitle: pay ? 'Relatório financeiro de vencimentos' : 'Relatório financeiro de recebimentos', meta,
+      kpis: [
+        { label: 'Total de lançamentos', value: String(live.length), hint: 'parcelas', icon: 'doc' },
+        { label: 'Valor total', value: formatBRL(sum((r) => r.amount_cents)), icon: 'coins' },
+        { label: 'Em aberto', value: formatBRL(sum((r) => r.remaining_cents)), icon: 'clock' },
+        { label: 'Vencidas', value: formatBRL(sum((r) => (r.status === 'overdue' ? r.remaining_cents : 0))), icon: 'alert', tone: 'error' },
+      ],
+      header, rows, footer,
+      align: grid.cols.map((c) => c.align),
+      statusCol: grid.cols.findIndex((c) => c.id === 'status'),
+      logoUrl: (comp as { logo_url?: string | null } | undefined)?.logo_url || orgLogoUrl,
+      brand: comp?.name ?? orgName,
+      fileName: `${pay ? 'contas-a-pagar' : 'contas-a-receber'}-${today}`,
+    }, mode);
   };
 
   const barBtn = 'flex h-10 items-center gap-1.5 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50';
@@ -252,13 +278,14 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
         </div>
         <div className="relative ml-auto flex items-center gap-2">
           <GridReset grid={grid} />
+          <Button variant="outline" onClick={() => doReport('print')} disabled={!rowsView.length}><Printer className="h-4 w-4" /> Imprimir</Button>
           <Button variant="outline" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'} disabled={!rowsView.length}>
             <Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" />
           </Button>
           {menu === 'export' && (
             <div className="absolute right-0 top-full z-[var(--z-popover,60)] mt-1 w-48 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] p-1 shadow-[var(--shadow-lg)]">
               <button type="button" className={menuItem} onClick={() => void doExcel()}><FileSpreadsheet className="h-4 w-4 text-[#16a34a]" /> Excel (.xlsx)</button>
-              <button type="button" className={menuItem} onClick={doPdf}><FileText className="h-4 w-4 text-[#dc2626]" /> PDF</button>
+              <button type="button" className={menuItem} onClick={() => doReport('pdf')}><FileText className="h-4 w-4 text-[#dc2626]" /> PDF</button>
             </div>
           )}
         </div>
