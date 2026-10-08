@@ -25,7 +25,7 @@ const CRIAR_ITEMS = [
   { label: 'Contato', icon: User, href: '/contacts', perm: 'contacts.create' },
   { label: 'Negócio', icon: Briefcase, href: '/funil', perm: 'deals.view' },
   { label: 'Visita', icon: CalendarDays, href: '/agenda', perm: 'visits.create' },
-  { label: 'Tarefa', icon: CheckSquare, href: '/tasks', perm: 'tasks.create' },
+  { label: 'Tarefa', icon: CheckSquare, href: '/quadros?modo=caixa', perm: 'tasks.create' },
   { label: 'Campanha', icon: Megaphone, href: '/campaigns', perm: 'campaigns.manage' },
 ] as const;
 

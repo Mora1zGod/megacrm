@@ -162,8 +162,8 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
       render: (n) => <span className="tabular-nums">{formatBRL(n.total_cents)}</span> },
     { id: 'entry', label: 'Entrada', width: 92, sortValue: (n) => n.entry_date ?? '', exportValue: (n) => fmtDate(n.entry_date), render: (n) => fmtDate(n.entry_date) },
     { id: 'issue', label: 'Emissão', width: 92, sortValue: (n) => n.issue_date ?? '', exportValue: (n) => fmtDate(n.issue_date), render: (n) => fmtDate(n.issue_date) },
-    { id: 'created', label: 'Cadastro', width: 92, sortValue: (n) => n.created_at, exportValue: (n) => fmtDate(n.created_at.slice(0, 10)), render: (n) => fmtDate(n.created_at.slice(0, 10)) },
-    { id: 'source', label: 'Tipo', width: 70, sortValue: (n) => SOURCE[n.source], exportValue: (n) => SOURCE[n.source], render: (n) => <span className="text-[var(--color-text-secondary)]">{SOURCE[n.source]}</span> },
+    { id: 'created', label: 'Cadastro', width: 92, defaultHidden: true, sortValue: (n) => n.created_at, exportValue: (n) => fmtDate(n.created_at.slice(0, 10)), render: (n) => fmtDate(n.created_at.slice(0, 10)) },
+    { id: 'source', label: 'Tipo', width: 70, defaultHidden: true, sortValue: (n) => SOURCE[n.source], exportValue: (n) => SOURCE[n.source], render: (n) => <span className="text-[var(--color-text-secondary)]">{SOURCE[n.source]}</span> },
     { id: 'fin', label: 'Conc. Fin.', width: 88, align: 'center', sortValue: (n) => (NO_RECON.has(n.status) ? '' : n.fin_reconciled ? 'Sim' : 'Não'),
       render: (n) => (NO_RECON.has(n.status) ? '—' : <YesNoPill on={n.fin_reconciled} title={n.fin_diff_accepted ? 'Conciliado com diferença aceita' : undefined} />) },
     { id: 'stock', label: 'Conc. Estoq.', width: 98, align: 'center', sortValue: (n) => (NO_RECON.has(n.status) ? '' : n.stock_reconciled ? 'Sim' : 'Não'),
@@ -173,7 +173,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         const [l, tone] = displayStatus(n);
         return <span className="inline-flex items-center gap-1"><Badge tone={tone}>{l}</Badge>{n.sefaz_situation === 'cancelada' && n.status !== 'canceled_sefaz' && <Badge tone="error">cancelada!</Badge>}</span>;
       } },
-  ], []);
+  ], [lookups.companies.length]);
   const grid = useGrid('megacrm_grid_nfe_entrada', columns, list);
 
   const doExport = async (kind: 'xlsx' | 'pdf') => {
@@ -249,7 +249,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
           <span className="mr-1 text-xs text-[var(--color-text-secondary)]">Período por</span>
           {radio('entry', 'Data de entrada')}{radio('issue', 'Data de emissão')}{radio('created', 'Data de cadastro')}
         </div>
-        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5', lookups.companies.length > 1 ? 'xl:grid-cols-10' : 'xl:grid-cols-9')}>
+        <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5', lookups.companies.length > 1 ? '2xl:grid-cols-10' : '2xl:grid-cols-9')}>
           <div className="sm:col-span-2 lg:col-span-2"><Field label="Período" htmlFor="nf-from">
             <div className="flex items-center gap-1.5">
               <input id="nf-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} aria-label="De" />

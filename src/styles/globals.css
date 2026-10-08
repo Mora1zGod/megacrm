@@ -408,3 +408,26 @@ select option {
 /* Pill "AMAIA ativa" do topo — verde legível nos dois temas. */
 .amaia-on { color: #4ADE80; }
 :root[data-theme='light'] .amaia-on { color: #15803D; }
+
+/* -----------------------------------------------------------------------------
+   Quadros (estilo Trello): listas e cartões com cores próprias sobre o fundo do quadro.
+   Escuro é o padrão do CRM; o claro sobrescreve.
+   ----------------------------------------------------------------------------- */
+.board-canvas {
+  --board-list: #101204;
+  --board-list-text: #B6C2CF;
+  --board-list-muted: #9FADBC;
+  --board-card: #22272B;
+  --board-card-text: #B6C2CF;
+  --board-card-muted: #9FADBC;
+  --board-hover: rgba(166, 197, 226, 0.12);
+}
+:root[data-theme='light'] .board-canvas {
+  --board-list: #F1F2F4;
+  --board-list-text: #172B4D;
+  --board-list-muted: #44546F;
+  --board-card: #FFFFFF;
+  --board-card-text: #172B4D;
+  --board-card-muted: #44546F;
+  --board-hover: rgba(9, 30, 66, 0.08);
+}

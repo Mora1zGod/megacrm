@@ -33,7 +33,7 @@ export function Sidebar() {
   })).filter((group) => group.items.length > 0);
 
   const badgeFor = (to: string): number => {
-    if (to === '/tasks') return pendingCount;
+    if (to === '/quadros') return pendingCount;
     if (to === '/chat') return unreadTotal;
     return 0;
   };

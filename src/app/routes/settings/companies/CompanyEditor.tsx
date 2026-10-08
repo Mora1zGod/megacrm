@@ -472,7 +472,14 @@ function PurchasesTab({ row, onSaved }: { row: CompanyRow; onSaved: () => Promis
     order_notes: String(rules.order_notes ?? ''),
   }, row.id, onSaved);
   const { f, set } = form;
-  const members = [...pl.people.entries()];
+  // Só gente ativa como responsável (inativo/pendente não aparece; o atual continua visível se for um deles).
+  const [active, setActive] = useState<Array<{ user_id: string; name: string }>>([]);
+  useEffect(() => {
+    void getSupabase().rpc('list_members').then(({ data }) => setActive(((data ?? []) as Array<{ user_id: string; display_name: string | null; email: string; status: string }>)
+      .filter((m) => m.status === 'active').map((m) => ({ user_id: m.user_id, name: m.display_name?.trim() || m.email }))));
+  }, []);
+  const members: Array<[string, string]> = active.map((m) => [m.user_id, m.name]);
+  if (row.purchase_manager_id && !members.some(([id]) => id === row.purchase_manager_id)) members.push([row.purchase_manager_id, `${pl.people.get(row.purchase_manager_id) ?? 'Usuário'} (inativo)`]);
   const ro = !canEdit;
   const save = () => void form.save((v) => {
     const { min_quotes, require_justification, order_notes, ...rest } = v;
@@ -596,7 +603,7 @@ function UsersTab({ row }: { row: CompanyRow }) {
     if (m.error) toast.error(companyError(m.error));
     if (l.error && !/fin_company_users/.test(l.error.message)) toast.error(companyError(l.error));
     if (l.error && /fin_company_users/.test(l.error.message)) toast.error('Falta rodar o SQL das Empresas (company_settings) no Supabase.');
-    setMembers(((m.data ?? []) as MemberLite[]).filter((x) => x.status !== 'pending'));
+    setMembers(((m.data ?? []) as MemberLite[]).filter((x) => x.status === 'active'));
     setLinks((l.data ?? []) as typeof links);
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -630,7 +637,7 @@ function UsersTab({ row }: { row: CompanyRow }) {
                 const link = mine.get(m.user_id);
                 return (
                   <tr key={m.user_id} className="border-t border-[var(--color-border-soft)]">
-                    <td className="px-3 py-2"><div className="font-medium text-[var(--color-text-primary)]">{m.display_name || m.email}</div><div className="text-xs text-[var(--color-text-muted)]">{m.email}{m.status !== 'active' ? ' · inativo' : ''}</div></td>
+                    <td className="px-3 py-2"><div className="font-medium text-[var(--color-text-primary)]">{m.display_name || m.email}</div><div className="text-xs text-[var(--color-text-muted)]">{m.email}</div></td>
                     <td className="px-3 py-2 text-[var(--color-text-secondary)]"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" />{m.role_name ?? '—'}</span></td>
                     <td className="px-3 py-2 text-center">
                       <input type="checkbox" aria-label={`${m.display_name ?? m.email} trabalha nesta empresa`} disabled={!canEdit || busy === m.user_id} checked={Boolean(link)}

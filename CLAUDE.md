@@ -744,3 +744,13 @@ Regras:
   pagar/receber, Notas de entrada, Requisições, Cotações, Pedidos, Recebimentos, Fornecedores, Itens, Transferências, Pessoas, Contatos,
   Usuários, Agenda (lista) e Funil (lista). Notas de entrada: botões $ e estoque abrem conciliações separadas (`pur_invoice_post` com só
   `p_finance` ou só `p_stock`).
+
+## Tarefas e quadros (08/10/2026) — rota `/quadros` (`/tasks` redireciona para `?modo=caixa`)
+- Uma área só, estilo Trello: barra de baixo Caixa de entrada (TasksPage, tabela `tasks`) · Planejador (semana com prazos de
+  `board_cards.due_date` + `tasks.due_at`) · Quadro · Mudar de quadros. Menu: item "Tarefas e quadros" (`anyPerm` boards.view/tasks.view).
+- Quadro: fundo por `boards.color` (chaves de `BOARD_BG`), listas/cartões com tokens `.board-canvas` (globals.css), arrastar cartão entre e
+  dentro das listas (posição antes do cartão alvo), menu do quadro (renomear, fundo, itens arquivados com restaurar, arquivar).
+- "Mudar de quadros": abrir, criar, restaurar arquivados e **Juntar quadros em um só** (cada quadro vira uma lista do quadro novo; move
+  `board_cards.list_id` e `board_labels.board_id`; os antigos ficam arquivados vazios — nada é apagado).
+- Cartão (`CardModal`): duas colunas como o Trello (detalhes à esquerda, "Comentários e atividade" à direita).
+- `DataGrid` cabe na largura da tela (larguras viram proporções, com mínimo por coluna) e tem menu "Colunas" (mostrar/esconder, padrão).

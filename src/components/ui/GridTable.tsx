@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Tabela com colunas que o usuário arrasta (ordem), estica/encolhe (largura) e ordena (clique no título).
@@ -15,9 +15,10 @@ export interface GridColumn<T> {
   exportValue?: (row: T) => string | number | null; // valor no Excel/PDF (sem isto, usa sortValue)
   footer?: ReactNode;
   className?: string;
+  defaultHidden?: boolean;               // começa escondida (a pessoa liga em "Colunas")
 }
 
-interface Saved { order: string[]; widths: Record<string, number>; sort: { id: string; dir: 'asc' | 'desc' } | null }
+interface Saved { order: string[]; widths: Record<string, number>; sort: { id: string; dir: 'asc' | 'desc' } | null; hidden?: string[] }
 
 function read(key: string): Partial<Saved> {
   try { return JSON.parse(window.localStorage.getItem(key) ?? '{}') as Partial<Saved>; } catch { return {}; }
@@ -37,9 +38,17 @@ export function useGrid<T>(storageKey: string, columns: GridColumn<T>[], rows: T
   });
   const [widths, setWidths] = useState<Record<string, number>>(saved.widths ?? {});
   const [sort, setSort] = useState<Saved['sort']>(saved.sort === undefined ? defaultSort : saved.sort);
-  const persist = (p: Partial<Saved>) => write(storageKey, { order, widths, sort, ...p });
+  const defHidden = columns.filter((c) => c.defaultHidden).map((c) => c.id);
+  const [hidden, setHidden] = useState<string[]>(saved.hidden ?? defHidden);
+  const persist = (p: Partial<Saved>) => write(storageKey, { order, widths, sort, hidden, ...p });
 
-  const cols = order.map((id) => columns.find((c) => c.id === id)).filter(Boolean) as GridColumn<T>[];
+  const allCols = order.map((id) => columns.find((c) => c.id === id)).filter(Boolean) as GridColumn<T>[];
+  const cols = allCols.filter((c) => !hidden.includes(c.id));
+  const toggleHidden = (id: string) => {
+    const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id];
+    if (allCols.length - next.length < 1) return;
+    setHidden(next); persist({ hidden: next });
+  };
   const width = (c: GridColumn<T>) => Math.max(c.minWidth ?? 60, widths[c.id] ?? c.width);
 
   const sorted = useMemo(() => {
@@ -66,26 +75,27 @@ export function useGrid<T>(storageKey: string, columns: GridColumn<T>[], rows: T
     setOrder(o); persist({ order: o });
   };
   const resize = (id: string, w: number) => setWidths((cur) => ({ ...cur, [id]: Math.round(w) }));
-  const commitWidths = () => setWidths((cur) => { write(storageKey, { order, widths: cur, sort }); return cur; });
+  const commitWidths = () => setWidths((cur) => { write(storageKey, { order, widths: cur, sort, hidden }); return cur; });
   const reset = () => {
-    setOrder(ids); setWidths({}); setSort(defaultSort);
+    setOrder(ids); setWidths({}); setSort(defaultSort); setHidden(defHidden);
     try { window.localStorage.removeItem(storageKey); } catch { /* ignore */ }
   };
-  const customized = order.join() !== ids.join() || Object.keys(widths).length > 0;
+  const customized = order.join() !== ids.join() || Object.keys(widths).length > 0 || hidden.join() !== defHidden.join();
 
-  return { cols, sorted, sort, width, toggleSort, move, resize, commitWidths, reset, customized };
+  return { cols, allCols, hidden, toggleHidden, sorted, sort, width, toggleSort, move, resize, commitWidths, reset, customized };
 }
 
 export type Grid<T> = ReturnType<typeof useGrid<T>>;
 
 // Cabeçalho: arrastar o título muda a ordem; puxar a borda direita muda a largura; clicar ordena.
-export function GridHead<T>({ grid, thClass, lead, trail }: { grid: Grid<T>; thClass: string; lead?: ReactNode; trail?: ReactNode }) {
+export function GridHead<T>({ grid, thClass, lead, trail, scale = 1 }: { grid: Grid<T>; thClass: string; lead?: ReactNode; trail?: ReactNode; scale?: number }) {
   const dragId = useRef<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const startResize = (e: React.PointerEvent, c: GridColumn<T>) => {
     e.preventDefault(); e.stopPropagation();
     const x0 = e.clientX; const w0 = grid.width(c);
-    const onMove = (ev: PointerEvent) => grid.resize(c.id, Math.max(c.minWidth ?? 60, w0 + ev.clientX - x0));
+    const k = scale > 0 ? scale : 1; // a tela mostra a largura escalada; o arraste mexe na proporção
+    const onMove = (ev: PointerEvent) => grid.resize(c.id, Math.max(c.minWidth ?? 60, w0 + (ev.clientX - x0) / k));
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); grid.commitWidths(); };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -127,11 +137,11 @@ export function GridHead<T>({ grid, thClass, lead, trail }: { grid: Grid<T>; thC
   );
 }
 
-export function GridColGroup<T>({ grid, lead = [], trail = [] }: { grid: Grid<T>; lead?: number[]; trail?: number[] }) {
+export function GridColGroup<T>({ grid, lead = [], trail = [], widthOf }: { grid: Grid<T>; lead?: number[]; trail?: number[]; widthOf?: (c: GridColumn<T>) => number }) {
   return (
     <colgroup>
       {lead.map((w, i) => <col key={`l${i}`} style={{ width: w }} />)}
-      {grid.cols.map((c) => <col key={c.id} style={{ width: grid.width(c) }} />)}
+      {grid.cols.map((c) => <col key={c.id} style={{ width: (widthOf ?? grid.width)(c) }} />)}
       {trail.map((w, i) => <col key={`t${i}`} style={{ width: w }} />)}
     </colgroup>
   );
@@ -161,7 +171,24 @@ export function DataGrid<T>({
   const rows = grid.sorted;
   const lead = selection ? [44] : [];
   const trail = actions ? [actionsWidth] : [];
-  const width = lead.reduce((a, b) => a + b, 0) + grid.cols.reduce((a, c) => a + grid.width(c), 0) + trail.reduce((a, b) => a + b, 0);
+  // Cabe na tela: as larguras viram proporções e a tabela ocupa exatamente a largura disponível
+  // (só rola para o lado se nem com o mínimo de cada coluna couber).
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxW, setBoxW] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBoxW(el.clientWidth));
+    ro.observe(el); setBoxW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  const fixed = lead.reduce((a, b) => a + b, 0) + trail.reduce((a, b) => a + b, 0);
+  const natural = grid.cols.reduce((a, c) => a + grid.width(c), 0);
+  const avail = Math.max(0, boxW - fixed - 2);
+  const scale = boxW > 0 && natural > 0 ? avail / natural : 1;
+  const minOf = (c: GridColumn<T>) => c.minWidth ?? Math.min(grid.width(c), c.align === 'right' ? 112 : 88);
+  const widthOf = (c: GridColumn<T>) => Math.max(minOf(c), Math.floor(grid.width(c) * scale));
+  const width = fixed + grid.cols.reduce((a, c) => a + widthOf(c), 0);
   const allOn = !!selection && rows.length > 0 && rows.every((r) => selection.selected.has(rowKey(r)));
   const someOn = !!selection && rows.some((r) => selection.selected.has(rowKey(r)));
   const toggle = (id: string) => {
@@ -171,11 +198,11 @@ export function DataGrid<T>({
     selection.onChange(n);
   };
   return (
-    <div className={cn('overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]', className)}>
+    <div ref={boxRef} className={cn('overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]', className)}>
       <table className="text-sm" style={{ tableLayout: 'fixed', width, minWidth: '100%' }}>
-        <GridColGroup grid={grid} lead={lead} trail={trail} />
+        <GridColGroup grid={grid} lead={lead} trail={trail} widthOf={widthOf} />
         <thead>
-          <GridHead grid={grid} thClass={thClass}
+          <GridHead grid={grid} thClass={thClass} scale={scale}
             lead={selection ? (
               <th className={cn(thClass, 'w-11')}>
                 <input type="checkbox" aria-label="Marcar todas" checked={allOn} ref={(el) => { if (el) el.indeterminate = someOn && !allOn; }}
@@ -200,7 +227,7 @@ export function DataGrid<T>({
                   </td>
                 )}
                 {grid.cols.map((c) => (
-                  <td key={c.id} className={cn(tdClass, 'overflow-hidden', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.className)}>{c.render(r)}</td>
+                  <td key={c.id} className={cn(tdClass, 'overflow-hidden text-ellipsis whitespace-nowrap', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.className)}>{c.render(r)}</td>
                 ))}
                 {actions && <td className={cn(tdClass, 'text-right')} onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
               </tr>
@@ -222,14 +249,38 @@ export function DataGrid<T>({
 const DEFAULT_TH = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)] whitespace-nowrap';
 const DEFAULT_TD = 'px-3 py-2 align-middle';
 
-// Botão "Colunas padrão" (só aparece quando a pessoa mexeu nas colunas).
+// Botão "Colunas": liga/desliga colunas e volta ao padrão (ordem, largura e quais aparecem).
 export function GridReset<T>({ grid }: { grid: Grid<T> }) {
-  if (!grid.customized) return null;
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
   return (
-    <button type="button" onClick={grid.reset} title="Volta a ordem e a largura original das colunas"
-      className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
-      Colunas padrão
-    </button>
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
+        <Columns3 className="h-4 w-4" /> Colunas{grid.hidden.length ? ` (${grid.allCols.length - grid.hidden.length}/${grid.allCols.length})` : ''}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-[var(--z-popover,60)] mt-1 w-60 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] p-1.5 shadow-[var(--shadow-lg)]">
+          <div className="max-h-72 overflow-y-auto">
+            {grid.allCols.map((c) => (
+              <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--color-surface-hover)]">
+                <input type="checkbox" checked={!grid.hidden.includes(c.id)} onChange={() => grid.toggleHidden(c.id)} className="h-4 w-4 accent-[var(--accent-fill)]" />{c.label}
+              </label>
+            ))}
+          </div>
+          <div className="mt-1 border-t border-[var(--color-border-soft)] pt-1">
+            <button type="button" disabled={!grid.customized} onClick={() => { grid.reset(); setOpen(false); }} className="w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40">Voltar ao padrão</button>
+          </div>
+          <p className="px-2 pb-1 pt-1 text-[11px] text-[var(--color-text-muted)]">Arraste o título para mudar a ordem e puxe a borda para a largura.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

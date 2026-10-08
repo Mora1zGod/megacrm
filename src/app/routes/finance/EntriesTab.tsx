@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Ban, CheckCircle2, ChevronDown, Download, Eye, FileSpreadsheet, FileText, ListChecks, Pencil, Plus, RotateCcw, Search, Trash2, Undo2 } from 'lucide-react';
+import { Ban, CheckCircle2, ChevronDown, Download, Eye, FileSpreadsheet, FileText, ListChecks, Pencil, Plus, Search, Trash2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -11,10 +11,10 @@ import { fmtDate, friendlyError, monthEnd, monthStart, rpc, STATUS_LABEL, todayS
 import { EntryFormDialog } from './EntryFormDialog';
 import { EntryDetailDialog } from './EntryDetailDialog';
 import { SettleDialog } from './SettleDialog';
-import { CompanySelect, inputCls, ReasonDialog, StatusBadge, SummaryCard, tdCls, thCls } from './ui';
+import { CompanySelect, inputCls, ReasonDialog, StatusBadge, SummaryCard } from './ui';
 import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/app/routes/settings/sections/access/ui';
-import { GridColGroup, GridHead, useGrid, type GridColumn } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid, type GridColumn } from '@/components/ui/GridTable';
 import { exportExcel, exportPdf } from '@/lib/table-export';
 
 type StatusFilter = '' | InstStatus;
@@ -87,14 +87,14 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       render: (r) => <span className="tabular-nums">{formatBRL(r.amount_cents)}</span> },
     { id: 'remaining', label: 'Falta', width: 115, align: 'right', sortValue: (r) => r.remaining_cents, exportValue: (r) => r.remaining_cents / 100,
       render: (r) => <span className="font-semibold tabular-nums">{formatBRL(r.remaining_cents)}</span> },
-    { id: 'paid_at', label: pay ? 'Pago em' : 'Recebido em', width: 110, sortValue: (r) => r.last_settle_date ?? '', exportValue: (r) => (r.last_settle_date ? fmtDate(r.last_settle_date) : ''),
+    { id: 'paid_at', label: pay ? 'Pago em' : 'Recebido em', width: 110, defaultHidden: true, sortValue: (r) => r.last_settle_date ?? '', exportValue: (r) => (r.last_settle_date ? fmtDate(r.last_settle_date) : ''),
       render: (r) => <span className="whitespace-nowrap text-[var(--color-text-secondary)]">{r.last_settle_date ? fmtDate(r.last_settle_date) : '—'}</span> },
     { id: 'status', label: 'Status', width: 110, sortValue: (r) => STATUS_LABEL[r.status] ?? r.status, exportValue: (r) => STATUS_LABEL[r.status] ?? r.status,
       render: (r) => <StatusBadge status={r.status} partial={r.is_partial} /> },
-    { id: 'cc', label: 'Centro de custo', width: 130, sortValue: (r) => r.cost_center_name ?? '',
+    { id: 'cc', label: 'Centro de custo', width: 130, defaultHidden: true, sortValue: (r) => r.cost_center_name ?? '',
       render: (r) => <span className="block truncate text-xs text-[var(--color-text-secondary)]">{r.cost_center_name ?? '—'}</span> },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [pay]);
+  ], [pay, lookups.companies.length]);
   const grid = useGrid(`megacrm_fin_grid_${kind}`, columns, list);
   const rowsView = grid.sorted;
   const totals = useMemo(() => list.reduce((acc, r) => ({ amount: acc.amount + r.amount_cents, remaining: acc.remaining + r.remaining_cents }), { amount: 0, remaining: 0 }), [list]);
@@ -103,8 +103,6 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
   const [sel, setSel] = useState<Set<string>>(new Set());
   useEffect(() => { setSel((cur) => new Set([...cur].filter((id) => list.some((r) => r.id === id)))); }, [list]);
   const chosen = rowsView.filter((r) => sel.has(r.id));
-  const allOn = rowsView.length > 0 && chosen.length === rowsView.length;
-  const toggle = (id: string) => setSel((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const [bulk, setBulk] = useState<null | 'settle' | 'cancel' | 'delete' | 'reverse'>(null);
   const [editing, setEditing] = useState<{ entry: Entry; hasSettlement: boolean } | null>(null);
@@ -253,9 +251,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
           )}
         </div>
         <div className="relative ml-auto flex items-center gap-2">
-          {grid.customized && (
-            <Button variant="ghost" size="sm" onClick={grid.reset} title="Volta a ordem e a largura original das colunas"><RotateCcw className="h-3.5 w-3.5" /> Colunas padrão</Button>
-          )}
+          <GridReset grid={grid} />
           <Button variant="outline" onClick={() => setMenu(menu === 'export' ? null : 'export')} aria-expanded={menu === 'export'} disabled={!rowsView.length}>
             <Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" />
           </Button>
@@ -267,57 +263,23 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
           )}
         </div>
       </div>
-      <p className="-mt-2 text-[11px] text-[var(--color-text-muted)]">Dica: arraste o título da coluna para mudar a posição, puxe a borda para mudar a largura e clique para ordenar (A→Z, Z→A).</p>
 
       {error && <div className="rounded-[var(--radius-card)] border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.06)] p-3 text-sm text-[var(--color-error)]">{error}</div>}
 
       {rows === null ? (
         <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]">
-          <table className="text-sm" style={{ tableLayout: 'fixed', width: 44 + grid.cols.reduce((a, c) => a + grid.width(c), 0) + 130, minWidth: '100%' }}>
-            <GridColGroup grid={grid} lead={[44]} trail={[130]} />
-            <thead>
-              <GridHead grid={grid} thClass={thCls}
-                lead={<th className={cn(thCls, 'w-11')}><input type="checkbox" aria-label="Marcar todas" checked={allOn}
-                  ref={(el) => { if (el) el.indeterminate = chosen.length > 0 && !allOn; }}
-                  onChange={() => setSel(allOn ? new Set() : new Set(rowsView.map((r) => r.id)))} className="h-4 w-4 accent-[var(--accent-fill)]" /></th>}
-                trail={<th className={cn(thCls, 'text-right')}>Ações</th>} />
-            </thead>
-            <tbody>
-              {rowsView.length === 0 && <tr><td colSpan={grid.cols.length + 2} className="px-3 py-8 text-center text-sm text-[var(--color-text-muted)]">Nada encontrado com esses filtros.</td></tr>}
-              {rowsView.map((r) => (
-                <tr key={r.id} className={cn('border-b border-[var(--color-border-soft)] last:border-0 hover:bg-[var(--color-surface-hover)]',
-                  r.status === 'canceled' && 'opacity-60', sel.has(r.id) && 'bg-[var(--color-accent-subtle)]')}>
-                  <td className={tdCls}><input type="checkbox" aria-label={`Marcar ${r.description}`} checked={sel.has(r.id)} onChange={() => toggle(r.id)} className="h-4 w-4 accent-[var(--accent-fill)]" /></td>
-                  {grid.cols.map((c) => (
-                    <td key={c.id} className={cn(tdCls, 'overflow-hidden', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center')}>{c.render(r)}</td>
-                  ))}
-                  <td className={cn(tdCls, 'text-right')}>
-                    <div className="flex justify-end gap-1">
-                      {r.remaining_cents > 0 && r.status !== 'canceled' && perms.can('financial.ledger_settle') && (
-                        <Button size="sm" onClick={() => setSettling(r)}><CheckCircle2 className="h-3.5 w-3.5" /> {pay ? 'Pagar' : 'Receber'}</Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => setDetail(r.entry_id)} aria-label="Ver lançamento"><Eye className="h-3.5 w-3.5" /></Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {rowsView.length > 0 && (
-              <tfoot><tr className="border-t border-[var(--color-border-card)] font-semibold">
-                <td className={tdCls}>{chosen.length ? <span className="text-xs text-[var(--accent-primary)]">{chosen.length}</span> : null}</td>
-                {grid.cols.map((c, i) => (
-                  <td key={c.id} className={cn(tdCls, 'whitespace-nowrap', c.align === 'right' && 'text-right tabular-nums')}>
-                    {c.id === 'amount' ? formatBRL(totals.amount) : c.id === 'remaining' ? formatBRL(totals.remaining)
-                      : i === 0 ? `${rowsView.length} parcela${rowsView.length === 1 ? '' : 's'}` : null}
-                  </td>
-                ))}
-                <td />
-              </tr></tfoot>
-            )}
-          </table>
-        </div>
+        <DataGrid grid={grid} rowKey={(r) => r.id} selection={{ selected: sel, onChange: setSel }} actionsWidth={124}
+          rowClassName={(r) => r.status === 'canceled' && 'opacity-60'}
+          footer={{ [grid.cols[0]?.id ?? 'due']: `${rowsView.length} parcela${rowsView.length === 1 ? '' : 's'}`, amount: formatBRL(totals.amount), remaining: formatBRL(totals.remaining) }}
+          actions={(r) => (
+            <div className="flex justify-end gap-1">
+              {r.remaining_cents > 0 && r.status !== 'canceled' && perms.can('financial.ledger_settle') && (
+                <Button size="sm" onClick={() => setSettling(r)}><CheckCircle2 className="h-3.5 w-3.5" /> {pay ? 'Pagar' : 'Receber'}</Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setDetail(r.entry_id)} aria-label="Ver lançamento"><Eye className="h-3.5 w-3.5" /></Button>
+            </div>
+          )} />
       )}
 
       {creating && <EntryFormDialog kind={kind} lookups={lookups} onClose={() => setCreating(false)} onSaved={(id) => { setCreating(false); void load(); setDetail(id); }} />}

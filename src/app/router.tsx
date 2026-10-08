@@ -27,7 +27,6 @@ const AIAgentPage = lazy(() => import('./routes/ai-agent/AIAgentPage'));
 const AutomationsPage = lazy(() => import('./routes/automations/AutomationsPage'));
 const SettingsPage = lazy(() => import('./routes/settings/SettingsPage'));
 const LegacySettingsRedirect = lazy(() => import('./routes/settings/SettingsPage').then((m) => ({ default: m.LegacySettingsRedirect })));
-const TasksPage = lazy(() => import('./routes/tasks/TasksPage'));
 const FinancePage = lazy(() => import('./routes/finance/FinancePage'));
 const PurchasesPage = lazy(() => import('./routes/purchases/PurchasesPage'));
 const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
@@ -83,6 +82,14 @@ function RequirePermission({ perm, area, children }: { perm: string; area?: stri
   const { can, loading } = usePermission();
   if (userLoading || loading) return <PageFallback />;
   if (!can(perm)) return <AccessDeniedPage area={area} />;
+  return children;
+}
+
+function RequireAnyPermission({ perms: keys, area, children }: { perms: string[]; area?: string; children: ReactElement }) {
+  const { loading: userLoading } = useAppUser();
+  const { can, loading } = usePermission();
+  if (userLoading || loading) return <PageFallback />;
+  if (!keys.some((k) => can(k))) return <AccessDeniedPage area={area} />;
   return children;
 }
 
@@ -225,7 +232,7 @@ export function AppRouter() {
           <Route path="/agenda" element={<RequirePermission perm="visits.view" area="Agenda"><VisitsPage /></RequirePermission>} />
           {/* Visitas virou Agenda (visitas + tarefas + lembretes) — mantém links antigos. */}
           <Route path="/visitas" element={<RequirePermission perm="visits.view" area="Agenda"><VisitsPage /></RequirePermission>} />
-          <Route path="/quadros" element={<RequirePermission perm="boards.view" area="Quadros"><BoardsPage /></RequirePermission>} />
+          <Route path="/quadros" element={<RequireAnyPermission perms={['boards.view', 'tasks.view']} area="Tarefas e quadros"><BoardsPage /></RequireAnyPermission>} />
           {/* /vendas (Vendas & Recompra) removido — redireciona pro dashboard */}
           <Route path="/vendas" element={<HomeRedirect />} />
           {/* /projetos (Entrega) e /educacao removidos — redirecionam pro funil */}
@@ -245,7 +252,7 @@ export function AppRouter() {
           <Route path="/admin" element={<RequireSuperAdmin><Navigate to="/configuracoes/sistema/organizacoes" replace /></RequireSuperAdmin>} />
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
           <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
-          <Route path="/tasks" element={<RequirePermission perm="tasks.view" area="Tarefas"><TasksPage /></RequirePermission>} />
+          <Route path="/tasks" element={<Navigate to="/quadros?modo=caixa" replace />} />
           <Route path="/relatorios" element={<RequirePermission perm="reports.view" area="Relatórios"><ReportsPage /></RequirePermission>} />
           <Route path="/integracoes" element={<Navigate to="/configuracoes/integracoes" replace />} />
           <Route path="/logs-auditoria" element={<Navigate to="/configuracoes/sistema/auditoria" replace />} />

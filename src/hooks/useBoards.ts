@@ -87,6 +87,8 @@ export interface Board {
   name: string;
   description: string | null;
   position: number;
+  color: string | null;
+  archived: boolean;
 }
 
 // Calcula a posição para inserir entre dois itens. Usar a média em float
@@ -99,25 +101,27 @@ export function positionBetween(antes: number | null, depois: number | null): nu
 }
 
 export function useBoards() {
-  const [boards, setBoards] = useState<Board[]>([]);
+  const [all, setAll] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Carrega também os arquivados (para "Mudar de quadros" → restaurar/juntar).
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     const { data, error: err } = await getSupabase()
       .from('boards')
-      .select('id, name, description, position')
-      .eq('archived', false)
+      .select('id, name, description, position, color, archived')
       .order('position');
     if (err) setError(err.message);
-    else setBoards((data ?? []) as Board[]);
+    else setAll((data ?? []) as Board[]);
     setLoading(false);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-  return { boards, loading, error, reload: load, setBoards };
+  const boards = all.filter((b) => !b.archived);
+  const archivedBoards = all.filter((b) => b.archived);
+  return { boards, archivedBoards, loading, error, reload: load, setBoards: setAll };
 }
 
 export function useBoardContent(boardId: string | null) {
