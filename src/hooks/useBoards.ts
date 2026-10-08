@@ -277,7 +277,7 @@ export function useBoardMembers(boardId: string | null) {
       .eq('board_id', boardId);
     setMemberIds(((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
     setLoading(false);
-  }, [idsKey]);
+  }, [boardId]);
 
   useEffect(() => { void load(); }, [load]);
 
