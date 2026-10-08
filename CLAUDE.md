@@ -613,6 +613,28 @@ Regras:
   perfil+equipe, tira o ban e põe `status='active'`; recusar apaga a linha e a conta.
 - `list_operators()` esconde pendentes; `status='pending'` já não passa no `current_org_active()`.
 
+## Financeiro (08/10/2026) — `20261008140000_finance_module.sql`, rota `/financeiro`
+
+- Grupo com várias empresas NA MESMA org: `fin_companies` (1 padrão, não se exclui). Cadastros:
+  `fin_accounts` (banco/caixa, dono = empresa), `fin_chart_accounts` (árvore sintética/analítica,
+  tipo revenue/expense + natureza p/ DRE), `fin_cost_centers`, `fin_parties`.
+- Lançamento `fin_entries` → `fin_installments` → baixas `fin_settlements` (estorno = linha nova
+  negativa com `reversal_of`); `fin_transfers` (estorno = transferência de volta); `fin_period_locks`
+  (fechamento por empresa); `fin_charges` (ASAAS); `fin_entry_attachments` (bucket privado
+  `whatsapp-hub-finance/<org>/<entry>/…`). Visões `fin_installments_v` (status aberto/vencido/parcial/
+  pago/cancelado), `fin_movements_v`, `fin_account_balances_v` (security_invoker).
+- Regras no banco: centavos `bigint`; DELETE bloqueado (`_fin_no_delete`); toda escrita de
+  lançamento/baixa/transferência/fechamento só por RPC `fin_*` SECURITY DEFINER com `fin_require`
+  (permissões `financial.ledger_*`, `financial.transfer`, `.period_close`, `.setup`, `.billing`);
+  `fin_audit_log` (antes/depois/quem/quando) em toda tabela; erros em PT via `fin_fail`; "hoje" =
+  `fin_today()` (America/Sao_Paulo). Banco da baixa/cobrança tem de ser da empresa do lançamento.
+- Relatórios: `fin_report_agenda/cashflow/costs/dre`, `fin_entries_summary` (todos com empresa opcional).
+- Integrações: `fin_create_entry` aceita `source` purchase/hr/associates (+`source_ref`; hr/associates
+  vão para a empresa padrão) e `fin_link_purchase` (concilia nota com conta a pagar existente).
+- ASAAS: Edge `fin-asaas` (config, emitir/cancelar/devolver) e `fin-asaas-webhook` (`?org=`, header
+  `asaas-access-token`; CONFIRMED/RECEIVED → `fin_charge_paid`, REFUNDED → `fin_charge_refunded`).
+  Credenciais por org: `asaas_api_key`, `asaas_env`, `asaas_webhook_token`.
+
 ## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
 
 - `messages.reply_to_id` / `platform_message_id` ("wamid", do webhook Zernio) /

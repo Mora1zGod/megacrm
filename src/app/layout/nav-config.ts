@@ -16,6 +16,7 @@ import {
   ScrollText,
   Paperclip,
   MessagesSquare,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -52,6 +53,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/automations', label: 'Automações', icon: Zap, group: 'Engajamento', perm: 'automations.view' },
   { to: '/ai-agent', label: 'Agente de IA', icon: Bot, group: 'Engajamento', perm: 'settings.ai' },
   { to: '/quadros', label: 'Quadros', icon: ClipboardList, group: 'Gestão', perm: 'boards.view' },
+  { to: '/financeiro', label: 'Financeiro', icon: Wallet, group: 'Gestão', perm: 'financial.ledger_view' },
   { to: '/tasks', label: 'Tarefas', icon: CheckSquare, group: 'Gestão', perm: 'tasks.view' },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3, group: 'Gestão', perm: 'reports.view' },
   { to: '/settings/profile', label: 'Configurações', icon: Settings, group: 'Administração' },
