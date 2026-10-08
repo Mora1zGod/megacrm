@@ -105,6 +105,7 @@ export function Sidebar() {
           )}
           {!collapsed && <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" title="Online" />}
         </div>
+        <AppVersion collapsed={collapsed} />
       </div>
 
       <button
@@ -119,5 +120,23 @@ export function Sidebar() {
         {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
     </aside>
+  );
+}
+
+// Versão no ar: o mesmo código curto do `git log` + quando foi publicado.
+const COMMIT = import.meta.env.VITE_APP_COMMIT as string | undefined;
+const COMMIT_MSG = import.meta.env.VITE_APP_COMMIT_MSG as string | undefined;
+const BUILT_AT = import.meta.env.VITE_APP_BUILT_AT as string | undefined;
+
+function AppVersion({ collapsed }: { collapsed: boolean }) {
+  if (!COMMIT) return null;
+  const when = BUILT_AT
+    ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Rio_Branco', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(BUILT_AT))
+    : '';
+  const title = `Versão ${COMMIT}${when ? ` · publicada em ${when}` : ''}${COMMIT_MSG ? `\n${COMMIT_MSG}` : ''}`;
+  return (
+    <div title={title} className={cn('mt-1 select-all truncate font-mono text-[10px] text-[var(--color-text-muted)]', collapsed ? 'text-center' : 'px-2')}>
+      {collapsed ? COMMIT.slice(0, 7) : `v ${COMMIT}${when ? ` · ${when}` : ''}`}
+    </div>
   );
 }
