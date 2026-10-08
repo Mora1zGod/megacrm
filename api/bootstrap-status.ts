@@ -1,3 +1,6 @@
+// Também responde GET = readiness probe do wizard (/api/health é reescrito para
+// cá no vercel.json — o plano Hobby da Vercel aceita no máximo 12 funções).
+//
 // Read-only companion to api/bootstrap.ts. The wizard calls this when it lands
 // on Step 3 (including after a refresh) to hydrate the timeline from the
 // idempotent _bootstrap_state checkpoints. It only SELECTs step names; it never
@@ -32,6 +35,10 @@ async function supabaseQuery(ref: string, pat: string, query: string) {
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (req.method === 'GET') {
+    const ready = Boolean(process.env.SUPABASE_URL);
+    return res.status(ready ? 200 : 503).json({ ready });
+  }
   if (req.method !== 'POST') return res.status(405).end();
   try {
     const { supabase_url, supabase_pat } = req.body ?? {};
