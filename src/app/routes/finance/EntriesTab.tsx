@@ -61,11 +61,14 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
 
   useEffect(() => { void load(); }, [load]);
 
+  // Nome fantasia do fornecedor/cliente (cai na razão social quando não tem).
+  const fantasy = useMemo(() => new Map(lookups.parties.map((p) => [p.id, p.trade_name?.trim() || p.name])), [lookups.parties]);
+  const partyLabel = useCallback((r: InstallmentRow) => (r.party_id ? fantasy.get(r.party_id) : null) ?? r.party_name ?? '', [fantasy]);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return rows ?? [];
-    return (rows ?? []).filter((r) => `${r.description} ${r.party_name ?? ''} ${r.chart_name}`.toLowerCase().includes(t));
-  }, [rows, q]);
+    return (rows ?? []).filter((r) => `${r.description} ${r.party_name ?? ''} ${partyLabel(r)} ${r.chart_name}`.toLowerCase().includes(t));
+  }, [rows, q, partyLabel]);
 
   const pay = kind === 'payable';
   const partyOptions = lookups.parties.filter((p) => p.kind === 'both' || p.kind === (kind === 'payable' ? 'supplier' : 'customer'));
@@ -76,8 +79,8 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       render: (r) => <span className={cn('whitespace-nowrap', r.status === 'overdue' && 'font-semibold text-[var(--color-error)]')}>{fmtDate(r.due_date)}</span> },
     { id: 'desc', label: 'Descrição', width: 250, minWidth: 140, sortValue: (r) => r.description,
       render: (r) => <button type="button" onClick={() => setDetail(r.entry_id)} className="block w-full truncate text-left font-medium text-[var(--color-text-primary)] hover:underline" title={r.description}>{r.description}</button> },
-    { id: 'party', label: pay ? 'Fornecedor' : 'Cliente', width: 180, sortValue: (r) => r.party_name ?? '',
-      render: (r) => <span className="block truncate text-[var(--color-text-secondary)]" title={r.party_name ?? ''}>{r.party_name ?? '—'}</span> },
+    { id: 'party', label: pay ? 'Fornecedor' : 'Cliente', width: 180, sortValue: (r) => partyLabel(r),
+      render: (r) => <span className="block truncate text-[var(--color-text-secondary)]" title={r.party_name ?? ''}>{partyLabel(r) || '—'}</span> },
     { id: 'inst', label: 'Parcela', width: 92, align: 'center', sortValue: (r) => r.number, exportValue: (r) => `${r.number}/${r.installments_count}`,
       render: (r) => <span className="tabular-nums text-[var(--color-text-secondary)]">{r.number}/{r.installments_count}</span> },
     { id: 'company', label: 'Empresa', width: 120, sortValue: (r) => r.company_name,
@@ -95,7 +98,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     { id: 'cc', label: 'Centro de custo', width: 130, defaultHidden: true, sortValue: (r) => r.cost_center_name ?? '',
       render: (r) => <span className="block truncate text-xs text-[var(--color-text-secondary)]">{r.cost_center_name ?? '—'}</span> },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [pay, lookups.companies.length]);
+  ], [pay, lookups.companies.length, partyLabel]);
   const grid = useGrid(`megacrm_fin_grid_${kind}`, columns, list);
   const rowsView = grid.sorted;
   const totals = useMemo(() => list.reduce((acc, r) => ({ amount: acc.amount + r.amount_cents, remaining: acc.remaining + r.remaining_cents }), { amount: 0, remaining: 0 }), [list]);
@@ -183,7 +186,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       ['Empresa', company ? (comp?.name ?? '') : lookups.companies.length > 1 ? 'Todas as empresas' : (comp?.name ?? orgName ?? '')],
     ];
     if (status) meta.push(['Status', STATUS_LABEL[status] ?? status]);
-    if (party) meta.push([pay ? 'Fornecedor' : 'Cliente', partyOptions.find((x) => x.id === party)?.name ?? '']);
+    if (party) meta.push([pay ? 'Fornecedor' : 'Cliente', fantasy.get(party) ?? '']);
     void openReport({
       title, subtitle: pay ? 'Relatório financeiro de vencimentos' : 'Relatório financeiro de recebimentos', meta,
       kpis: [
@@ -227,7 +230,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={cn(inputCls, 'w-36')} /></label>
         <select value={party} onChange={(e) => setParty(e.target.value)} className={cn(inputCls, 'w-44')} aria-label={pay ? 'Fornecedor' : 'Cliente'}>
           <option value="">{pay ? 'Todos os fornecedores' : 'Todos os clientes'}</option>
-          {partyOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {[...partyOptions].sort((a, b) => (a.trade_name?.trim() || a.name).localeCompare(b.trade_name?.trim() || b.name)).map((p) => <option key={p.id} value={p.id}>{p.trade_name?.trim() || p.name}</option>)}
         </select>
         <select value={chart} onChange={(e) => setChart(e.target.value)} className={cn(inputCls, 'w-44')} aria-label="Conta">
           <option value="">Todas as contas</option>

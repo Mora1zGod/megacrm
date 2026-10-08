@@ -20,6 +20,7 @@ export interface CostCenter { id: string; parent_id: string | null; code: string
 export interface Party {
   id: string; kind: 'supplier' | 'customer' | 'both'; name: string; doc: string | null;
   email: string | null; phone: string | null; is_active: boolean; asaas_customer_id: string | null;
+  trade_name?: string | null; // nome fantasia (20261008170000_suppliers.sql)
 }
 export interface InstallmentRow {
   id: string; entry_id: string; number: number; due_date: string; amount_cents: number;
