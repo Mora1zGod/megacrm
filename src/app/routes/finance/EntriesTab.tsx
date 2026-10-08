@@ -17,6 +17,7 @@ import { Field } from '@/app/routes/settings/sections/access/ui';
 import { DataGrid, GridReset, useGrid, type GridColumn } from '@/components/ui/GridTable';
 import { exportExcel, openReport, reportNow } from '@/lib/table-export';
 import { useAppUser } from '@/app/providers/AppUserProvider';
+import { SendTextToConversations } from '@/components/inbox/SendTextToConversations';
 
 type StatusFilter = '' | InstStatus;
 
@@ -206,6 +207,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
 
   // Envia o resumo das contas pelo WhatsApp do usuário: monta o texto (marcadas ou, sem marcação, as da lista),
   // copia para a área de transferência e abre o WhatsApp para escolher a pessoa ou o grupo.
+  const [waText, setWaText] = useState<string | null>(null);
   const sendWhatsApp = async () => {
     const base = (chosen.length ? chosen : rowsView).filter((r) => r.status !== 'canceled');
     if (!base.length) { toast.info('Nenhuma conta para enviar.'); return; }
@@ -226,6 +228,8 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       `🔴 vencida · 🟡 em aberto · 🟠 parcial · ✅ paga`,
     ];
     const text = lines.join('\n');
+    // Com permissão de responder no Atendimento, envia pelo número do CRM (pessoa ou grupo).
+    if (perms.can('inbox.reply')) { setWaText(text); return; }
     let copied = false;
     try { await navigator.clipboard.writeText(text); copied = true; } catch { /* sem permissão de cópia */ }
     // Link muito grande o WhatsApp corta: aí abre vazio e o texto vai colado.
@@ -344,6 +348,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
           )} />
       )}
 
+      {waText !== null && <SendTextToConversations title={`Enviar ${title.toLowerCase()} pelo WhatsApp`} text={waText} onClose={() => setWaText(null)} />}
       {creating && <EntryFormDialog kind={kind} lookups={lookups} onClose={() => setCreating(false)} onSaved={(id) => { setCreating(false); void load(); setDetail(id); }} />}
       {detail && <EntryDetailDialog entryId={detail} lookups={lookups} onClose={() => setDetail(null)} onChanged={() => { void load(); void lookups.reload(); }} />}
       {editing && <EntryFormDialog kind={kind} lookups={lookups} entry={editing.entry} hasSettlement={editing.hasSettlement}
