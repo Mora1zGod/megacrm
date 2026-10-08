@@ -37,7 +37,10 @@ const TABS: TabDef[] = [
 export default function AIAgentPage() {
   const { loading } = useAppUser();
   const perms = usePermission();
-  const [active, setActive] = useState<TabId>('overview');
+  const [active, setActive] = useState<TabId>(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return (TABS.some((x) => x.id === t) ? t : 'overview') as TabId;
+  });
   const current = TABS.find((t) => t.id === active) ?? TABS[0];
 
   if (loading) {

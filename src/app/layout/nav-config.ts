@@ -7,13 +7,10 @@ import {
   Settings,
   KanbanSquare,
   Zap,
-  Building2,
   CalendarDays,
   ClipboardList,
   CheckSquare,
   BarChart3,
-  Plug,
-  ScrollText,
   Paperclip,
   MessagesSquare,
   Wallet,
@@ -58,10 +55,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/compras', label: 'Compras', icon: ShoppingCart, group: 'Gestão', perm: 'purchases.view' },
   { to: '/tasks', label: 'Tarefas', icon: CheckSquare, group: 'Gestão', perm: 'tasks.view' },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3, group: 'Gestão', perm: 'reports.view' },
-  { to: '/settings/profile', label: 'Configurações', icon: Settings, group: 'Administração' },
-  { to: '/integracoes', label: 'Integrações', icon: Plug, group: 'Administração', perm: 'settings.integrations' },
-  { to: '/logs-auditoria', label: 'Logs de Auditoria', icon: ScrollText, group: 'Administração', perm: 'audit.view' },
-  { to: '/admin', label: 'Organizações', icon: Building2, group: 'Administração', superAdminOnly: true },
+  // Integrações, Logs de Auditoria e Organizações agora ficam dentro de Configurações.
+  { to: '/configuracoes', label: 'Configurações', icon: Settings, group: 'Administração' },
 ];
 
 // Item visível para o usuário? (super admin só para /admin; `perm` via can()).
@@ -73,6 +68,6 @@ export function navItemVisible(item: NavItem, can: (key: string) => boolean, isS
 
 // "Início" do usuário: a 1ª área liberada no menu (Visão geral para quem pode).
 export function firstAllowedPath(can: (key: string) => boolean): string {
-  const item = NAV_ITEMS.find((i) => !i.superAdminOnly && (!i.perm || can(i.perm)) && i.to !== '/settings/profile');
-  return item?.to ?? '/settings/profile';
+  const item = NAV_ITEMS.find((i) => !i.superAdminOnly && (!i.perm || can(i.perm)) && i.to !== '/configuracoes');
+  return item?.to ?? '/configuracoes';
 }

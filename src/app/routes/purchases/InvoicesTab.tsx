@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useMyDefaultCompany } from '@/hooks/useMyDefaultCompany';
 import { Ban, CloudDownload, KeyRound, Download, Eye, FilePlus2, FileUp, Link2, Loader2, PackagePlus, RotateCcw, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -38,8 +39,9 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const [manual, setManual] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncCompany, setSyncCompany] = useState('');
+  const myCompany = useMyDefaultCompany();
+  useEffect(() => { if (myCompany && !syncCompany && lookups.companies.some((c) => c.id === myCompany)) setSyncCompany(myCompany); }, [myCompany, syncCompany, lookups.companies]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [, setParams] = useSearchParams();
   const [certInfo, setCertInfo] = useState<{ any: boolean; loaded: boolean }>({ any: true, loaded: false });
   useEffect(() => {
     if (!perms.can('purchases.invoice')) return;
@@ -47,7 +49,11 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
       .then((r) => setCertInfo({ any: r.companies.some((c) => c.has_cert), loaded: true }))
       .catch(() => setCertInfo({ any: true, loaded: true }));
   }, [perms]);
-  const goCert = () => setParams((p) => { p.set('tab', 'config'); p.delete('doc'); return p; });
+  const navigate = useNavigate();
+  const goCert = () => {
+    const cid = syncCompany || lookups.companies.find((c) => c.is_default)?.id;
+    navigate(cid ? `/configuracoes/empresas/${cid}?aba=certificados` : '/configuracoes/empresas');
+  };
 
   const load = useCallback(async () => {
     const col = by === 'issue' ? 'issue_date' : by === 'created' ? 'created_at' : 'effective_date';

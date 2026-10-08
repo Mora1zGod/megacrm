@@ -727,3 +727,15 @@ Regras:
 - Fornecedor: `purchases/SupplierForm.tsx` consulta a BrasilAPI no navegador (`/api/cnpj/v1/{cnpj}`, `/api/cep/v1/{cep}`) e grava
   situação, abertura, CNAE, porte, natureza, Simples/MEI, capital, matriz/filial e o JSON completo em `fin_parties.cnpj_data`
   (`20261008180000_suppliers_cnpj.sql`).
+
+## Configurações (08/10/2026) — rota `/configuracoes/:section/:item`
+- Centro administrativo único (`routes/settings/SettingsPage.tsx`): Conta · Equipe e acessos · Comunicação e integrações ·
+  Automação e IA · Empresas / Organizações · Sistema. Cada item reaproveita a tela antiga (AccountSettings, AccessSettings com
+  `initialTab`, TeamSettings, ChannelsSettings, ApiKeysSettings, Branding, QuickReplies, Attendance, Birthday, Products, AuditLogPage,
+  AdminPage). Menu principal ficou só com áreas operacionais + Configurações.
+- Rotas antigas redirecionam: `/settings(/profile)?tab=…` (mapa `LEGACY_TAB`), `/integracoes`, `/logs-auditoria`, `/admin` (super admin).
+- Empresas = `fin_companies` da org (não confundir com `organizations`, que é o tenant): `/configuracoes/empresas/:id?aba=geral|fiscal|
+  financeiro|compras|certificados|integracoes|usuarios`. Gravação só por `fin_company_update(p_id, p)` (campos por grupo: geral/fiscal/
+  financeiro → `financial.setup`; compras → `purchases.setup`; refs da mesma org/empresa). `fin_company_users` + `fin_company_user_set` +
+  `my_default_company()` (`20261008190000_company_settings.sql`). Certificado A1 agora fica na aba Certificados (Compras só consome).
+- Consulta CNPJ/CEP: `src/lib/cnpj-lookup.ts` (BrasilAPI → CNPJ.ws → CNPJá; CEP BrasilAPI → ViaCEP), tudo no formato da BrasilAPI.

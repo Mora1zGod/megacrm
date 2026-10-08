@@ -18,7 +18,7 @@ export function CredentialsBanner() {
       </div>
       <div className="min-w-0 flex-1 text-sm text-[var(--color-text-primary)]">
         Configure as chaves de API para ativar WhatsApp e IA. A do WhatsApp fica em{' '}
-        <Link to="/settings?tab=channels" className="font-semibold text-[var(--accent-primary)] hover:underline">
+        <Link to="/configuracoes/integracoes/canais" className="font-semibold text-[var(--accent-primary)] hover:underline">
           Canais
         </Link>{' '}
         e a da OpenAI em{' '}

@@ -189,7 +189,10 @@ export function ApproveSignupDialog({ member, roles, teams, canGrantAdmin, onClo
     const err = await invokeManage({ action: 'approve', user_id: member.user_id, access_role_id: roleId, team_id: teamId || null });
     setBusy(false);
     if (err) { toast.error('Não foi possível aprovar', { description: err }); return; }
-    toast.success(`${memberLabel(member)} foi aprovado e já pode entrar.`);
+    toast.success(`${memberLabel(member)} foi aprovado e já pode entrar.`, {
+      description: `O sistema não manda e-mail: avise a pessoa que é só entrar em ${window.location.origin} com o e-mail ${member.email ?? ''} e a senha que ela criou no cadastro.`,
+      duration: 12000,
+    });
     onDone();
   };
 

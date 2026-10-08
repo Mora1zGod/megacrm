@@ -11,7 +11,8 @@ import { getSupabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/money';
 import { maskPhoneBR } from '@/lib/phone';
 import { formatDoc, maskCEP, maskDoc, onlyDigits } from '@/lib/format';
-import { fmtDate, fmtDateTime, purError, usePurLookups, type CnpjData, type PurLookups, type Supplier } from './data';
+import { fmtDate, fmtDateTime, purError, usePurLookups, type PurLookups, type Supplier } from './data';
+import { lookupCep as fetchCep, lookupCnpj as fetchCnpj } from '@/lib/cnpj-lookup';
 import { Badge } from './ui';
 import { ChartPicker } from '../finance/ui';
 
@@ -91,10 +92,7 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved, 
     if (docDigits.length !== 14) { toast.error('Digite os 14 números do CNPJ.'); return; }
     setLooking(true);
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${docDigits}`);
-      if (res.status === 404) throw new Error('CNPJ não encontrado na Receita.');
-      if (!res.ok) throw new Error(res.status === 429 ? 'Muitas consultas seguidas. Espere um minuto e tente de novo.' : 'A consulta do CNPJ não respondeu agora. Tente de novo.');
-      const d = (await res.json()) as CnpjData;
+      const { source, state_registration: ie, ...d } = await fetchCnpj(docDigits);
       const phone1 = onlyDigits(d.ddd_telefone_1);
       const phone2 = onlyDigits(d.ddd_telefone_2);
       const mobile = [phone1, phone2].find((p) => p.length === 11);
@@ -115,6 +113,7 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved, 
         city: d.municipio ? d.municipio.toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) : x.city,
         state: d.uf || x.state,
         category: x.category || (d.cnae_fiscal_descricao ?? '').slice(0, 60),
+        state_registration: x.state_registration || ie || '',
       }));
       setRf({
         legal_status: d.descricao_situacao_cadastral ?? null,
@@ -129,7 +128,7 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved, 
         cnpj_data: d,
         cnpj_checked_at: new Date().toISOString(),
       });
-      toast.success(`Dados da Receita carregados: ${d.razao_social ?? ''}`);
+      toast.success(`Dados da Receita carregados: ${d.razao_social ?? ''}`, { description: `Fonte: ${source}` });
     } catch (e) {
       toast.error('Consulta do CNPJ', { description: e instanceof Error && !/fetch/i.test(e.message) ? e.message : 'Sem conexão com o serviço de consulta. Tente de novo.' });
     } finally { setLooking(false); }
@@ -140,10 +139,9 @@ export function SupplierForm({ lookups, supplier, categories, onClose, onSaved, 
     if (d.length !== 8) return;
     setCepBusy(true);
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cep/v1/${d}`);
-      if (!res.ok) return;
-      const c = (await res.json()) as { street?: string; neighborhood?: string; city?: string; state?: string };
-      setF((x) => ({ ...x, street: c.street || x.street, district: c.neighborhood || x.district, city: c.city || x.city, state: c.state || x.state }));
+      const c = await fetchCep(d);
+      if (!c) return;
+      setF((x) => ({ ...x, street: c.street || x.street, district: c.district || x.district, city: c.city || x.city, state: c.state || x.state }));
     } catch { /* sem internet: segue manual */ } finally { setCepBusy(false); }
   };
 

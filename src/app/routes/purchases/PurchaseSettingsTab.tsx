@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { KeyRound, Loader2, Plus, ShieldAlert, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { getSupabase } from '@/lib/supabase';
 import { formatBRL } from '@/lib/money';
 import { formatDoc } from '../finance/SetupTab';
 import { fmtDate, fmtDateTime, purError, sefazApi, type PurLookups } from './data';
-import { Badge, Card, EmptyRow, Field, inputCls, MoneyInput, Spinner, SubTabs, TableWrap, tdCls, thCls } from './ui';
+import { Badge, Card, EmptyRow, Field, inputCls, MoneyInput, Spinner, TableWrap, tdCls, thCls } from './ui';
 
 interface Band { id: string; min_cents: number; max_cents: number | null; access_role_id: string }
 interface CertCompany {
@@ -16,17 +17,26 @@ interface CertCompany {
   last_sync_at: string | null; next_sync_after: string | null; last_status: string | null;
 }
 
+// Compras → Configurações: só as regras de Compras. O certificado digital é da EMPRESA
+// (Configurações → Empresas → Certificados); Compras e a busca na SEFAZ só o consomem.
 export function PurchaseSettingsTab({ lookups }: { lookups: PurLookups }) {
-  const [sec, setSec] = useState<'sefaz' | 'alcadas'>('sefaz');
+  const def = lookups.companies.find((c) => c.is_default) ?? lookups.companies[0];
   return (
     <div className="space-y-4">
-      <SubTabs value={sec} onChange={setSec} tabs={[['sefaz', 'Certificado digital / SEFAZ'], ['alcadas', 'Alçadas de aprovação']]} />
-      {sec === 'sefaz' ? <SefazSettings /> : <Bands lookups={lookups} />}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4 text-sm">
+        <span className="flex items-center gap-2 text-[var(--color-text-secondary)]"><KeyRound className="h-4 w-4 text-[var(--accent-primary)]" />
+          O <b className="text-[var(--color-text-primary)]">certificado digital</b> e os padrões de Compras (almoxarifado, centro de custo, conta, limite e responsável) ficam no cadastro de cada empresa.</span>
+        <Link to={def ? `/configuracoes/empresas/${def.id}?aba=certificados` : '/configuracoes/empresas'}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--accent-fill)] px-3.5 text-sm font-semibold text-white hover:bg-[var(--accent-fill-hover)]">Abrir empresas</Link>
+      </div>
+      <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Alçadas de aprovação</h3>
+      <Bands lookups={lookups} />
     </div>
   );
 }
 
-function SefazSettings() {
+// Certificado A1 + busca na SEFAZ (usado em Configurações → Empresas → Certificados).
+export function SefazSettings({ companyId }: { companyId?: string } = {}) {
   const [data, setData] = useState<{ strict_tls: boolean; companies: CertCompany[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [upload, setUpload] = useState<CertCompany | null>(null);
@@ -57,9 +67,11 @@ function SefazSettings() {
           A conexão com a SEFAZ é cifrada e usa o seu certificado, mas o servidor ainda não confere a cadeia ICP-Brasil do site da SEFAZ (variável SEFAZ_CA_PEM não configurada na Vercel).
         </p>
       )}
-      {data.companies.map((c) => {
+      {data.companies.filter((c) => !companyId || c.id === companyId).map((c) => {
         const expired = c.cert_valid_until && new Date(c.cert_valid_until).getTime() < Date.now();
         const soon = c.cert_valid_until && !expired && new Date(c.cert_valid_until).getTime() - Date.now() < 30 * 86400000;
+        const days = c.cert_valid_until ? Math.ceil((new Date(c.cert_valid_until).getTime() - Date.now()) / 86400000) : null;
+        const invalid = c.has_cert && !c.cert_valid_until;
         return (
           <Card key={c.id} title={<span className="flex items-center gap-2">{c.name}{c.is_default && <Badge tone="accent">padrão</Badge>}{!c.is_active && <Badge tone="muted">inativa</Badge>}</span>}
             actions={<>
@@ -80,12 +92,21 @@ function SefazSettings() {
                 {c.next_sync_after && new Date(c.next_sync_after).getTime() > Date.now() && <div className="text-xs text-[var(--color-text-muted)]">próxima liberada {fmtDateTime(c.next_sync_after)}</div>}
               </div>
             </div>
+            {(expired || soon || invalid) && (
+              <p className={`mt-3 flex items-center gap-2 rounded-lg border p-2.5 text-xs font-medium ${expired || invalid ? 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.06)] text-[var(--color-error)]' : 'border-[rgba(245,158,11,0.4)] bg-[rgba(245,158,11,0.06)] text-[var(--inbox-warn-text,#B45309)]'}`}>
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                {invalid ? 'Certificado inválido: não foi possível ler a validade. Envie o arquivo de novo.'
+                  : expired ? 'Certificado vencido: a busca na SEFAZ e a ciência das notas param até enviar um novo.'
+                  : `Certificado vence em ${days} dia(s). Providencie a renovação para não parar a busca das notas.`}
+              </p>
+            )}
             {c.cert_subject && <p className="mt-2 truncate text-xs text-[var(--color-text-muted)]">{c.cert_subject}</p>}
             {c.last_status && <p className="mt-1 text-xs text-[var(--color-text-secondary)]">SEFAZ: {c.last_status}{c.last_nsu ? ` · NSU ${Number(c.last_nsu)}${c.max_nsu ? ` de ${Number(c.max_nsu)}` : ''}` : ''}</p>}
           </Card>
         );
       })}
-      {data.companies.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">Cadastre as empresas no Financeiro → Cadastros → Empresas.</p>}
+      {data.companies.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">Cadastre as empresas em Configurações → Empresas.</p>}
+      <p className="text-xs text-[var(--color-text-muted)]">Certificado <b>A3</b> (cartão ou token USB) não serve para a busca automática: ele só funciona plugado no computador, e a busca roda no servidor. Use um A1 para a empresa.</p>
       {upload && <CertDialog company={upload} onClose={() => setUpload(null)} onDone={() => { setUpload(null); void load(); }} />}
     </div>
   );
@@ -124,7 +145,7 @@ function CertDialog({ company, onClose, onDone }: { company: CertCompany; onClos
   );
 }
 
-function Bands({ lookups }: { lookups: PurLookups }) {
+export function Bands({ lookups }: { lookups: PurLookups }) {
   const [rows, setRows] = useState<Band[] | null>(null);
   const [edit, setEdit] = useState<Band | 'new' | null>(null);
   const load = useCallback(async () => {

@@ -279,7 +279,7 @@ export function NewSaleDialog({
           <div className="sm:col-span-2">
             <span className={labelCls}>Produtos / serviços</span>
             {products.length === 0 ? (
-              <div className="text-xs text-[var(--color-text-muted)]">Nenhum produto cadastrado (Configurações → Produtos).</div>
+              <div className="text-xs text-[var(--color-text-muted)]">Nenhum produto cadastrado (Configurações → Sistema → Produtos).</div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {products.map((p) => {

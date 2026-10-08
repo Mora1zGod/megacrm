@@ -20,10 +20,10 @@ import { invokeManage, memberLabel, MODULE_LABELS, useAccessData, type AccessRol
 type Tab = 'users' | 'roles' | 'teams' | 'audit';
 
 // Configurações → Usuários e acessos.
-export function AccessSettings() {
+export function AccessSettings({ initialTab = 'users' }: { initialTab?: 'users' | 'roles' | 'teams' | 'audit' } = {}) {
   const perms = usePermission();
   const data = useAccessData();
-  const [tab, setTab] = useState<Tab>('users');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [editing, setEditing] = useState<Member | 'new' | null>(null);
   const [editingRole, setEditingRole] = useState<AccessRole | 'new' | null>(null);
   const [historyUser, setHistoryUser] = useState<Member | null>(null);

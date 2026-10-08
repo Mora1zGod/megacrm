@@ -461,7 +461,7 @@ function ProductMultiSelect({
           <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1 shadow-[var(--shadow-lg)]">
             {catalog.length === 0 ? (
               <div className="px-3 py-2 text-xs text-[var(--color-text-secondary)]">
-                Nenhum produto no catálogo. Cadastre em Configurações → Produtos.
+                Nenhum produto no catálogo. Cadastre em Configurações → Sistema → Produtos.
               </div>
             ) : (
               catalog.map((p) => {

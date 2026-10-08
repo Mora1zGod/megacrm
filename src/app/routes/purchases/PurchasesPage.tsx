@@ -28,7 +28,7 @@ export default function PurchasesPage() {
     ['notas', 'Notas de entrada', true],
     ['fornecedores', 'Fornecedores', true],
     ['itens', 'Itens e locais', perms.can('inventory.view') || perms.can('inventory.setup')],
-    ['config', 'Configurações', perms.can('purchases.setup')],
+    ['config', 'Alçadas', perms.can('purchases.setup')],
   ];
   const visible = tabs.filter(([, , show]) => show);
   const tab = (visible.find(([k]) => k === params.get('tab'))?.[0] ?? 'requisicoes') as PurTab;

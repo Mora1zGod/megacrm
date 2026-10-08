@@ -26,13 +26,11 @@ const BoardsPage = lazy(() => import('./routes/boards/BoardsPage'));
 const AIAgentPage = lazy(() => import('./routes/ai-agent/AIAgentPage'));
 const AutomationsPage = lazy(() => import('./routes/automations/AutomationsPage'));
 const SettingsPage = lazy(() => import('./routes/settings/SettingsPage'));
-const AdminPage = lazy(() => import('./routes/admin/AdminPage'));
+const LegacySettingsRedirect = lazy(() => import('./routes/settings/SettingsPage').then((m) => ({ default: m.LegacySettingsRedirect })));
 const TasksPage = lazy(() => import('./routes/tasks/TasksPage'));
 const FinancePage = lazy(() => import('./routes/finance/FinancePage'));
 const PurchasesPage = lazy(() => import('./routes/purchases/PurchasesPage'));
 const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
-const IntegrationsPage = lazy(() => import('./routes/integrations/IntegrationsPage'));
-const AuditLogPage = lazy(() => import('./routes/admin/AuditLogPage'));
 const FilesPage = lazy(() => import('./routes/files/FilesPage'));
 const ChatPage = lazy(() => import('./routes/chat/ChatPage'));
 const SalesTvPage = lazy(() => import('./routes/tv/SalesTvPage'));
@@ -238,17 +236,21 @@ export function AppRouter() {
           {/* Rotas antigas → agora abas dentro de /ai-agent */}
           <Route path="/knowledge" element={<Navigate to="/ai-agent" replace />} />
           <Route path="/follow-ups" element={<Navigate to="/automations?tab=followups" replace />} />
-          <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
-          <Route path="/settings/profile" element={<SettingsPage />} />
-          <Route path="/admin" element={<RequireSuperAdmin><AdminPage /></RequireSuperAdmin>} />
+          {/* Configurações (centro administrativo). Rotas antigas redirecionam mantendo a aba. */}
+          <Route path="/configuracoes" element={<SettingsPage />} />
+          <Route path="/configuracoes/:section" element={<SettingsPage />} />
+          <Route path="/configuracoes/:section/:item" element={<SettingsPage />} />
+          <Route path="/settings" element={<LegacySettingsRedirect />} />
+          <Route path="/settings/profile" element={<LegacySettingsRedirect />} />
+          <Route path="/admin" element={<RequireSuperAdmin><Navigate to="/configuracoes/sistema/organizacoes" replace /></RequireSuperAdmin>} />
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
           <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
           <Route path="/tasks" element={<RequirePermission perm="tasks.view" area="Tarefas"><TasksPage /></RequirePermission>} />
           <Route path="/relatorios" element={<RequirePermission perm="reports.view" area="Relatórios"><ReportsPage /></RequirePermission>} />
-          <Route path="/integracoes" element={<RequirePermission perm="settings.integrations" area="Integrações"><IntegrationsPage /></RequirePermission>} />
-          <Route path="/logs-auditoria" element={<RequirePermission perm="audit.view" area="Auditoria"><AuditLogPage /></RequirePermission>} />
+          <Route path="/integracoes" element={<Navigate to="/configuracoes/integracoes" replace />} />
+          <Route path="/logs-auditoria" element={<Navigate to="/configuracoes/sistema/auditoria" replace />} />
           {/* Credenciais agora é aba dentro de Configurações */}
-          <Route path="/settings/credentials" element={<Navigate to="/settings/profile" replace />} />
+          <Route path="/settings/credentials" element={<Navigate to="/configuracoes/integracoes/externas" replace />} />
         </Route>
 
         <Route path="*" element={<HomeRedirect />} />

@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { maskMoneyInput } from '@/lib/money';
+import { useMyDefaultCompany } from '@/hooks/useMyDefaultCompany';
 import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { formatBRL, splitInstallments } from '@/lib/money';
@@ -48,6 +49,11 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
   const today = todaySP();
   const defaultCompany = lookups.companies.find((c) => c.is_default && c.is_active) ?? lookups.companies.find((c) => c.is_active);
   const [companyId, setCompanyId] = useState(entry?.company_id ?? defaultCompany?.id ?? '');
+  const myCompany = useMyDefaultCompany();
+  const touchedCompany = useRef(false);
+  useEffect(() => {
+    if (!entry && myCompany && !touchedCompany.current && lookups.companies.some((c) => c.id === myCompany && c.is_active)) setCompanyId(myCompany);
+  }, [entry, myCompany, lookups.companies]);
   const [description, setDescription] = useState(entry?.description ?? '');
   const [partyId, setPartyId] = useState(entry?.party_id ?? '');
   const [chartId, setChartId] = useState(entry?.chart_account_id ?? '');
@@ -179,7 +185,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <F icon={Building2} label="Empresa" required htmlFor="ef-company" hint={editing && hasSettlement ? 'Já houve baixa: a empresa não muda.' : undefined}>
             <WithIcon icon={Building2}>
-              <select id="ef-company" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={cn(inputCls, 'h-11 pl-10')}>
+              <select id="ef-company" value={companyId} onChange={(e) => { touchedCompany.current = true; setCompanyId(e.target.value); }} className={cn(inputCls, 'h-11 pl-10')}>
                 {lookups.companies.filter((c) => editing || c.is_active).map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (padrão)' : ''}{c.is_active ? '' : ' — inativa'}</option>
                 ))}

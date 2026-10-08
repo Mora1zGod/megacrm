@@ -51,9 +51,9 @@ export function SettingsTab() {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="h-4 w-4" /> Certificado digital (SEFAZ)</h3>
-          <p className="text-xs text-[var(--color-text-secondary)]">O certificado A1 de cada empresa fica em Compras → Configurações. Com ele o sistema puxa as notas de entrada sozinho.</p>
+          <p className="text-xs text-[var(--color-text-secondary)]">O certificado A1 de cada empresa fica em Configurações → Empresas → Certificados. Com ele o sistema puxa as notas de entrada sozinho.</p>
         </div>
-        <Link to="/compras?tab=config" className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--accent-fill)] px-3.5 text-sm font-semibold text-white hover:bg-[var(--accent-fill-hover)]">Abrir certificado</Link>
+        <Link to="/configuracoes/empresas" className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--accent-fill)] px-3.5 text-sm font-semibold text-white hover:bg-[var(--accent-fill-hover)]">Abrir empresas</Link>
       </div>
       <div className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4">
         <h3 className="mb-1 flex items-center gap-2 font-semibold"><KeyRound className="h-4 w-4 text-[var(--accent-primary)]" /> Cobrança ASAAS (boleto e PIX)</h3>

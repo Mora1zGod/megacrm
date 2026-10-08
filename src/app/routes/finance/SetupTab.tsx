@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Pencil, Plus, Search, Star } from 'lucide-react';
@@ -70,7 +71,7 @@ function Companies({ lookups }: { lookups: Lookups }) {
   const [edit, setEdit] = useState<Company | 'new' | null>(null);
   return (
     <>
-      <Header text="As empresas do grupo. Uma é a padrão (RH e associados lançam nela). Empresa não se exclui — só desativa." onNew={can ? () => setEdit('new') : undefined} />
+      <Header text="As empresas do grupo. Uma é a padrão (RH e associados lançam nela). Empresa não se exclui — só desativa. O cadastro completo (fiscal, certificados, padrões) fica em Configurações → Empresas." onNew={can ? () => setEdit('new') : undefined} />
       <TableWrap minWidth={600}>
         <thead><tr className="border-b border-[var(--color-border-card)]"><th className={thCls}>Nome</th><th className={thCls}>CNPJ</th><th className={thCls}>Situação</th><th className={thCls} /></tr></thead>
         <tbody>
@@ -80,7 +81,7 @@ function Companies({ lookups }: { lookups: Lookups }) {
               <td className={tdCls}><b>{c.name}</b>{c.is_default && <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-primary)]"><Star className="h-3 w-3" /> padrão</span>}</td>
               <td className={tdCls}>{formatDoc(c.cnpj)}</td>
               <td className={tdCls}><Active on={c.is_active} /></td>
-              <td className={cn(tdCls, 'text-right')}>{can && <Button size="sm" variant="outline" onClick={() => setEdit(c)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>}</td>
+              <td className={cn(tdCls, 'text-right')}><Link to={`/configuracoes/empresas/${c.id}`} className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-3 text-xs font-semibold hover:bg-[var(--color-surface-hover)]"><Pencil className="h-3.5 w-3.5" /> {can ? 'Editar cadastro' : 'Ver cadastro'}</Link></td>
             </tr>
           ))}
         </tbody>
