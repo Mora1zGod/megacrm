@@ -512,7 +512,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const action = String(b.action ?? '');
     // E-mail (IMAP/SMTP): chega por /api/mail (rewrite no vercel.json) — mesma função para caber no limite de 12.
     if (action.startsWith('mail_')) {
-      const mailOut = await mailAction({ userId: ctx.userId, orgId: ctx.orgId, sys: ctx.sys }, action, b);
+      const mailOut = await mailAction({ userId: ctx.userId, orgId: ctx.orgId, sys: ctx.sys, asUser: ctx.db }, action, b);
       if (mailOut === null) return res.status(400).json({ message: 'Ação desconhecida.' });
       return res.status(200).json(mailOut);
     }

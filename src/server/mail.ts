@@ -24,6 +24,9 @@ export interface MailCtx {
   orgId: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sys: SupabaseClient<any, any, any>;
+  // Cliente com a sessão do usuário (schema whatsapp_hub) — o banco confere se o acesso está ativo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  asUser: SupabaseClient<any, any, any>;
 }
 
 interface Account {
@@ -422,8 +425,10 @@ async function sendMessage(ctx: MailCtx, b: Record<string, unknown>) {
 export async function mailAction(ctx: MailCtx, action: string, b: Record<string, unknown>) {
   if (!action.startsWith('mail_')) return null;
   // Usuário desativado (ou fora da org) não usa e-mail, mesmo com token ainda válido.
-  const { data: me } = await db(ctx).from('app_users').select('status').eq('user_id', ctx.userId).eq('org_id', ctx.orgId).maybeSingle();
-  if (!me || ((me as { status?: string }).status ?? 'active') !== 'active') throw new MailError(403, 'Seu acesso está desativado.');
+  // Mesma regra do resto do sistema (current_org_active): org ativa + usuário ativo; super admin que entrou na org passa.
+  const { data: active, error: activeErr } = await ctx.asUser.rpc('current_org_active');
+  if (activeErr) throw new MailError(500, 'Não foi possível conferir seu acesso. Tente de novo.');
+  if (active !== true) throw new MailError(403, 'Seu acesso está desativado.');
   switch (action) {
     case 'mail_save_account': return saveAccount(ctx, b);
     case 'mail_delete_account': return deleteAccount(ctx, b);
