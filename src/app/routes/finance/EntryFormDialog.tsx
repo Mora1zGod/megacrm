@@ -36,11 +36,15 @@ const SUGGESTIONS: Record<EntryKind, Array<{ label: string; description: string;
 };
 
 // Lançamento novo ou edição do cabeçalho (valor e parcelas não mudam na edição).
-export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, onSaved }: {
+// Dados vindos de fora (ex.: e-mail com boleto) para já abrir preenchido.
+export interface EntryPrefill { description?: string; partyId?: string; totalCents?: number; dueDate?: string; issueDate?: string; notes?: string; files?: File[] }
+
+export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, onClose, onSaved }: {
   kind: EntryKind;
   lookups: Lookups;
   entry?: Entry | null;
   hasSettlement?: boolean;
+  prefill?: EntryPrefill;
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
@@ -54,17 +58,17 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, onClose, 
   useEffect(() => {
     if (!entry && myCompany && !touchedCompany.current && lookups.companies.some((c) => c.id === myCompany && c.is_active)) setCompanyId(myCompany);
   }, [entry, myCompany, lookups.companies]);
-  const [description, setDescription] = useState(entry?.description ?? '');
-  const [partyId, setPartyId] = useState(entry?.party_id ?? '');
+  const [description, setDescription] = useState(entry?.description ?? prefill?.description ?? '');
+  const [partyId, setPartyId] = useState(entry?.party_id ?? prefill?.partyId ?? '');
   const [chartId, setChartId] = useState(entry?.chart_account_id ?? '');
   const [ccId, setCcId] = useState(entry?.cost_center_id ?? '');
-  const [total, setTotal] = useState(entry?.total_cents ?? 0);
-  const [issue, setIssue] = useState(entry?.issue_date ?? today);
+  const [total, setTotal] = useState(entry?.total_cents ?? prefill?.totalCents ?? 0);
+  const [issue, setIssue] = useState(entry?.issue_date ?? prefill?.issueDate ?? today);
   const [competence, setCompetence] = useState(entry?.competence_date ?? today);
-  const [due, setDue] = useState(today);
+  const [due, setDue] = useState(prefill?.dueDate ?? today);
   const [installments, setInstallments] = useState(entry?.installments_count ?? 1);
-  const [notes, setNotes] = useState(entry?.notes ?? '');
-  const [files, setFiles] = useState<File[]>([]);
+  const [notes, setNotes] = useState(entry?.notes ?? prefill?.notes ?? '');
+  const [files, setFiles] = useState<File[]>(prefill?.files ?? []);
   const [saving, setSaving] = useState(false);
   const [newParty, setNewParty] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

@@ -14,6 +14,7 @@ import {
   MessagesSquare,
   Wallet,
   ShoppingCart,
+  AtSign,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,6 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/agenda', label: 'Agenda', icon: CalendarDays, group: 'Operação', perm: 'visits.view' },
   { to: '/contacts', label: 'Contatos', icon: Users, group: 'Operação', perm: 'contacts.view' },
   { to: '/arquivos', label: 'Arquivos', icon: Paperclip, group: 'Operação', perm: 'files.view' },
+  { to: '/email', label: 'E-mail', icon: AtSign, group: 'Operação' },
   { to: '/chat', label: 'Chat da equipe', icon: MessagesSquare, group: 'Operação', perm: 'chat.view' },
   { to: '/campaigns', label: 'Campanhas', icon: Megaphone, group: 'Engajamento', perm: 'campaigns.view' },
   { to: '/automations', label: 'Automações', icon: Zap, group: 'Engajamento', perm: 'automations.view' },

@@ -773,3 +773,15 @@ Regras:
 - Contas a pagar/receber → WhatsApp: `SendBillsDialog` desenha o resumo em PNG no navegador (`lib/wa-summary-image.ts`,
   1ª imagem com indicadores + 8 contas, depois 10 por imagem, até 5) e envia; alternativas: conversa do Atendimento
   (`SendTextToConversations`) ou o WhatsApp do próprio usuário.
+
+## E-mail (09/10/2026) — `20261009100000_mail_accounts.sql`, rota `/email`
+- Caixas IMAP/SMTP (padrão Hostinger: imap.hostinger.com:993 / smtp.hostinger.com:465) POR USUÁRIO: `mail_accounts` (dono = owner_id),
+  `mail_account_members` (liberar para colega, `can_send`), `mail_account_secrets` (senha AES-GCM/CRYPTO_KEY, sem policy = só service role).
+  Admin NÃO vê caixa alheia sem ser liberado (`mail_can_use`). Bucket privado `whatsapp-hub-mail` p/ anexos > 3 MB (link de 10 min).
+- Servidor: `src/server/mail.ts` (imapflow + mailparser + nodemailer, versões fixas) chamado por `api/sefaz.ts` quando `action` começa com
+  `mail_` — o front chama `/api/mail` (rewrite no vercel.json → mesma função; limite de 12 funções do Hobby). Nada de e-mail vai para o banco:
+  cada ação abre a caixa e fecha. Envio grava cópia em "Enviados" (APPEND) e marca o original como respondido. Limite Vercel ~4,5 MB por
+  pedido/resposta: anexos de envio até 3 MB no total.
+- Tela: pastas · lista (busca IMAP, não lidos, estrela, páginas de 40) · leitura em iframe sandbox (sem script; imagens de fora bloqueadas até
+  "Mostrar imagens"). Boleto no texto (`lib/boleto.ts`: linha digitável 47/48 dígitos, fator de vencimento com a virada de 22/02/2025) →
+  "Lançar conta a pagar" (`EntryFormDialog` com `prefill`, PDF anexado, fornecedor por e-mail/CNPJ/domínio); XML de NF-e → `import_xml`.

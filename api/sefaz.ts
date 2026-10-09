@@ -18,6 +18,7 @@ import { gunzipSync } from 'node:zlib';
 import forge from 'node-forge';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getCredential, setCredential } from '../src/lib/credentials.js';
+import { mailAction, MailError } from '../src/server/mail.js';
 import { parseDistResponse, parseEvent, parseEventResponse, parseFullNfe, parseSummary, type InvoicePayload } from '../src/lib/nfe.js';
 
 type ApiRequest = { method?: string; body?: unknown; headers?: Record<string, string | string[] | undefined> };
@@ -509,6 +510,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const ctx = await auth(req);
     const b = (req.body && typeof req.body === 'object' ? req.body : JSON.parse(String(req.body ?? '{}'))) as Record<string, unknown>;
     const action = String(b.action ?? '');
+    // E-mail (IMAP/SMTP): chega por /api/mail (rewrite no vercel.json) — mesma função para caber no limite de 12.
+    if (action.startsWith('mail_')) {
+      const mailOut = await mailAction({ userId: ctx.userId, orgId: ctx.orgId, sys: ctx.sys }, action, b);
+      if (mailOut === null) return res.status(400).json({ message: 'Ação desconhecida.' });
+      return res.status(200).json(mailOut);
+    }
     const out = action === 'cert_status' ? await certStatus(ctx)
       : action === 'save_cert' ? await saveCert(ctx, b)
       : action === 'remove_cert' ? await removeCert(ctx, b)
@@ -521,9 +528,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (out === null) return res.status(400).json({ message: 'Ação desconhecida.' });
     return res.status(200).json(out);
   } catch (e) {
-    const status = e instanceof HttpError ? e.status : 500;
+    const known = e instanceof HttpError || e instanceof MailError;
+    const status = known ? (e as HttpError | MailError).status : 500;
     const message = e instanceof Error ? e.message : 'Erro inesperado.';
     if (status >= 500) console.error('sefaz', message);
-    return res.status(status).json({ message: status === 500 && !(e instanceof HttpError) ? 'Erro inesperado no servidor. Tente de novo.' : message });
+    return res.status(status).json({ message: status === 500 && !known ? 'Erro inesperado no servidor. Tente de novo.' : message });
   }
 }

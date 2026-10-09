@@ -29,6 +29,7 @@ const SettingsPage = lazy(() => import('./routes/settings/SettingsPage'));
 const LegacySettingsRedirect = lazy(() => import('./routes/settings/SettingsPage').then((m) => ({ default: m.LegacySettingsRedirect })));
 const FinancePage = lazy(() => import('./routes/finance/FinancePage'));
 const PurchasesPage = lazy(() => import('./routes/purchases/PurchasesPage'));
+const EmailPage = lazy(() => import('./routes/email/EmailPage'));
 const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
 const FilesPage = lazy(() => import('./routes/files/FilesPage'));
 const ChatPage = lazy(() => import('./routes/chat/ChatPage'));
@@ -251,6 +252,7 @@ export function AppRouter() {
           <Route path="/settings/profile" element={<LegacySettingsRedirect />} />
           <Route path="/admin" element={<RequireSuperAdmin><Navigate to="/configuracoes/sistema/organizacoes" replace /></RequireSuperAdmin>} />
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
+          <Route path="/email" element={<EmailPage />} />
           <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
           <Route path="/tasks" element={<Navigate to="/quadros?modo=caixa" replace />} />
           <Route path="/relatorios" element={<RequirePermission perm="reports.view" area="Relatórios"><ReportsPage /></RequirePermission>} />

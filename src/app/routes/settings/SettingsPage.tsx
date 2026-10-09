@@ -24,6 +24,7 @@ import { CompaniesSection } from './companies/CompaniesSection';
 import { CompanyEditor } from './companies/CompanyEditor';
 import { ChannelsStatus, ExternalServices, IntegrationsHub, WebhooksPanel } from './integrations/IntegrationsHub';
 import { WaNotifySettings } from './integrations/WaNotifySettings';
+import { MailAccountsSettings } from '../email/MailAccountsSettings';
 import { SettingsTab as AsaasSettings } from '../finance/SettingsTab';
 
 const AuditLogPage = lazy(() => import('../admin/AuditLogPage'));
@@ -64,6 +65,7 @@ const SECTIONS: SectionDef[] = [
     render: () => <IntegrationsHub />,
     items: [
       { id: 'canais', title: 'WhatsApp e Instagram', desc: 'Números, contas e conexões', icon: MessagesSquare, perm: 'settings.channels', render: () => <ChannelsSettings /> },
+      { id: 'email', title: 'E-mail (Hostinger e outros)', desc: 'Ligar sua caixa, assinatura e liberar para colegas', icon: Mail, render: () => <MailAccountsSettings /> },
       { id: 'avisos', title: 'Notificações WhatsApp', desc: 'Número que envia os avisos e quem recebe', icon: BellRing, anyPerm: ['settings.channels', 'financial.ledger_view'], render: () => <WaNotifySettings /> },
       { id: 'status', title: 'Status dos canais', desc: 'Conectado, desconectado e última mensagem', icon: Activity, perm: 'settings.channels', render: () => <ChannelsStatus /> },
       { id: 'api', title: 'APIs', desc: 'Chaves de integração', icon: KeyRound, perm: 'settings.integrations', render: () => <ApiKeysSettings /> },

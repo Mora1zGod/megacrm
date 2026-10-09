@@ -15,6 +15,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/mail",
+      "destination": "/api/sefaz"
+    },
+    {
       "source": "/api/health",
       "destination": "/api/bootstrap-status"
     },

@@ -98,6 +98,8 @@ export function IntegrationsHub() {
       on: !live ? null : wa.length ? wa.every((x) => x.s.connected) : false,
       status: !live ? 'Verificando…' : wa.length ? `${wa.filter((x) => x.s.connected).length} de ${wa.length} número(s) conectado(s)` : 'Nenhum número', meta: last(wa) ? `Última mensagem ${fmtWhen(last(wa))}` : undefined,
       to: '/configuracoes/integracoes/canais', cta: 'Configurar' },
+    { id: 'caixas', title: 'E-mail (caixas)', icon: Mail, tone: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]', show: true,
+      on: null, status: 'Ler, responder e baixar anexos no CRM', meta: 'Hostinger ou qualquer IMAP/SMTP', to: '/configuracoes/integracoes/email', cta: 'Configurar' },
     { id: 'avisos', title: 'Notificações WhatsApp', icon: BellRing, tone: 'bg-[rgba(34,197,94,0.12)] text-[#16a34a]', show: perms.can('settings.channels') || perms.can('financial.ledger_view'),
       on: null, status: 'Número UAZAPI que envia os avisos', meta: 'Contas a pagar e outros avisos para pessoas e grupos', to: '/configuracoes/integracoes/avisos', cta: 'Configurar' },
     { id: 'instagram', title: 'Instagram', icon: Instagram, tone: 'bg-[rgba(221,42,123,0.12)] text-[#DD2A7B]', show: perms.can('settings.channels'),
