@@ -757,6 +757,9 @@ Regras:
 - Tela inicial = **Todos os quadros** (`routes/boards/AllBoardsView.tsx`): cada quadro é uma coluna com todos os cartões dele
   (etiqueta com o nome da lista quando não é a primeira); arrastar para outra coluna leva à lista de mesmo nome (ou à primeira);
   título da coluna arrasta para reordenar (`boards.position` renumerado 1000, 2000…). `useBoardContent` aceita 1 id ou vários.
+- Busca das listas (09/10/2026): `src/lib/search.ts` — `searchMatch(q, campos, centavos)`: texto sem acento/maiúscula, números (CNPJ, chave,
+  nº) com ou sem pontuação, e valor (`898` = começo dos reais; `898,85` = exato). Usado em Contas a pagar/receber e Notas de entrada (lá a
+  busca é na tela sobre as notas do período — não mais `.or()` no PostgREST).
 - Listas com cabeçalho fixo (09/10/2026): `<DataGrid fill>` = a tabela ocupa o resto da altura e só as linhas rolam; `<thead>` e `<tfoot>` são
   sticky. A aba precisa da raiz `flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0` (sem o `shrink-0` blocos com overflow-hidden — ex. cards —
   encolhem até sumir). Usado em Contas a pagar/receber e em todas as listas de Compras. Mínimo da lista 260 px (tela baixa: a página rola).

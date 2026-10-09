@@ -5,6 +5,7 @@ import { useMyDefaultCompany } from '@/hooks/useMyDefaultCompany';
 import { Ban, Boxes, CheckCircle2, CloudDownload, DollarSign, KeyRound, Download, Eye, FileSpreadsheet, FileText, FileUp, Link2, Loader2, PackagePlus, Pencil, Plus, Printer, RotateCcw, Save, Search, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
 import { DataGrid, GridReset, gridExportRows, useGrid, type GridColumn } from '@/components/ui/GridTable';
 import { exportExcel, openReport, reportNow } from '@/lib/table-export';
+import { searchMatch } from '@/lib/search';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -87,19 +88,11 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
     if (source) query = query.eq('source', source);
     if (finRec) query = query.eq('fin_reconciled', finRec === 'yes');
     if (stockRec) query = query.eq('stock_reconciled', stockRec === 'yes');
-    const t = q.trim().replace(/[,()]/g, ' ');
-    if (t) {
-      const d = t.replace(/\D/g, '');
-      // Também acha pelo nome fantasia do cadastro.
-      const tl = t.toLowerCase();
-      const byFantasy = lookups.suppliers.filter((p) => p.trade_name?.toLowerCase().includes(tl)).map((p) => p.id).slice(0, 50);
-      query = query.or([`number.ilike.%${t}%`, `supplier_name.ilike.%${t}%`, `party_name.ilike.%${t}%`, d.length >= 4 ? `access_key.ilike.%${d}%` : '', d.length >= 4 ? `supplier_doc.ilike.%${d}%` : '',
-        byFantasy.length ? `party_id.in.(${byFantasy.join(',')})` : ''].filter(Boolean).join(','));
-    }
+    // A busca (número, chave, CNPJ, fornecedor, valor) é feita na tela sobre as notas do período — ver `list`.
     const { data, error } = await query;
     if (error) toast.error(purError(error));
     setRows((data ?? []) as Invoice[]);
-  }, [from, to, by, companyId, partyId, status, source, finRec, stockRec, q, lookups.suppliers]);
+  }, [from, to, by, companyId, partyId, status, source, finRec, stockRec]);
   useEffect(() => { void load(); }, [load]);
   const current = useOpenDoc('pur_invoices_v', openId, rows);
 
@@ -148,7 +141,16 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
     void load();
   };
 
-  const list = rows ?? [];
+  // Fornecedor pelo nome fantasia (cadastro), senão a razão social da nota.
+  const supById = useMemo(() => new Map(lookups.suppliers.map((p) => [p.id, p])), [lookups.suppliers]);
+  const supName = useCallback((n: Invoice) => partyDisplay(n.party_id ? supById.get(n.party_id) : null, n.party_name ?? n.supplier_name), [supById]);
+  // Busca: número/série, chave, CNPJ/CPF, fornecedor (fantasia, razão social da nota e do cadastro), empresa e valor.
+  const list = useMemo(() => (rows ?? []).filter((n) => {
+    if (!q.trim()) return true;
+    const p = n.party_id ? supById.get(n.party_id) : undefined;
+    return searchMatch(q, [n.number, n.series ? `${n.number}/${n.series}` : null, n.access_key, n.supplier_doc, p?.doc, n.supplier_name, n.party_name,
+      p?.trade_name, p?.name, supName(n), n.company_name], [n.total_cents]);
+  }), [rows, q, supById, supName]);
   const live = list.filter((n) => n.status !== 'ignored' && n.status !== 'canceled_sefaz');
   const finPend = list.filter((n) => !NO_RECON.has(n.status) && !n.fin_reconciled);
   const stockPend = list.filter((n) => !NO_RECON.has(n.status) && !n.stock_reconciled);
@@ -156,9 +158,6 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const sumOf = (a: Invoice[]) => a.reduce((s, n) => s + n.total_cents, 0);
   const canRemove = (n: Invoice) => perms.can('purchases.invoice') && !n.fin_entry_id && !n.stock_reconciled && n.status !== 'posted';
 
-  // Fornecedor pelo nome fantasia (cadastro), senão a razão social da nota.
-  const supById = useMemo(() => new Map(lookups.suppliers.map((p) => [p.id, p])), [lookups.suppliers]);
-  const supName = useCallback((n: Invoice) => partyDisplay(n.party_id ? supById.get(n.party_id) : null, n.party_name ?? n.supplier_name), [supById]);
   const columns = useMemo<GridColumn<Invoice>[]>(() => [
     { id: 'number', label: 'Número', width: 110, sortValue: (n) => n.number, exportValue: (n) => `${n.number}${n.series ? `/${n.series}` : ''}`,
       render: (n) => <span className="font-semibold">{n.doc_type !== 'nfe' && <span className="mr-1 text-xs font-normal text-[var(--color-text-muted)]">{DOC_TYPE[n.doc_type]}</span>}{n.number}{n.series ? `/${n.series}` : ''}</span> },
@@ -285,7 +284,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} aria-label="Até" />
             </div>
           </Field></div>
-          <Field label="Número" htmlFor="nf-q"><input id="nf-q" value={text} onChange={(e) => setText(e.target.value)} placeholder="Número, chave ou fornecedor" className={inputCls} /></Field>
+          <Field label="Buscar" htmlFor="nf-q"><input id="nf-q" value={text} onChange={(e) => setText(e.target.value)} placeholder="Nº, chave, CNPJ, fornecedor ou valor" title="Número da nota, chave de acesso, CNPJ/CPF, fornecedor (fantasia ou razão social) ou valor (ex.: 490 ou 5.270,00)" className={inputCls} /></Field>
           <Field label="Fornecedor" htmlFor="nf-party">
             <select id="nf-party" value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputCls}>
               <option value="">Todos os fornecedores</option>
