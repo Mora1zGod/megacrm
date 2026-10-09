@@ -770,9 +770,13 @@ Regras:
   escrita: `settings.channels`. Tela: Configurações → Comunicação e integrações → Notificações WhatsApp (teste por destinatário).
 - Edge Function `send-wa-notification` (`financial.ledger_view` ou `settings.channels`): `{recipient_ids, text?, images_base64?}` —
   PNGs vão para `whatsapp-hub-media/<org>/notificacoes/` e saem por `/send/media` (legenda na 1ª). Não grava no Atendimento.
-- Contas a pagar/receber → WhatsApp: `SendBillsDialog` desenha o resumo em PNG no navegador (`lib/wa-summary-image.ts`,
-  1ª imagem com indicadores + 8 contas, depois 10 por imagem, até 5) e envia; alternativas: conversa do Atendimento
-  (`SendTextToConversations`) ou o WhatsApp do próprio usuário.
+- Contas a pagar/receber → WhatsApp: `SendBillsDialog` desenha o resumo em PNG no navegador (`lib/wa-summary-image.ts`):
+  12 contas por imagem (60 = 5 imagens; >5 imagens vão em lotes de 5, resumo só no 1º), cabeçalho + 4 indicadores só na 1ª,
+  "Continuação · Página X de Y" nas outras, legenda só na última. Ordem `sortBills`: vencida → aberta → parcial → paga, vencimento
+  crescente. Modo `billsMode`: normal ≤12, compacto 13–40, super compacto >40 (2ª linha só com documento — `docRef`).
+  Fornecedor `abbreviateParty` (tira LTDA/ME…, abrevia EMPRESA→EMP. etc.), descrição `shortDesc` (45 + "…"). Texto
+  `buildBillsText` ≤ 1.500 caracteres (com imagens só o resumo). Só apresentação: nada soma/remove/altera conta.
+  Alternativas: conversa do Atendimento (`SendTextToConversations`) ou o WhatsApp do próprio usuário (texto ≤ 1.500).
 
 ## E-mail (09/10/2026) — `20261009100000_mail_accounts.sql`, rota `/email`
 - Caixas IMAP/SMTP (padrão Hostinger: imap.hostinger.com:993 / smtp.hostinger.com:465) POR USUÁRIO: `mail_accounts` (dono = owner_id),

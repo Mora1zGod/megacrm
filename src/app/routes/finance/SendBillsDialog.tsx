@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 import { formatPhone } from '@/lib/format';
-import { MAX_IMAGE_ITEMS, renderBillsImages, type BillsImage } from '@/lib/wa-summary-image';
+import { ITEMS_PER_IMAGE, renderBillsImages, type BillsImage } from '@/lib/wa-summary-image';
 import { sendWaNotification, type NotifyRecipient } from '@/app/routes/settings/integrations/WaNotifySettings';
 import { SendTextToConversations } from '@/components/inbox/SendTextToConversations';
 
@@ -17,7 +17,6 @@ export function SendBillsDialog({ data, text, caption, onClose }: { data: BillsI
   const [imgs, setImgs] = useState<string[] | null>(null);
   const [cfg, setCfg] = useState<{ channel: string | null; recipients: NotifyRecipient[] } | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  const [withText, setWithText] = useState(data.items.length > MAX_IMAGE_ITEMS);
   const [sending, setSending] = useState(false);
   const [viaInbox, setViaInbox] = useState(false);
 
@@ -40,9 +39,16 @@ export function SendBillsDialog({ data, text, caption, onClose }: { data: BillsI
     if (!picked.length || !imgs?.length) return;
     setSending(true);
     try {
-      const res = await sendWaNotification({ recipient_ids: picked, images_base64: imgs, text: withText ? text : caption });
-      const fails = res.results.filter((x) => !x.ok);
-      toast.success(`Enviado para ${res.sent} destinatário(s) pelo número ${res.channel}.`);
+      // O envio aceita até 5 imagens por vez: mais que isso vai em lotes, com o resumo só no 1º.
+      const fails: Array<{ name: string; error?: string }> = [];
+      let sent = 0;
+      let channel = '';
+      for (let i = 0; i < imgs.length; i += 5) {
+        const res = await sendWaNotification({ recipient_ids: picked, images_base64: imgs.slice(i, i + 5), text: i === 0 ? caption : undefined });
+        if (i === 0) { sent = res.sent; channel = res.channel; }
+        fails.push(...res.results.filter((x) => !x.ok));
+      }
+      toast.success(`Enviado para ${sent} destinatário(s) pelo número ${channel}.`);
       if (fails.length) toast.error('Alguns não receberam', { description: fails.map((f) => `${f.name}: ${f.error}`).join('\n') });
       if (!fails.length) onClose();
     } catch (e) { toast.error('Não foi enviado.', { description: e instanceof Error ? e.message : String(e) }); }
@@ -87,10 +93,9 @@ export function SendBillsDialog({ data, text, caption, onClose }: { data: BillsI
                     );
                   })}
                 </ul>
-                <label className="flex items-start gap-2 text-xs text-[var(--color-text-secondary)]">
-                  <input type="checkbox" checked={withText} onChange={(e) => setWithText(e.target.checked)} className="mt-0.5" />
-                  <span>Mandar também a lista em texto{data.items.length > MAX_IMAGE_ITEMS ? ` (as imagens mostram ${MAX_IMAGE_ITEMS} de ${data.items.length})` : ''}</span>
-                </label>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {data.items.length} conta{data.items.length === 1 ? '' : 's'} em {imgs?.length ?? Math.ceil(data.items.length / ITEMS_PER_IMAGE)} imagem(ns), até {ITEMS_PER_IMAGE} por imagem. A mensagem leva só o resumo (total, em aberto e vencidas).
+                </p>
                 <Button onClick={() => void send()} disabled={sending || !picked.length || !imgs?.length}>
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar{imgs && imgs.length > 1 ? ` ${imgs.length} imagens` : ''}{picked.length ? ` para ${picked.length}` : ''}
                 </Button>

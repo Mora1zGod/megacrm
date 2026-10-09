@@ -1,9 +1,24 @@
-// Gera a imagem (PNG) do resumo de contas para mandar no WhatsApp — mesmo visual do card:
-// cabeçalho, 3 indicadores, lista de lançamentos com data, bolinha de status, nome, descrição,
-// valor e selo, e a legenda. Desenhado direto no <canvas> (sem dependência).
+// Resumo de contas para o WhatsApp: imagens (PNG, desenhadas no <canvas>) + texto curto.
+// Visual aprovado: fundo verde-claro, cards brancos, data em bloco, fornecedor em destaque, valor à direita, selo de status.
+// Só muda a APRESENTAÇÃO — nunca soma, remove ou altera conta, valor, vencimento ou status.
+//
+// Regras:
+// - Até 12 contas por imagem (60 contas = 5 imagens); cabeçalho completo só na 1ª, as outras têm "Continuação".
+// - Ordem: vencidas → em aberto → parciais → pagas; dentro de cada grupo, vencimento crescente.
+// - Cada conta ocupa no máximo 2 linhas. Modo pelo total: normal (≤12), compacto (13–40), super compacto (>40:
+//   a 2ª linha só aparece se a descrição tiver um documento, ex. "NF 1537").
+// - Rodapé "Página X/Y · N contas"; legenda só na última.
+// - Texto do WhatsApp nunca passa de 1.500 caracteres (`buildBillsText`).
 
 export type BillStatus = 'overdue' | 'open' | 'partial' | 'paid';
-export interface BillItem { date: string; name: string; desc: string; amount: string; status: BillStatus }
+export interface BillItem {
+  date: string;   // dd/mm/aaaa (exibição)
+  due?: string;   // aaaa-mm-dd (ordenação; sem ele usa `date`)
+  name: string;
+  desc: string;
+  amount: string;
+  status: BillStatus;
+}
 export interface BillsImage {
   title: string;
   period: string;
@@ -14,27 +29,113 @@ export interface BillsImage {
   overdue: string;
   items: BillItem[];
 }
+export type BillsMode = 'normal' | 'compacto' | 'super_compacto';
+
+export const ITEMS_PER_IMAGE = 12;
+export const MAX_TEXT_CHARS = 1500;
 
 const W = 1080;
-const PAD = 40;
+const PAD = 36;
 const FONT = '"Inter","Segoe UI",Roboto,Arial,sans-serif';
 const C = {
-  bg: '#F3FBF5', card: '#FFFFFF', ink: '#10231A', soft: '#5B6B63', line: '#E3EFE7', chip: '#EEF4F0',
-  green: '#1F9D55', orange: '#EA6A12',
+  bg: '#E9F6EC', card: '#FFFFFF', ink: '#10231A', soft: '#5B6B63', chip: '#EEF4F0', green: '#1F9D55',
+  amber: '#D97706', red: '#C21F2B',
   st: {
-    overdue: { dot: '#E5484D', bg: '#FDE2E3', fg: '#C21F2B', label: 'Vencida' },
-    open: { dot: '#F5C431', bg: '#FFF3C9', fg: '#B45309', label: 'Em aberto' },
-    partial: { dot: '#F28C38', bg: '#FFE6D2', fg: '#C2410C', label: 'Parcial' },
-    paid: { dot: '#2FB45A', bg: '#DCF5E4', fg: '#15803D', label: 'Paga' },
+    overdue: { dot: '#E5484D', bg: '#FDE2E3', fg: '#C21F2B', label: 'Vencida', emoji: '🔴' },
+    open: { dot: '#F5C431', bg: '#FFF3C9', fg: '#A16207', label: 'Em aberto', emoji: '🟡' },
+    partial: { dot: '#F28C38', bg: '#FFE6D2', fg: '#C2410C', label: 'Parcial', emoji: '🟠' },
+    paid: { dot: '#2FB45A', bg: '#DCF5E4', fg: '#15803D', label: 'Paga', emoji: '🟢' },
   },
 } as const;
 const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-// WhatsApp reduz imagem muito comprida — por isso a lista vai em várias imagens (1ª com os indicadores).
-const FIRST_PAGE_ITEMS = 8;
-const PAGE_ITEMS = 10;
-const MAX_PAGES = 5;
-export const MAX_IMAGE_ITEMS = FIRST_PAGE_ITEMS + PAGE_ITEMS * (MAX_PAGES - 1);
+const RANK: Record<BillStatus, number> = { overdue: 0, open: 1, partial: 2, paid: 3 };
 
+// ------------------------------------------------------------------ regras de apresentação (puras, testáveis)
+export function billsMode(n: number): BillsMode {
+  if (n > 40) return 'super_compacto';
+  if (n > 12) return 'compacto';
+  return 'normal';
+}
+
+const isoOf = (it: BillItem) => {
+  if (it.due) return it.due;
+  const [d, m, y] = it.date.split('/');
+  return y && m && d ? `${y}-${m}-${d}` : it.date;
+};
+export function sortBills(items: BillItem[]): BillItem[] {
+  return items
+    .map((it, i) => ({ it, i }))
+    .sort((a, b) => RANK[a.it.status] - RANK[b.it.status] || isoOf(a.it).localeCompare(isoOf(b.it)) || a.i - b.i)
+    .map((x) => x.it);
+}
+
+export function paginate<T>(items: T[], per = ITEMS_PER_IMAGE): T[][] {
+  const pages: T[][] = [];
+  for (let i = 0; i < items.length; i += per) pages.push(items.slice(i, i + per));
+  return pages.length ? pages : [[]];
+}
+
+const SUFFIX = /\s*(?:[-–,]\s*)?\b(?:LTDA\.?|EIRELI|EPP|MEI|ME|S\/A|S\.A\.?|SA)\s*$/;
+const STOP = new Set(['DE', 'DA', 'DO', 'DOS', 'DAS', 'E']);
+const ABBR: Record<string, string> = {
+  EMPRESA: 'EMP.', COMERCIO: 'COM.', 'COMÉRCIO': 'COM.', DISTRIBUIDORA: 'DIST.', INDUSTRIA: 'IND.', 'INDÚSTRIA': 'IND.',
+  SERVICOS: 'SERV.', 'SERVIÇOS': 'SERV.', PRODUTOS: 'PROD.', CONSTRUCOES: 'CONSTR.', 'CONSTRUÇÕES': 'CONSTR.',
+  ADMINISTRADORA: 'ADM.', TRANSPORTES: 'TRANSP.', REPRESENTACOES: 'REPR.', 'REPRESENTAÇÕES': 'REPR.',
+  EQUIPAMENTOS: 'EQUIP.', TECNOLOGIA: 'TEC.', COMERCIAL: 'COM.', BRASIL: 'BR', BRASILEIRA: 'BRAS.', NACIONAL: 'NAC.',
+  ENGENHARIA: 'ENG.', SOLUCOES: 'SOL.', 'SOLUÇÕES': 'SOL.', IMPORTACAO: 'IMP.', 'IMPORTAÇÃO': 'IMP.', EXPORTACAO: 'EXP.', 'EXPORTAÇÃO': 'EXP.',
+};
+// Nome do fornecedor curto e sempre igual para o mesmo nome (mesma entrada → mesma saída).
+export function abbreviateParty(name: string, max = 26): string {
+  let s = (name || '—').toUpperCase().replace(/\s+/g, ' ').trim();
+  if (s.length <= max) return s;
+  for (let i = 0; i < 3 && SUFFIX.test(s); i++) s = s.replace(SUFFIX, '').trim();
+  if (s.length <= max) return s;
+  s = s.split(' ').filter((w) => !STOP.has(w)).map((w) => ABBR[w] ?? w).join(' ');
+  return s;
+}
+
+export function shortDesc(desc: string, max = 45): string {
+  const s = (desc || '').replace(/\s+/g, ' ').trim();
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+}
+
+// Documento citado na descrição (NF 1537, DOC 66606/1, Fatura 10/2026, Pedido 7788…). Nada achado = null.
+const DOC_RE = /\b(NF-?e|NFS-?e|NFSE|NFE|NF|N\.F\.|DOC(?:TO)?|DOCUMENTO|FATURA|FAT|BOLETO|PEDIDO|PED|DUPLICATA|DUP|PARCELA|PARC|CONTRATO|UC|NOTA)\b\.?\s*(?:N[º°o.]?\s*)?[:#-]?\s*([A-Z0-9][\w./-]*\d[\w./-]*)/i;
+export function docRef(desc: string): string | null {
+  const m = DOC_RE.exec(desc || '');
+  if (!m) return null;
+  const kind = m[1].toUpperCase().replace(/\./g, '').replace(/^NFE$/, 'NF-e').replace(/^NOTA$/, 'NF');
+  return `${kind} ${m[2]}`.slice(0, 30);
+}
+
+// Texto do WhatsApp. Com imagens: só o resumo financeiro. Sem imagens (Atendimento / meu WhatsApp): resumo + quantas
+// contas couberem em 1 linha cada, sempre ≤ 1.500 caracteres.
+export function buildBillsText(d: BillsImage, opts: { withImages: boolean; max?: number }): string {
+  const max = opts.max ?? MAX_TEXT_CHARS;
+  const head = [
+    `*${d.title} — ${d.period}*${d.company ? `\n${d.company}` : ''}`,
+    '',
+    `${d.count} parcela${d.count === 1 ? '' : 's'}`,
+    `Total: *${d.total}*`,
+    `Em aberto: *${d.open}*`,
+    `Vencidas: *${d.overdue}*`,
+  ].join('\n');
+  if (opts.withImages) return `${head}\n\n📎 Segue o relatório detalhado nas imagens.`.slice(0, max);
+  const items = sortBills(d.items);
+  const tail = (left: number) => (left > 0 ? `\n… e mais ${left} conta${left === 1 ? '' : 's'} (lista completa no CRM)` : '');
+  const legend = `\n\n🔴 vencida · 🟡 em aberto · 🟠 parcial · 🟢 paga`;
+  let body = `${head}\n`;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const line = `\n${C.st[it.status].emoji} ${it.date.slice(0, 5)} | ${abbreviateParty(it.name, 22)} | ${it.amount}`;
+    const reserve = tail(items.length - i - 1).length + legend.length + 60;
+    if ((body + line).length + reserve > max) { body += tail(items.length - i); break; }
+    body += line;
+  }
+  return `${body}${legend}`.slice(0, max);
+}
+
+// ------------------------------------------------------------------ desenho
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill: string) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -47,168 +148,184 @@ function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
   ctx.fill();
 }
 function font(ctx: CanvasRenderingContext2D, size: number, weight = 400) { ctx.font = `${weight} ${size}px ${FONT}`; }
-// Quebra em até `max` linhas; a última ganha "…" se sobrar texto.
-function wrap(ctx: CanvasRenderingContext2D, text: string, width: number, max: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let cur = '';
-  for (const w of words) {
-    const t = cur ? `${cur} ${w}` : w;
-    if (ctx.measureText(t).width <= width) { cur = t; continue; }
-    if (cur) lines.push(cur);
-    cur = w;
-    if (lines.length === max) break;
-  }
-  if (lines.length < max && cur) lines.push(cur);
-  if (lines.length > max) lines.length = max;
-  const used = lines.join(' ').split(/\s+/).length;
-  if (used < words.length && lines.length) {
-    let last = lines[lines.length - 1];
-    while (last && ctx.measureText(`${last}…`).width > width) last = last.slice(0, -1);
-    lines[lines.length - 1] = `${last.trimEnd()}…`;
-  }
-  return lines;
+// Corta com "…" até caber na largura (nunca quebra linha).
+function fit(ctx: CanvasRenderingContext2D, text: string, width: number): string {
+  if (ctx.measureText(text).width <= width) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > width) t = t.slice(0, -1);
+  return `${t.trimEnd()}…`;
 }
-function icon(ctx: CanvasRenderingContext2D, kind: 'doc' | 'bars' | 'clock' | 'list' | 'tag', x: number, y: number, color: string) {
+type IconKind = 'doc' | 'layers' | 'bars' | 'clock' | 'alert' | 'list' | 'info';
+function icon(ctx: CanvasRenderingContext2D, kind: IconKind, x: number, y: number, color: string, s = 1) {
   ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s);
   ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath();
   if (kind === 'doc') {
-    ctx.moveTo(x - 10, y - 14); ctx.lineTo(x + 4, y - 14); ctx.lineTo(x + 12, y - 6); ctx.lineTo(x + 12, y + 14); ctx.lineTo(x - 10, y + 14); ctx.closePath();
-    ctx.moveTo(x - 4, y); ctx.lineTo(x + 6, y); ctx.moveTo(x - 4, y + 6); ctx.lineTo(x + 6, y + 6); ctx.stroke();
+    ctx.moveTo(-11, -15); ctx.lineTo(4, -15); ctx.lineTo(12, -7); ctx.lineTo(12, 15); ctx.lineTo(-11, 15); ctx.closePath();
+    ctx.moveTo(-5, -1); ctx.lineTo(6, -1); ctx.moveTo(-5, 6); ctx.lineTo(6, 6); ctx.stroke();
+  } else if (kind === 'layers') {
+    ctx.moveTo(0, -12); ctx.lineTo(13, -5); ctx.lineTo(0, 2); ctx.lineTo(-13, -5); ctx.closePath();
+    ctx.moveTo(-13, 2); ctx.lineTo(0, 9); ctx.lineTo(13, 2); ctx.moveTo(-13, 8); ctx.lineTo(0, 15); ctx.lineTo(13, 8); ctx.stroke();
   } else if (kind === 'bars') {
-    ctx.moveTo(x - 8, y + 12); ctx.lineTo(x - 8, y + 2); ctx.moveTo(x, y + 12); ctx.lineTo(x, y - 10); ctx.moveTo(x + 8, y + 12); ctx.lineTo(x + 8, y - 3); ctx.stroke();
+    ctx.lineWidth = 5; ctx.moveTo(-9, 12); ctx.lineTo(-9, 3); ctx.moveTo(0, 12); ctx.lineTo(0, -4); ctx.moveTo(9, 12); ctx.lineTo(9, -12); ctx.stroke();
   } else if (kind === 'clock') {
-    ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.moveTo(x, y - 7); ctx.lineTo(x, y); ctx.lineTo(x + 6, y + 4); ctx.stroke();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.moveTo(0, -6); ctx.lineTo(0, 0); ctx.lineTo(5, 4); ctx.stroke();
+  } else if (kind === 'alert') {
+    ctx.moveTo(0, -13); ctx.lineTo(14, 12); ctx.lineTo(-14, 12); ctx.closePath(); ctx.moveTo(0, -4); ctx.lineTo(0, 3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 8, 1.8, 0, Math.PI * 2); ctx.fill();
   } else if (kind === 'list') {
-    for (const dy of [-8, 0, 8]) { ctx.moveTo(x - 4, y + dy); ctx.lineTo(x + 12, y + dy); }
+    for (const dy of [-8, 0, 8]) { ctx.moveTo(-4, dy); ctx.lineTo(12, dy); }
     ctx.stroke();
-    for (const dy of [-8, 0, 8]) { ctx.beginPath(); ctx.arc(x - 11, y + dy, 2, 0, Math.PI * 2); ctx.fill(); }
+    for (const dy of [-8, 0, 8]) { ctx.beginPath(); ctx.arc(-11, dy, 2, 0, Math.PI * 2); ctx.fill(); }
   } else {
-    ctx.moveTo(x - 12, y - 12); ctx.lineTo(x + 1, y - 12); ctx.lineTo(x + 13, y); ctx.lineTo(x + 1, y + 12); ctx.lineTo(x - 12, y - 1); ctx.closePath(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x - 5, y - 5, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.font = `800 16px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('i', 0, 1);
   }
   ctx.restore();
 }
 
-// Devolve 1 a 5 PNGs (base64, sem o prefixo data:).
+interface Metrics { rowH1: number; rowH2: number; gap: number; date: number; dd: number; mm: number; name: number; sub: number; amount: number; pill: number; pillH: number }
+const METRICS: Record<BillsMode, Metrics> = {
+  normal: { rowH1: 78, rowH2: 96, gap: 10, date: 70, dd: 30, mm: 19, name: 29, sub: 23, amount: 30, pill: 23, pillH: 44 },
+  compacto: { rowH1: 70, rowH2: 84, gap: 8, date: 62, dd: 27, mm: 17, name: 27, sub: 21, amount: 28, pill: 21, pillH: 40 },
+  super_compacto: { rowH1: 62, rowH2: 78, gap: 7, date: 56, dd: 25, mm: 16, name: 26, sub: 20, amount: 27, pill: 20, pillH: 38 },
+};
+
+// Devolve 1 PNG (base64, sem "data:") a cada 12 contas.
 export async function renderBillsImages(d: BillsImage): Promise<string[]> {
-  const pages: BillItem[][] = [d.items.slice(0, FIRST_PAGE_ITEMS)];
-  for (let i = FIRST_PAGE_ITEMS; i < Math.min(d.items.length, MAX_IMAGE_ITEMS); i += PAGE_ITEMS) pages.push(d.items.slice(i, i + PAGE_ITEMS));
-  const extra = Math.max(0, d.items.length - MAX_IMAGE_ITEMS);
-  return pages.map((items, i) => renderPage(d, items, { page: i + 1, pages: pages.length, extra: i === pages.length - 1 ? extra : 0 }));
+  const mode = billsMode(d.items.length);
+  const pages = paginate(sortBills(d.items));
+  return pages.map((items, i) => renderPage(d, items, { page: i + 1, pages: pages.length, mode }));
 }
 
-function renderPage(d: BillsImage, shown: BillItem[], o: { page: number; pages: number; extra: number }): string {
+function renderPage(d: BillsImage, shown: BillItem[], o: { page: number; pages: number; mode: BillsMode }): string {
   const first = o.page === 1;
   const last = o.page === o.pages;
-  const extra = o.extra;
-  // Medição: cada linha tem altura conforme a descrição (1 ou 2 linhas).
-  const probe = document.createElement('canvas').getContext('2d')!;
-  font(probe, 26);
-  const descW = W - PAD * 2 - 450;
-  const rows = shown.map((it) => ({ it, desc: wrap(probe, it.desc.toUpperCase(), descW, 2) }));
-  const rowH = (n: number) => (n > 1 ? 150 : 116);
-  const listH = rows.reduce((s, r) => s + rowH(r.desc.length) + 14, 0) + (extra > 0 ? 60 : 0);
-  const H = PAD + 150 + (first ? 190 + 90 : 0) + listH + (last ? 100 : 0) + PAD;
+  const m = METRICS[o.mode];
+  const innerX = PAD + 16;
+  const innerW = W - PAD * 2 - 32;
+
+  // Cada conta: linha 1 = fornecedor; linha 2 = descrição (normal/compacto) ou documento (super compacto, só se houver).
+  const rows = shown.map((it) => {
+    const sub = o.mode === 'super_compacto' ? docRef(it.desc) : shortDesc(it.desc) || null;
+    return { it, sub, h: sub ? m.rowH2 : m.rowH1 };
+  });
+  const headerH = first ? 118 + 150 + 74 : 108;
+  const listH = rows.reduce((s, r) => s + r.h + m.gap, 0);
+  const footerH = last ? 132 : 64;
+  const H = PAD + headerH + listH + footerH + PAD;
 
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d')!;
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#EFEAE2'; ctx.fillRect(0, 0, W, H);
+  // Balão verde (o "card" da mensagem)
+  rr(ctx, PAD - 16, PAD - 16, W - (PAD - 16) * 2, H - (PAD - 16) * 2, 28, C.bg);
 
-  // Cabeçalho: ícone de documento com $ + título + período
   let y = PAD;
-  rr(ctx, PAD, y + 10, 92, 110, 14, C.green);
-  ctx.fillStyle = '#FFFFFF'; font(ctx, 60, 800); ctx.textAlign = 'center'; ctx.fillText('$', PAD + 46, y + 66);
-  ctx.textAlign = 'left';
-  ctx.fillStyle = C.ink; font(ctx, 62, 800); ctx.fillText(d.title, PAD + 120, y + 42);
-  if (o.pages > 1) {
-    const tw = ctx.measureText(d.title).width;
-    ctx.fillStyle = C.soft; font(ctx, 30, 600); ctx.fillText(`(${o.page}/${o.pages})`, PAD + 120 + tw + 16, y + 46);
-  }
-  ctx.fillStyle = C.soft; font(ctx, 32, 500);
-  ctx.fillText(`Período: ${d.period}${d.company ? `  ·  ${d.company}` : ''}`, PAD + 120, y + 100);
-  y += 150;
-
   if (first) {
-    // 3 indicadores
-    const gap = 18;
-    const cw = [(W - PAD * 2 - gap * 2) * 0.27, (W - PAD * 2 - gap * 2) * 0.33, (W - PAD * 2 - gap * 2) * 0.40];
-    let x = PAD;
-    const kpi = (w: number, ic: 'doc' | 'bars' | 'clock', icBg: string, icFg: string, label: string, value: string, valueColor: string, sub?: string) => {
-      rr(ctx, x, y, w, 168, 22, C.card);
-      rr(ctx, x + 20, y + 22, 64, 64, 14, icBg);
-      icon(ctx, ic, x + 52, y + 54, icFg);
-      ctx.fillStyle = C.soft; font(ctx, 26, 500); ctx.fillText(label, x + 100, y + 44);
-      // Valor diminui até caber no card.
-      let fs = 40;
+    rr(ctx, innerX, y + 8, 76, 88, 16, '#DDF0E3');
+    icon(ctx, 'doc', innerX + 38, y + 52, C.green, 1.4);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.ink; font(ctx, 46, 800); ctx.fillText(d.title, innerX + 100, y + 34);
+    ctx.fillStyle = '#2F4A3B'; font(ctx, 28, 500);
+    ctx.fillText(fit(ctx, `Período: ${d.period}${d.company ? `  ·  ${d.company}` : ''}`, innerW - 100), innerX + 100, y + 80);
+    y += 118;
+
+    // 4 indicadores
+    const gap = 14;
+    const cw = (innerW - gap * 3) / 4;
+    const kpis: Array<[IconKind, string, string, string]> = [
+      ['layers', 'Parcelas', String(d.count), C.ink],
+      ['bars', 'Total geral', d.total, C.green],
+      ['clock', 'Em aberto', d.open, C.amber],
+      ['alert', 'Vencidas', d.overdue, C.red],
+    ];
+    kpis.forEach(([ic, label, value, color], i) => {
+      const x = innerX + i * (cw + gap);
+      rr(ctx, x, y, cw, 128, 18, C.card);
+      ctx.fillStyle = C.soft; font(ctx, 23, 500); ctx.textAlign = 'left'; ctx.fillText(label, x + 18, y + 34);
+      icon(ctx, ic, x + cw - 30, y + 34, i === 0 ? C.soft : color, 0.9);
+      let fs = 36;
       font(ctx, fs, 800);
-      while (fs > 22 && ctx.measureText(value).width > w - 120) { fs -= 2; font(ctx, fs, 800); }
-      ctx.fillStyle = valueColor; ctx.fillText(value, x + 100, y + 92);
-      if (sub) { ctx.fillStyle = C.soft; font(ctx, 23, 500); ctx.textAlign = 'right'; ctx.fillText(sub, x + w - 22, y + 140); ctx.textAlign = 'left'; }
-      x += w + gap;
-    };
-    kpi(cw[0], 'doc', C.chip, C.ink, 'Parcelas', String(d.count), C.ink);
-    kpi(cw[1], 'bars', '#E6F4EA', C.green, 'Total geral', d.total, C.ink);
-    kpi(cw[2], 'clock', '#FFEBDD', C.orange, 'Em aberto', d.open, C.orange, `Vencidas: ${d.overdue}`);
-    y += 190;
+      while (fs > 20 && ctx.measureText(value).width > cw - 32) { fs -= 2; font(ctx, fs, 800); }
+      ctx.fillStyle = color; ctx.fillText(value, x + 18, y + 88);
+    });
+    y += 150;
 
-    // Título da lista
-    rr(ctx, PAD, y, 64, 60, 14, C.chip);
-    icon(ctx, 'list', PAD + 34, y + 30, C.green);
-    ctx.fillStyle = C.ink; font(ctx, 34, 800); ctx.fillText('Lançamentos do período', PAD + 88, y + 31);
-    y += 90;
+    // Título da lista + página
+    rr(ctx, innerX, y, innerW, 60, 16, 'rgba(255,255,255,0.55)');
+    icon(ctx, 'list', innerX + 30, y + 30, C.ink, 0.9);
+    ctx.fillStyle = C.ink; font(ctx, 28, 800); ctx.textAlign = 'left'; ctx.fillText('Lançamentos do período', innerX + 60, y + 31);
+    ctx.fillStyle = C.soft; font(ctx, 22, 500); ctx.textAlign = 'right';
+    ctx.fillText(`Página ${o.page}/${o.pages}  ·  ${shown.length} conta${shown.length === 1 ? '' : 's'}`, innerX + innerW - 20, y + 31);
+    y += 74;
+  } else {
+    // Continuação: cabeçalho curto
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.ink; font(ctx, 38, 800); ctx.fillText(d.title, innerX, y + 30);
+    ctx.fillStyle = C.soft; font(ctx, 25, 500); ctx.fillText(`Continuação  ·  Página ${o.page} de ${o.pages}`, innerX, y + 72);
+    y += 108;
   }
 
-  for (const { it, desc } of rows) {
-    const h = rowH(desc.length);
-    rr(ctx, PAD, y, W - PAD * 2, h, 18, C.card);
-    // Data
+  // Colunas: data | fornecedor/descrição | valor | selo
+  const pillW = 150;
+  const pillX = innerX + innerW - 16 - pillW;
+  const amountRight = pillX - 18;
+  const textX = innerX + 16 + m.date + 22;
+  font(ctx, m.amount, 800);
+  const amountW = Math.max(...rows.map((r) => ctx.measureText(r.it.amount).width), 120);
+  const textW = amountRight - amountW - 24 - textX;
+
+  for (const { it, sub, h } of rows) {
+    rr(ctx, innerX, y, innerW, h, 14, C.card);
+    const cy = y + h / 2;
+    // Data em bloco
     const [dd, mm] = it.date.split('/');
-    rr(ctx, PAD + 20, y + (h - 84) / 2, 84, 84, 14, C.chip);
+    rr(ctx, innerX + 14, cy - m.date / 2, m.date, m.date, 12, C.chip);
     ctx.textAlign = 'center';
-    ctx.fillStyle = C.ink; font(ctx, 32, 800); ctx.fillText(dd ?? '', PAD + 62, y + h / 2 - 12);
-    ctx.fillStyle = C.soft; font(ctx, 22, 600); ctx.fillText(MONTHS[Number(mm) - 1] ?? '', PAD + 62, y + h / 2 + 22);
+    ctx.fillStyle = C.ink; font(ctx, m.dd, 800); ctx.fillText(dd ?? '', innerX + 14 + m.date / 2, cy - m.date * 0.16);
+    ctx.fillStyle = C.soft; font(ctx, m.mm, 600); ctx.fillText(MONTHS[Number(mm) - 1] ?? '', innerX + 14 + m.date / 2, cy + m.date * 0.24);
+    // Fornecedor (+ 2ª linha curta)
     ctx.textAlign = 'left';
-    // Bolinha
-    const st = C.st[it.status];
-    ctx.beginPath(); ctx.arc(PAD + 140, y + 42, 13, 0, Math.PI * 2); ctx.fillStyle = st.dot; ctx.fill();
-    // Nome + descrição
-    ctx.fillStyle = C.ink; font(ctx, 30, 800);
-    ctx.fillText(wrap(ctx, it.name.toUpperCase(), descW, 1)[0] ?? '', PAD + 172, y + 42);
-    ctx.fillStyle = C.soft; font(ctx, 26, 500);
-    desc.forEach((l, i) => ctx.fillText(l, PAD + 172, y + 84 + i * 34));
-    // Valor + selo
+    ctx.fillStyle = C.ink; font(ctx, m.name, 800);
+    const nameY = sub ? y + h * 0.36 : cy;
+    ctx.fillText(fit(ctx, abbreviateParty(it.name), textW), textX, nameY);
+    if (sub) { ctx.fillStyle = C.soft; font(ctx, m.sub, 500); ctx.fillText(fit(ctx, sub, textW), textX, y + h * 0.7); }
+    // Valor
     ctx.textAlign = 'right';
-    ctx.fillStyle = C.ink; font(ctx, 32, 800); ctx.fillText(it.amount, W - PAD - 24, y + 40);
-    font(ctx, 24, 600);
-    const lw = ctx.measureText(st.label).width + 36;
-    rr(ctx, W - PAD - 24 - lw, y + 66, lw, 44, 14, st.bg);
-    ctx.fillStyle = st.fg; ctx.fillText(st.label, W - PAD - 24 - 18, y + 89);
-    ctx.textAlign = 'left';
-    y += h + 14;
-  }
-  if (extra > 0) {
-    ctx.fillStyle = C.soft; font(ctx, 26, 600); ctx.textAlign = 'center';
-    ctx.fillText(`+ ${extra} conta(s) — veja a lista completa no texto`, W / 2, y + 24);
-    ctx.textAlign = 'left';
-    y += 60;
+    ctx.fillStyle = C.ink; font(ctx, m.amount, 800); ctx.fillText(it.amount, amountRight, cy);
+    // Selo
+    const st = C.st[it.status];
+    rr(ctx, pillX, cy - m.pillH / 2, pillW, m.pillH, m.pillH / 2, st.bg);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = st.fg; font(ctx, m.pill, 700); ctx.fillText(st.label, pillX + pillW / 2, cy + 1);
+    y += h + m.gap;
   }
 
+  // Rodapé
+  y += 6;
+  ctx.textAlign = 'left';
   if (last) {
-    // Legenda
-    y += 10;
-    rr(ctx, PAD, y, W - PAD * 2, 76, 18, '#E8F3EC');
-    icon(ctx, 'tag', PAD + 40, y + 38, C.ink);
-    ctx.fillStyle = C.ink; font(ctx, 26, 800); ctx.fillText('Legenda:', PAD + 72, y + 39);
-    let lx = PAD + 210;
+    rr(ctx, innerX, y, innerW, 58, 16, 'rgba(255,255,255,0.7)');
+    ctx.fillStyle = C.ink; font(ctx, 23, 800); ctx.fillText('Legenda:', innerX + 20, y + 30);
+    let lx = innerX + 140;
     for (const k of ['overdue', 'open', 'partial', 'paid'] as const) {
-      ctx.beginPath(); ctx.arc(lx + 12, y + 38, 12, 0, Math.PI * 2); ctx.fillStyle = C.st[k].dot; ctx.fill();
-      ctx.fillStyle = C.ink; font(ctx, 25, 500); ctx.fillText(C.st[k].label, lx + 34, y + 39);
-      lx += 34 + ctx.measureText(C.st[k].label).width + 42;
+      ctx.beginPath(); ctx.arc(lx + 10, y + 29, 10, 0, Math.PI * 2); ctx.fillStyle = C.st[k].dot; ctx.fill();
+      ctx.fillStyle = C.ink; font(ctx, 23, 500); ctx.fillText(C.st[k].label, lx + 28, y + 30);
+      lx += 28 + ctx.measureText(C.st[k].label).width + 36;
     }
+    y += 72;
+    ctx.fillStyle = C.soft; font(ctx, 23, 600);
+    ctx.fillText(`Página ${o.page}/${o.pages}  ·  ${d.items.length} conta${d.items.length === 1 ? '' : 's'} no total`, innerX + 4, y + 22);
+  } else {
+    icon(ctx, 'info', innerX + 16, y + 24, '#7A8C82', 0.85);
+    ctx.fillStyle = C.soft; font(ctx, 22, 500);
+    ctx.fillText('Legenda completa na última página.', innerX + 38, y + 25);
+    ctx.textAlign = 'right'; font(ctx, 22, 600);
+    ctx.fillText(`Página ${o.page}/${o.pages}  ·  ${shown.length} contas`, innerX + innerW - 4, y + 25);
   }
 
   return cv.toDataURL('image/png').split(',')[1];

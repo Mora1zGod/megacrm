@@ -18,7 +18,7 @@ import { DataGrid, GridReset, useGrid, type GridColumn } from '@/components/ui/G
 import { exportExcel, openReport, reportNow } from '@/lib/table-export';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { SendBillsDialog } from './SendBillsDialog';
-import type { BillItem, BillsImage } from '@/lib/wa-summary-image';
+import { buildBillsText, type BillItem, type BillsImage } from '@/lib/wa-summary-image';
 
 // Padrão ao entrar: só o que falta pagar/receber (aberto, vencido e parcial).
 const DEFAULT_STATUSES: InstStatus[] = ['open', 'overdue', 'partial'];
@@ -219,32 +219,19 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
   const sendWhatsApp = async () => {
     const base = (chosen.length ? chosen : rowsView).filter((r) => r.status !== 'canceled');
     if (!base.length) { toast.info('Nenhuma conta para enviar.'); return; }
-    const icon: Record<string, string> = { overdue: '🔴', open: '🟡', partial: '🟠', paid: '✅' };
-    const short = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
     const sum = (f: (r: InstallmentRow) => number) => base.reduce((a, r) => a + f(r), 0);
     const comp = company ? lookups.companies.find((c) => c.id === company)?.name : null;
-    const lines = [
-      `*${title}* — ${from ? fmtDate(from) : '—'} a ${to ? fmtDate(to) : '—'}${comp ? `\n${comp}` : ''}`,
-      `${base.length} parcela(s) · Total ${formatBRL(sum((r) => r.amount_cents))}`,
-      `Em aberto *${formatBRL(sum((r) => r.remaining_cents))}* · Vencidas *${formatBRL(sum((r) => (r.status === 'overdue' ? r.remaining_cents : 0)))}*`,
-      '',
-      ...base.map((r) => {
-        const st = r.is_partial && r.status !== 'paid' ? 'partial' : r.status;
-        return `${icon[st] ?? '▫️'} ${fmtDate(r.due_date).slice(0, 5)} · ${short(partyLabel(r) || '—', 32)} · *${formatBRL(r.remaining_cents || r.amount_cents)}*\n      ${short(r.description, 48)}`;
-      }),
-      '',
-      `🔴 vencida · 🟡 em aberto · 🟠 parcial · ✅ paga`,
-    ];
-    const text = lines.join('\n');
     // Envia pelo CRM: imagem (card) pelo número de avisos, ou conversa do Atendimento, ou o WhatsApp próprio.
     const data: BillsImage = {
       title, period: `${from ? fmtDate(from) : '—'} a ${to ? fmtDate(to) : '—'}`, company: comp,
       count: base.length, total: formatBRL(sum((r) => r.amount_cents)), open: formatBRL(sum((r) => r.remaining_cents)),
       overdue: formatBRL(sum((r) => (r.status === 'overdue' ? r.remaining_cents : 0))),
-      items: base.map((r) => ({ date: fmtDate(r.due_date), name: partyLabel(r) || '—', desc: r.description,
+      items: base.map((r) => ({ date: fmtDate(r.due_date), due: r.due_date, name: partyLabel(r) || '—', desc: r.description,
         amount: formatBRL(r.remaining_cents || r.amount_cents), status: (r.is_partial && r.status !== 'paid' ? 'partial' : r.status) as BillItem['status'] })),
     };
-    const caption = `*${title}* — ${data.period}\nEm aberto *${data.open}* · Vencidas *${data.overdue}*`;
+    // Texto sempre ≤ 1.500 caracteres: com imagens só o resumo; sem imagens o resumo + as contas que couberem.
+    const text = buildBillsText(data, { withImages: false });
+    const caption = buildBillsText(data, { withImages: true });
     if (perms.can('inbox.reply') || perms.can('financial.ledger_view')) { setWaSend({ data, text, caption }); return; }
     let copied = false;
     try { await navigator.clipboard.writeText(text); copied = true; } catch { /* sem permissão de cópia */ }
