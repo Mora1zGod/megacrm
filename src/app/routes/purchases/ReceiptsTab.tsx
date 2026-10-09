@@ -43,14 +43,14 @@ export function ReceiptsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
     { id: 'status', label: 'Situação', width: 150, sortValue: (r: ReceiptRow) => RECEIPT_STATUS[r.status][0], render: (r: ReceiptRow) => <StatusPill map={RECEIPT_STATUS} status={r.status} /> },
   ], rows ?? []);
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="flex flex-wrap items-center gap-2">
         <SubTabs value={status} onChange={setStatus} tabs={[['', 'Todos'], ['draft', 'Em conferência'], ['done', 'Concluídos'], ['reversed', 'Estornados']]} />
         <span className="text-xs text-[var(--color-text-muted)]">Para receber, abra o pedido e clique em “Receber”.</span>
       </div>
       <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!rows ? <Spinner /> : (
-        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('receipt', r.id)} emptyText="Nenhum recebimento." />
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('receipt', r.id)} emptyText="Nenhum recebimento." />
       )}
       {openId && current && <ReceiptDetail rc={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}
     </div>

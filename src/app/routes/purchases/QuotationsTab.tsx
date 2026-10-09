@@ -41,14 +41,14 @@ export function QuotationsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps)
     { id: 'status', label: 'Situação', width: 160, sortValue: (r: QuoteRow) => QUOTE_STATUS[r.status][0], render: (r: QuoteRow) => <StatusPill map={QUOTE_STATUS} status={r.status} /> },
   ], rows ?? []);
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="flex flex-wrap items-center gap-2">
         <SubTabs value={status} onChange={setStatus} tabs={[['', 'Todas'], ['open', 'Abertas'], ['pending_approval', 'Aguardando alçada'], ['approved', 'Aprovadas'], ['ordered', 'Com pedido'], ['canceled', 'Canceladas']]} />
         <span className="text-xs text-[var(--color-text-muted)]">Cotações nascem de uma requisição aprovada (botão “Abrir cotação”).</span>
       </div>
       <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!rows ? <Spinner /> : (
-        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('quotation', r.id)} emptyText="Nenhuma cotação." />
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('quotation', r.id)} emptyText="Nenhuma cotação." />
       )}
       {openId && current && <QuoteDetail quote={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}
     </div>

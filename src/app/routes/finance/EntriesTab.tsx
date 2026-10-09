@@ -264,7 +264,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
   const menuItem = 'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40';
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryCard label={`A ${pay ? 'pagar' : 'receber'} no período (aberto)`} cents={summary?.open_cents ?? 0} count={summary?.open_count}
           active={status === 'open'} onClick={() => setStatuses(status === 'open' ? DEFAULT_STATUSES : ['open'])} />
@@ -353,7 +353,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       {rows === null ? (
         <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
       ) : (
-        <DataGrid grid={grid} rowKey={(r) => r.id} selection={{ selected: sel, onChange: setSel }} actionsWidth={124}
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} selection={{ selected: sel, onChange: setSel }} actionsWidth={124}
           rowClassName={(r) => r.status === 'canceled' && 'opacity-60'}
           footer={{ [grid.cols[0]?.id ?? 'due']: `${rowsView.length} parcela${rowsView.length === 1 ? '' : 's'}`, amount: formatBRL(totals.amount), remaining: formatBRL(totals.remaining) }}
           actions={(r) => (

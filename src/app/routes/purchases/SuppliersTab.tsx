@@ -78,7 +78,7 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
     { id: 'pay', label: 'A pagar', width: 115, align: 'right' as const, sortValue: (s: Supplier) => s.open_payable_cents ?? 0, exportValue: (s: Supplier) => (s.open_payable_cents ?? 0) / 100, render: (s: Supplier) => <span className="tabular-nums">{s.open_payable_cents ? <span className={s.overdue_cents ? 'text-[var(--color-error)]' : ''}>{formatBRL(s.open_payable_cents)}</span> : '—'}</span> },
   ], rows ?? []);
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="grid gap-3 sm:grid-cols-4">
         <Metric label="Fornecedores" value={rows?.length ?? '—'} hint={onlyActive ? 'ativos' : 'todos'} />
         <Metric label="Compras em 12 meses" value={formatBRL(totals.y)} hint="notas de entrada" />
@@ -103,7 +103,7 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
       </div>
       <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!rows ? <Spinner /> : (
-        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('supplier', r.id)} emptyText="Nenhum fornecedor." />
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('supplier', r.id)} emptyText="Nenhum fornecedor." />
       )}
       {creating && <SupplierForm lookups={lookups} supplier={null} categories={categories} onClose={() => setCreating(false)} onSaved={async (id) => { setCreating(false); await changed(); onOpen('supplier', id); }} />}
       {current && !creating && <SupplierDetail supplier={current} lookups={lookups} categories={categories} onClose={onCloseDoc} onOpen={onOpen} onChanged={changed} />}

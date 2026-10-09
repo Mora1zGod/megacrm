@@ -55,7 +55,7 @@ export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProp
     { id: 'status', label: 'Situação', width: 170, sortValue: (r: Requisition) => REQ_STATUS[r.status][0], render: (r: Requisition) => <StatusPill map={REQ_STATUS} status={r.status} /> },
   ], filtered ?? []);
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="flex flex-wrap items-end gap-2">
         <SubTabs value={status} onChange={setStatus} tabs={[
           ['', 'Todas'], ['draft', 'Rascunhos'], ['pending', `Aguardando aprovação${pendingCount && !status ? ` (${pendingCount})` : ''}`],
@@ -71,7 +71,7 @@ export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProp
 
       <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!filtered ? <Spinner /> : (
-        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('requisition', r.id)} emptyText="Nenhuma requisição por aqui." />
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('requisition', r.id)} emptyText="Nenhuma requisição por aqui." />
       )}
 
       {editing && (

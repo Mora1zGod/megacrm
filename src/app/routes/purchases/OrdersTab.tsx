@@ -50,7 +50,7 @@ export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
     { id: 'status', label: 'Situação', width: 160, sortValue: (r: Order) => ORDER_STATUS[r.status][0], render: (r: Order) => <StatusPill map={ORDER_STATUS} status={r.status} /> },
   ], filtered ?? []);
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="flex flex-wrap items-center gap-2">
         <SubTabs value={status} onChange={setStatus} tabs={[['', 'Todos'], ['draft', 'Rascunhos'], ['open', 'A receber'], ['partial', 'Parciais'], ['received', 'Recebidos'], ['canceled', 'Cancelados']]} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar número ou fornecedor…" className={`${inputCls} max-w-xs`} aria-label="Buscar" />
@@ -59,7 +59,7 @@ export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
       </div>
       <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!filtered ? <Spinner /> : (
-        <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('order', r.id)} emptyText="Nenhum pedido." />
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('order', r.id)} emptyText="Nenhum pedido." />
       )}
       {creating && <OrderForm lookups={lookups} order={null} onClose={() => setCreating(false)} onSaved={(id) => { setCreating(false); void load(); onOpen('order', id); }} />}
       {openId && current && !creating && <OrderDetail order={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}

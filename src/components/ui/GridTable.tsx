@@ -171,7 +171,7 @@ export function GridColGroup<T>({ grid, lead = [], trail = [], widthOf }: { grid
 // ---------------------------------------------------------------------------
 export function DataGrid<T>({
   grid, rowKey, onRowClick, rowClassName, actions, actionsWidth = 140, actionsLabel = 'Ações', emptyText = 'Nada encontrado com esses filtros.',
-  footer, selection, thClass = DEFAULT_TH, tdClass = DEFAULT_TD, className,
+  footer, selection, thClass = DEFAULT_TH, tdClass = DEFAULT_TD, className, fill = false,
 }: {
   grid: Grid<T>;
   rowKey: (r: T) => string;
@@ -184,6 +184,8 @@ export function DataGrid<T>({
   footer?: Record<string, ReactNode>;          // conteúdo do rodapé por id de coluna
   selection?: { selected: Set<string>; onChange: (next: Set<string>) => void };
   thClass?: string; tdClass?: string; className?: string;
+  // fill: a tabela ocupa o resto da altura da tela e só as linhas rolam (filtros, botões e títulos das colunas ficam parados).
+  fill?: boolean;
 }) {
   const rows = grid.sorted;
   const lead = selection ? [44] : [];
@@ -215,10 +217,11 @@ export function DataGrid<T>({
     selection.onChange(n);
   };
   return (
-    <div ref={boxRef} className={cn('overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]', className)}>
+    <div ref={boxRef} className={cn('rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]',
+      fill ? 'min-h-[260px] flex-1 overflow-auto overscroll-contain' : 'overflow-x-auto', className)}>
       <table className="text-sm" style={{ tableLayout: 'fixed', width, minWidth: '100%' }}>
         <GridColGroup grid={grid} lead={lead} trail={trail} widthOf={widthOf} />
-        <thead>
+        <thead className="sticky top-0 z-[2] bg-[var(--color-surface)] shadow-[0_1px_0_var(--color-border-card)]">
           <GridHead grid={grid} thClass={thClass} scale={scale}
             lead={selection ? (
               <th className={cn(thClass, 'w-11')}>
@@ -252,7 +255,7 @@ export function DataGrid<T>({
           })}
         </tbody>
         {footer && rows.length > 0 && (
-          <tfoot><tr className="border-t border-[var(--color-border-card)] font-semibold">
+          <tfoot className="sticky bottom-0 z-[2] bg-[var(--color-surface)] shadow-[0_-1px_0_var(--color-border-card)]"><tr className="font-semibold">
             {selection && <td className={tdClass} />}
             {grid.cols.map((c) => <td key={c.id} className={cn(tdClass, 'whitespace-nowrap', c.align === 'right' && 'text-right tabular-nums')}>{footer[c.id] ?? null}</td>)}
             {actions && <td />}

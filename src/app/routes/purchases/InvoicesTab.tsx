@@ -232,7 +232,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const activeCompanies = lookups.companies.filter((c) => c.is_active);
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Notas de entrada</h2>
@@ -334,7 +334,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
       )}
 
       {!rows ? <Spinner /> : (
-        <DataGrid grid={grid} rowKey={(n) => n.id} onRowClick={(n) => onOpen('invoice', n.id)} emptyText="Nenhuma nota com esses filtros."
+        <DataGrid fill grid={grid} rowKey={(n) => n.id} onRowClick={(n) => onOpen('invoice', n.id)} emptyText="Nenhuma nota com esses filtros."
           rowClassName={(n) => (n.status === 'ignored' || n.status === 'canceled_sefaz') && 'opacity-60'}
           footer={{ number: `${list.length} nota(s)`, total: formatBRL(sumOf(list)) }} actionsWidth={156}
           actions={(n) => (

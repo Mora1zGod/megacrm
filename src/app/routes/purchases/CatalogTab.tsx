@@ -40,7 +40,7 @@ export function CatalogTab({ lookups }: { lookups: PurLookups }) {
     { id: 'lot', label: 'Lote', width: 100, sortValue: (i: InvItem) => (i.requires_lot ? 1 : 0), exportValue: (i: InvItem) => (i.requires_lot ? 'exige lote' : ''), render: (i: InvItem) => (i.requires_lot ? <Badge tone="warn">exige lote</Badge> : '—') },
   ], items ?? []);
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 [&>*]:shrink-0">
       <div className="flex flex-wrap items-center gap-2">
         <SubTabs value={sec} onChange={setSec} tabs={[['itens', `Itens (${lookups.items.length})`], ['locais', `Locais (${lookups.locations.length})`], ['saldo', 'Saldo atual']]} />
         {sec === 'itens' && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar item, código, EAN" className={`${inputCls} max-w-xs`} aria-label="Buscar" />}
@@ -50,7 +50,7 @@ export function CatalogTab({ lookups }: { lookups: PurLookups }) {
       </div>
       {sec === 'itens' && <div className="flex justify-end"><GridReset grid={grid} /></div>}
       {sec === 'itens' && (
-        <DataGrid grid={grid} rowKey={(r) => r.id} emptyText="Nenhum item cadastrado." actionsWidth={60} actions={can ? (i) => <Button size="sm" variant="ghost" onClick={() => setEditItem(i)} aria-label="Editar item"><Pencil className="h-3.5 w-3.5" /></Button> : undefined} />
+        <DataGrid fill grid={grid} rowKey={(r) => r.id} emptyText="Nenhum item cadastrado." actionsWidth={60} actions={can ? (i) => <Button size="sm" variant="ghost" onClick={() => setEditItem(i)} aria-label="Editar item"><Pencil className="h-3.5 w-3.5" /></Button> : undefined} />
       )}
       {sec === 'locais' && (
         <TableWrap minWidth={500}>
