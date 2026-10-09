@@ -628,6 +628,9 @@ Regras:
   (permissões `financial.ledger_*`, `financial.transfer`, `.period_close`, `.setup`, `.billing`);
   `fin_audit_log` (antes/depois/quem/quando) em toda tabela; erros em PT via `fin_fail`; "hoje" =
   `fin_today()` (America/Sao_Paulo). Banco da baixa/cobrança tem de ser da empresa do lançamento.
+- Editar lançamento (09/10/2026, `20261009150000_fin_edit_amounts.sql`): vencimento das parcelas sem baixa vai em `fin_update_entry` (`due_dates`);
+  valor em `fin_update_installment_amounts(p_entry, {id: centavos})` — parcela com baixa ou cobrança aberta não muda; total = soma das parcelas.
+  Tela (`EntryFormDialog`): 1 parcela = campos Valor/Vencimento editáveis; 2+ = tabela de parcelas.
 - Relatórios: `fin_report_agenda/cashflow/costs/dre`, `fin_entries_summary` (todos com empresa opcional).
 - Integrações: `fin_create_entry` aceita `source` purchase/hr/associates (+`source_ref`; hr/associates
   vão para a empresa padrão) e `fin_link_purchase` (concilia nota com conta a pagar existente).

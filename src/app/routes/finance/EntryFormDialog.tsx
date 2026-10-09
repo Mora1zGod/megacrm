@@ -71,6 +71,20 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
   const [files, setFiles] = useState<File[]>(prefill?.files ?? []);
   const [saving, setSaving] = useState(false);
   const [newParty, setNewParty] = useState(false);
+  // Edição: parcelas do lançamento (vencimento e valor mudam nas que ainda não tiveram baixa).
+  type EditRow = { id: string; number: number; due: string; cents: number; origDue: string; origCents: number; locked: string | null; chargeOpen: boolean };
+  const [editRows, setEditRows] = useState<EditRow[] | null>(editing ? null : []);
+  useEffect(() => {
+    if (!entry) return;
+    void getSupabase().from('fin_installments_v').select('id, number, due_date, amount_cents, paid_cents, charge_status').eq('entry_id', entry.id).order('number')
+      .then(({ data }) => setEditRows(((data ?? []) as Array<{ id: string; number: number; due_date: string; amount_cents: number; paid_cents: number; charge_status: string | null }>).map((r) => ({
+        id: r.id, number: r.number, due: r.due_date, cents: r.amount_cents, origDue: r.due_date, origCents: r.amount_cents,
+        locked: r.paid_cents > 0 ? 'Já teve baixa' : null, chargeOpen: r.charge_status === 'pending' || r.charge_status === 'open',
+      }))));
+  }, [entry]);
+  const editSum = (editRows ?? []).reduce((a, r) => a + r.cents, 0);
+  const singleEditable = editing && editRows?.length === 1 && !editRows[0].locked && !editRows[0].chargeOpen;
+  const setEditRow = (id: string, patch: Partial<EditRow>) => setEditRows((rows) => (rows ?? []).map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const fileRef = useRef<HTMLInputElement>(null);
   const addFiles = (list: FileList | null) => {
     const ok: File[] = [];
@@ -127,13 +141,29 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
     try {
       let id = entry?.id ?? '';
       if (editing) {
+        const rowsNow = editRows ?? [];
+        if (rowsNow.some((r) => !r.locked && (!r.due || r.cents <= 0))) { toast.error('Cada parcela precisa de vencimento e valor.'); setSaving(false); return; }
+        const dueDates = Object.fromEntries(rowsNow.filter((r) => !r.locked && r.due !== r.origDue).map((r) => [r.id, r.due]));
+        const amounts = Object.fromEntries(rowsNow.filter((r) => !r.locked && !r.chargeOpen && r.cents !== r.origCents).map((r) => [r.id, r.cents]));
         await rpc('fin_update_entry', {
           p_id: entry!.id,
           p: {
             company_id: companyId, description: description.trim(), party_id: partyId || '', chart_account_id: chartId,
             cost_center_id: ccId || '', issue_date: issue, competence_date: competence, notes,
+            ...(Object.keys(dueDates).length ? { due_dates: dueDates } : {}),
           },
         });
+        if (Object.keys(amounts).length) {
+          try {
+            await rpc('fin_update_installment_amounts', { p_entry: entry!.id, p_amounts: amounts });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (/fin_update_installment_amounts|schema cache|Could not find the function/i.test(msg)) {
+              throw new Error('Os dados e vencimentos foram salvos, mas o valor não: falta rodar o SQL-09-10-financeiro-editar-valor.sql no Supabase.');
+            }
+            throw new Error(`Os dados e vencimentos foram salvos, mas o valor não: ${msg}`);
+          }
+        }
       } else {
         const p = {
           kind, company_id: companyId, description: description.trim(), party_id: partyId || null, chart_account_id: chartId,
@@ -156,7 +186,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
 
   const payable = kind === 'payable';
   const title = editing ? 'Editar lançamento' : payable ? 'Nova conta a pagar' : 'Nova conta a receber';
-  const subtitle = editing ? 'Só o cabeçalho muda. Valor e parcelas ficam como foram lançados.'
+  const subtitle = editing ? 'Ajuste os dados, o vencimento e o valor das parcelas que ainda não tiveram baixa.'
     : payable ? 'Registre uma nova despesa para manter seu financeiro em dia.' : 'Registre um novo recebimento para manter seu financeiro em dia.';
   const who = payable ? 'fornecedor' : 'cliente';
   const dateCls = cn(inputCls, 'pl-10');
@@ -231,10 +261,12 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <F icon={CircleDollarSign} label="Valor total" required htmlFor="ef-total">
-            <div className={cn('flex h-11 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] focus-within:border-[var(--accent-primary)]', editing && 'opacity-60')}>
+            <div className={cn('flex h-11 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] focus-within:border-[var(--accent-primary)]', editing && !singleEditable && 'opacity-60')}>
               <span className="flex items-center border-r border-[var(--color-border-card)] bg-[var(--color-surface-hover)] px-3 text-sm font-semibold text-[var(--color-text-primary)]">R$</span>
-              <input id="ef-total" inputMode="numeric" disabled={editing} value={total ? formatBRL(total).replace('R$ ', '') : ''}
-                onChange={(e) => setTotal(maskMoneyInput(e.target.value).cents)} placeholder="0,00"
+              <input id="ef-total" inputMode="numeric" disabled={editing && !singleEditable}
+                value={editing ? (editSum ? formatBRL(editSum).replace('R$ ', '') : '') : total ? formatBRL(total).replace('R$ ', '') : ''}
+                title={editing && !singleEditable ? 'Soma das parcelas — mude o valor de cada parcela na tabela abaixo' : undefined}
+                onChange={(e) => { const c = maskMoneyInput(e.target.value).cents; if (editing) { if (singleEditable && editRows) setEditRow(editRows[0].id, { cents: c }); } else setTotal(c); }} placeholder="0,00"
                 className="no-focus-ring min-w-0 flex-1 bg-transparent px-3 text-sm tabular-nums text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-muted)]" />
             </div>
           </F>
@@ -244,6 +276,12 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
           <F icon={CalendarDays} label="Competência" htmlFor="ef-comp" hint={`Mês em que a ${payable ? 'despesa' : 'receita'} conta no DRE.`}>
             <WithIcon icon={CalendarDays}><input id="ef-comp" type="date" value={competence} onChange={(e) => setCompetence(e.target.value)} className={cn(dateCls, 'h-11')} /></WithIcon>
           </F>
+          {editing && editRows?.length === 1 && (
+            <F icon={CalendarDays} label="Vencimento" required htmlFor="ef-due-edit" hint={editRows[0].locked ? 'Já teve baixa: o vencimento não muda.' : undefined}>
+              <WithIcon icon={CalendarDays}><input id="ef-due-edit" type="date" value={editRows[0].due} disabled={!!editRows[0].locked}
+                onChange={(e) => setEditRow(editRows[0].id, { due: e.target.value })} className={cn(dateCls, 'h-11', editRows[0].locked && 'opacity-60')} /></WithIcon>
+            </F>
+          )}
           {!editing && (
             <F icon={CalendarDays} label="1º vencimento" required htmlFor="ef-due">
               <WithIcon icon={CalendarDays}><input id="ef-due" type="date" value={due} onChange={(e) => { setDue(e.target.value); setCustomSched(false); }} className={cn(dateCls, 'h-11')} /></WithIcon>
@@ -304,6 +342,43 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {editing && editRows === null && <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando parcelas…</div>}
+        {editing && editRows && editRows.length > 1 && (
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">Parcelas ({editRows.length})</span>
+              <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">Total {formatBRL(editSum)}</span>
+            </div>
+            <div className="overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-card)]">
+              <div className="max-h-56 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-[var(--color-surface-hover)] text-xs text-[var(--color-text-secondary)]">
+                    <tr><th className="w-16 px-3 py-1.5 text-left font-semibold">Parcela</th><th className="px-2 py-1.5 text-left font-semibold">Vencimento</th><th className="px-3 py-1.5 text-right font-semibold">Valor</th><th className="w-28 px-3 py-1.5" /></tr>
+                  </thead>
+                  <tbody>
+                    {editRows.map((r) => (
+                      <tr key={r.id} className={cn('border-t border-[var(--color-border-soft)]', r.locked && 'opacity-60')}>
+                        <td className="px-3 py-1 tabular-nums text-[var(--color-text-secondary)]">{r.number}/{editRows.length}</td>
+                        <td className="px-2 py-1">
+                          <input type="date" aria-label={`Vencimento da parcela ${r.number}`} value={r.due} disabled={!!r.locked}
+                            onChange={(e) => setEditRow(r.id, { due: e.target.value })} className={cn(inputCls, 'h-8 w-40 px-2')} />
+                        </td>
+                        <td className="px-3 py-1 text-right">
+                          <input inputMode="numeric" aria-label={`Valor da parcela ${r.number}`} disabled={!!r.locked || r.chargeOpen}
+                            value={r.cents ? formatBRL(r.cents).replace('R$ ', '') : ''} onChange={(e) => setEditRow(r.id, { cents: maskMoneyInput(e.target.value).cents })}
+                            className={cn(inputCls, 'ml-auto h-8 w-32 px-2 text-right tabular-nums')} />
+                        </td>
+                        <td className="px-3 py-1 text-right text-[11px] text-[var(--color-text-muted)]">{r.locked ?? (r.chargeOpen ? 'Cobrança emitida' : '')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">Parcela com baixa fica travada (estorne a baixa para mudar). O total passa a ser a soma das parcelas.</p>
           </div>
         )}
 
