@@ -175,3 +175,9 @@ export function chartTree(chart: ChartAccount[]): Array<ChartAccount & { depth: 
   for (const c of chart) if (!out.some((o) => o.id === c.id)) out.push({ ...c, depth: 0 });
   return out;
 }
+
+// Nome para listas: nome fantasia (quando houver) em MAIÚSCULAS; senão a razão social.
+export function partyDisplay(p: { name?: string | null; trade_name?: string | null } | null | undefined, fallback?: string | null): string {
+  return ((p?.trade_name?.trim() || p?.name || fallback || '') as string).toLocaleUpperCase('pt-BR');
+}
+export const upperBR = (v: string | null | undefined) => (v ?? '').toLocaleUpperCase('pt-BR');

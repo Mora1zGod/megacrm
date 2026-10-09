@@ -13,7 +13,7 @@ import {
   type PurLookups, type ReqItem, type ReqStatus, type Requisition, type TabProps,
 } from './data';
 import { Badge, Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 
 export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const perms = usePermission();
@@ -69,6 +69,7 @@ export function RequisitionsTab({ lookups, openId, onOpen, onCloseDoc }: TabProp
         {perms.can('purchases.request') && <Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Nova requisição</Button>}
       </div>
 
+      <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!filtered ? <Spinner /> : (
         <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('requisition', r.id)} emptyText="Nenhuma requisição por aqui." />
       )}

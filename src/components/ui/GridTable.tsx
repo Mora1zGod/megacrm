@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, GripVertical } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, Columns3, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Tabela com colunas que o usuário arrasta (ordem), estica/encolhe (largura) e ordena (clique no título).
@@ -76,10 +76,19 @@ export function useGrid<T>(storageKey: string, columns: GridColumn<T>[], rows: T
     const next: Saved['sort'] = !sort || sort.id !== id ? { id, dir: 'asc' } : sort.dir === 'asc' ? { id, dir: 'desc' } : null;
     setSort(next); persist({ sort: next });
   };
+  // Arrastar para a direita entra DEPOIS da coluna alvo; para a esquerda, ANTES (assim a vizinha também troca).
   const move = (from: string, to: string) => {
     if (from === to) return;
+    const fi = order.indexOf(from); const ti = order.indexOf(to);
     const o = order.filter((x) => x !== from);
-    o.splice(o.indexOf(to), 0, from);
+    o.splice(o.indexOf(to) + (fi < ti ? 1 : 0), 0, from);
+    setOrder(o); persist({ order: o });
+  };
+  // Sobe/desce uma posição (menu "Colunas").
+  const step = (id: string, dir: -1 | 1) => {
+    const i = order.indexOf(id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    const o = [...order]; [o[i], o[j]] = [o[j], o[i]];
     setOrder(o); persist({ order: o });
   };
   const resize = (id: string, w: number) => setWidths((cur) => ({ ...cur, [id]: Math.round(w) }));
@@ -90,7 +99,7 @@ export function useGrid<T>(storageKey: string, columns: GridColumn<T>[], rows: T
   };
   const customized = order.join() !== ids.join() || Object.keys(widths).length > 0 || hidden.join() !== defHidden.join();
 
-  return { cols, allCols, hidden, toggleHidden, sorted, sort, width, toggleSort, move, resize, commitWidths, reset, customized };
+  return { cols, allCols, hidden, toggleHidden, sorted, sort, width, toggleSort, move, step, resize, commitWidths, reset, customized };
 }
 
 export type Grid<T> = ReturnType<typeof useGrid<T>>;
@@ -260,6 +269,9 @@ const DEFAULT_TD = 'px-3 py-2 align-middle';
 // Botão "Colunas": liga/desliga colunas e volta ao padrão (ordem, largura e quais aparecem).
 export function GridReset<T>({ grid }: { grid: Grid<T> }) {
   const [open, setOpen] = useState(false);
+  const dragId = useRef<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const [alignLeft, setAlignLeft] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -269,23 +281,45 @@ export function GridReset<T>({ grid }: { grid: Grid<T> }) {
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+      <button type="button" onClick={() => { setAlignLeft((ref.current?.getBoundingClientRect().left ?? 999) < 320); setOpen((o) => !o); }} aria-expanded={open}
         className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
         <Columns3 className="h-4 w-4" /> Colunas{grid.hidden.length ? ` (${grid.allCols.length - grid.hidden.length}/${grid.allCols.length})` : ''}
       </button>
       {open && (
-        <div className="absolute right-0 z-[var(--z-popover,60)] mt-1 w-60 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] p-1.5 shadow-[var(--shadow-lg)]">
-          <div className="max-h-72 overflow-y-auto">
-            {grid.allCols.map((c) => (
-              <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--color-surface-hover)]">
-                <input type="checkbox" checked={!grid.hidden.includes(c.id)} onChange={() => grid.toggleHidden(c.id)} className="h-4 w-4 accent-[var(--accent-fill)]" />{c.label}
-              </label>
-            ))}
+        <div className={cn('absolute z-[var(--z-popover,60)] mt-1 w-72 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] p-1.5 shadow-[var(--shadow-lg)]', alignLeft ? 'left-0' : 'right-0')}>
+          <div className="max-h-80 overflow-y-auto">
+            {grid.allCols.map((c, i) => {
+              const s = grid.sort?.id === c.id ? grid.sort.dir : null;
+              return (
+                <div key={c.id} draggable
+                  onDragStart={(e) => { dragId.current = c.id; e.dataTransfer.effectAllowed = 'move'; }}
+                  onDragOver={(e) => { e.preventDefault(); setOver(c.id); }}
+                  onDrop={(e) => { e.preventDefault(); if (dragId.current) grid.move(dragId.current, c.id); dragId.current = null; setOver(null); }}
+                  onDragEnd={() => { dragId.current = null; setOver(null); }}
+                  className={cn('group flex items-center gap-1.5 rounded-md px-1 py-1 text-sm hover:bg-[var(--color-surface-hover)]', over === c.id && 'bg-[var(--color-accent-subtle)]')}>
+                  <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-[var(--color-text-muted)]" aria-hidden />
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                    <input type="checkbox" checked={!grid.hidden.includes(c.id)} onChange={() => grid.toggleHidden(c.id)} className="h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
+                    <span className="truncate">{c.label}</span>
+                  </label>
+                  {c.sortValue && (
+                    <button type="button" onClick={() => grid.toggleSort(c.id)} title="Ordenar por esta coluna (A→Z, Z→A)" aria-label={`Ordenar por ${c.label}`}
+                      className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded', s ? 'text-[var(--accent-primary)]' : 'text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100')}>
+                      {s === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : s === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUpDown className="h-3.5 w-3.5" />}
+                    </button>
+                  )}
+                  <button type="button" disabled={i === 0} onClick={() => grid.step(c.id, -1)} aria-label={`Subir ${c.label}`} title="Mover para a esquerda"
+                    className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20"><ChevronUp className="h-3.5 w-3.5" /></button>
+                  <button type="button" disabled={i === grid.allCols.length - 1} onClick={() => grid.step(c.id, 1)} aria-label={`Descer ${c.label}`} title="Mover para a direita"
+                    className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20"><ChevronDown className="h-3.5 w-3.5" /></button>
+                </div>
+              );
+            })}
           </div>
           <div className="mt-1 border-t border-[var(--color-border-soft)] pt-1">
             <button type="button" disabled={!grid.customized} onClick={() => { grid.reset(); setOpen(false); }} className="w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40">Voltar ao padrão</button>
           </div>
-          <p className="px-2 pb-1 pt-1 text-[11px] text-[var(--color-text-muted)]">Arraste o título para mudar a ordem e puxe a borda para a largura.</p>
+          <p className="px-2 pb-1 pt-1 text-[11px] text-[var(--color-text-muted)]">Arraste aqui ou no título da tabela para mudar a ordem; ↑↓ move uma posição; a seta ordena A→Z. Puxe a borda do título para a largura.</p>
         </div>
       )}
     </div>

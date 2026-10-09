@@ -20,14 +20,18 @@ import { useAppUser } from '@/app/providers/AppUserProvider';
 import { SendBillsDialog } from './SendBillsDialog';
 import type { BillItem, BillsImage } from '@/lib/wa-summary-image';
 
-type StatusFilter = '' | InstStatus;
+// Padrão ao entrar: só o que falta pagar/receber (aberto, vencido e parcial).
+const DEFAULT_STATUSES: InstStatus[] = ['open', 'overdue', 'partial'];
+const ALL_STATUSES: InstStatus[] = ['open', 'overdue', 'partial', 'paid', 'canceled'];
 
 // Lista de contas a pagar OU a receber (uma linha por parcela).
 export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookups }) {
   const perms = usePermission();
   const today = todaySP();
   const [company, setCompany] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('');
+  const [statuses, setStatuses] = useState<InstStatus[]>(DEFAULT_STATUSES);
+  // Compatível com o resto da tela: "status" único quando só um está marcado.
+  const status: '' | InstStatus = statuses.length === 1 ? statuses[0] : '';
   const [from, setFrom] = useState(monthStart(today));
   const [to, setTo] = useState(monthEnd(today));
   const [party, setParty] = useState('');
@@ -45,10 +49,9 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     if (company) query = query.eq('company_id', company);
     if (party) query = query.eq('party_id', party);
     if (chart) query = query.eq('chart_account_id', chart);
-    if (status) query = query.eq('status', status);
-    else query = query.neq('status', 'canceled'); // cancelados (= excluídos) só com o filtro "Cancelado"
-    // Vencidos aparecem mesmo de meses anteriores quando o filtro é "vencido".
-    if (from && status !== 'overdue') query = query.gte('due_date', from);
+    if (statuses.length && statuses.length < ALL_STATUSES.length) query = query.in('status', statuses);
+    // Vencidos aparecem mesmo de meses anteriores (quando "Vencido" está marcado).
+    if (from) query = statuses.includes('overdue') ? query.or(`due_date.gte.${from},status.eq.overdue`) : query.gte('due_date', from);
     if (to) query = query.lte('due_date', to);
     const [{ data, error: err }, sum] = await Promise.all([
       query,
@@ -59,7 +62,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     setError(err ? friendlyError(err) : null);
     setRows((data ?? []) as InstallmentRow[]);
     setSummary(sum);
-  }, [kind, company, party, chart, status, from, to]);
+  }, [kind, company, party, chart, statuses, from, to]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -191,7 +194,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       ['Gerado em', reportNow()],
       ['Empresa', company ? (comp?.name ?? '') : lookups.companies.length > 1 ? 'Todas as empresas' : (comp?.name ?? orgName ?? '')],
     ];
-    if (status) meta.push(['Status', STATUS_LABEL[status] ?? status]);
+    if (statuses.length < ALL_STATUSES.length) meta.push(['Status', statuses.map((x) => STATUS_LABEL[x]).join(', ')]);
     if (party) meta.push([pay ? 'Fornecedor' : 'Cliente', (fantasy.get(party) ?? '').toLocaleUpperCase('pt-BR')]);
     void openReport({
       title, subtitle: pay ? 'Relatório financeiro de vencimentos' : 'Relatório financeiro de recebimentos', meta,
@@ -259,19 +262,16 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryCard label={`A ${pay ? 'pagar' : 'receber'} no período (aberto)`} cents={summary?.open_cents ?? 0} count={summary?.open_count}
-          active={status === 'open'} onClick={() => setStatus(status === 'open' ? '' : 'open')} />
+          active={status === 'open'} onClick={() => setStatuses(status === 'open' ? DEFAULT_STATUSES : ['open'])} />
         <SummaryCard label="Vencido" tone="error" cents={summary?.overdue_cents ?? 0} count={summary?.overdue_count}
-          active={status === 'overdue'} onClick={() => setStatus(status === 'overdue' ? '' : 'overdue')} />
+          active={status === 'overdue'} onClick={() => setStatuses(status === 'overdue' ? DEFAULT_STATUSES : ['overdue'])} />
         <SummaryCard label={pay ? 'Pago no período' : 'Recebido no período'} tone="success" cents={summary?.paid_cents ?? 0}
-          active={status === 'paid'} onClick={() => setStatus(status === 'paid' ? '' : 'paid')} />
+          active={status === 'paid'} onClick={() => setStatuses(status === 'paid' ? DEFAULT_STATUSES : ['paid'])} />
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="w-48"><CompanySelect companies={lookups.companies} value={company} onChange={setCompany} /></div>
-        <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className={cn(inputCls, 'w-36')} aria-label="Status">
-          <option value="">Todos os status</option><option value="open">Aberto</option><option value="overdue">Vencido</option>
-          <option value="partial">Parcial</option><option value="paid">Pago</option><option value="canceled">Cancelado</option>
-        </select>
+        <StatusMulti value={statuses} onChange={setStatuses} pay={pay} />
         <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">Venc. de
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={cn(inputCls, 'w-36')} /></label>
         <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">até
@@ -428,5 +428,44 @@ function BulkSettleDialog({ rows, lookups, pay, onClose, onDone }: { rows: Insta
         <Button onClick={() => void go()} disabled={busy || open.length === 0}>{busy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />} Confirmar</Button>
       </div>
     </Dialog>
+  );
+}
+
+// Status com caixinhas: marque um ou vários (padrão: aberto + vencido + parcial).
+function StatusMulti({ value, onChange, pay }: { value: InstStatus[]; onChange: (v: InstStatus[]) => void; pay: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+  const label = (x: InstStatus) => (x === 'paid' ? (pay ? 'Pago' : 'Recebido') : STATUS_LABEL[x]);
+  const isDefault = value.length === DEFAULT_STATUSES.length && DEFAULT_STATUSES.every((x) => value.includes(x));
+  const summary = value.length === 0 || value.length === ALL_STATUSES.length ? 'Todos os status' : isDefault ? 'A pagar (aberto + vencido)' : value.map(label).join(', ');
+  const toggle = (x: InstStatus) => onChange(value.includes(x) ? value.filter((y) => y !== x) : ALL_STATUSES.filter((y) => y === x || value.includes(y)));
+  const quick = 'rounded-md border border-[var(--color-border-card)] px-2 py-1 text-xs hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]';
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Status"
+        className={cn(inputCls, 'flex w-52 items-center justify-between gap-2 text-left')}>
+        <span className="truncate">{summary.replace('A pagar', pay ? 'A pagar' : 'A receber')}</span><ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+      </button>
+      {open && (
+        <div className="absolute left-0 z-[var(--z-popover,60)] mt-1 w-60 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] p-2 shadow-[var(--shadow-lg)]">
+          {ALL_STATUSES.map((x) => (
+            <label key={x} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
+              <input type="checkbox" checked={value.includes(x)} onChange={() => toggle(x)} className="h-4 w-4 accent-[var(--accent-fill)]" />{label(x)}
+            </label>
+          ))}
+          <div className="mt-1 flex flex-wrap gap-1 border-t border-[var(--color-border-soft)] pt-2">
+            <button type="button" className={quick} onClick={() => onChange(DEFAULT_STATUSES)}>{pay ? 'A pagar' : 'A receber'}</button>
+            <button type="button" className={quick} onClick={() => onChange(['paid'])}>{pay ? 'Só pagas' : 'Só recebidas'}</button>
+            <button type="button" className={quick} onClick={() => onChange(ALL_STATUSES.filter((y) => y !== 'canceled'))}>Todas</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

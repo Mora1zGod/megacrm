@@ -12,9 +12,10 @@ import { AuditList } from '../finance/AuditList';
 import {
   fmtDateTime, personName, purError, qtyFmt, QUOTE_STATUS, rpc,
   type PurLookups, type QuotePrice, type QuoteItem, type QuoteStatus, type QuoteSupplier, type Quotation, type TabProps,
+  partyDisplay,
 } from './data';
 import { Field, inputCls, KV, MoneyInput, ReasonDialog, Spinner, StatusPill, SubTabs, tdCls, thCls, Trace, useOpenDoc } from './ui';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 
 type QuoteRow = Quotation & { pur_requisitions: { number: string | null; justification: string | null } | null };
 
@@ -45,6 +46,7 @@ export function QuotationsTab({ lookups, openId, onOpen, onCloseDoc }: TabProps)
         <SubTabs value={status} onChange={setStatus} tabs={[['', 'Todas'], ['open', 'Abertas'], ['pending_approval', 'Aguardando alçada'], ['approved', 'Aprovadas'], ['ordered', 'Com pedido'], ['canceled', 'Canceladas']]} />
         <span className="text-xs text-[var(--color-text-muted)]">Cotações nascem de uma requisição aprovada (botão “Abrir cotação”).</span>
       </div>
+      <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!rows ? <Spinner /> : (
         <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('quotation', r.id)} emptyText="Nenhuma cotação." />
       )}
@@ -88,7 +90,7 @@ function QuoteDetail({ quote, lookups, onClose, onOpen, onChanged }: { quote: Qu
     const vals = sups.filter(valid).map((s) => price(s.id, itemId)).filter((v): v is number => v !== undefined);
     return vals.length ? Math.min(...vals) : undefined;
   };
-  const partyName = (id: string) => lookups.suppliers.find((p) => p.id === id)?.name ?? 'Fornecedor';
+  const partyName = (id: string) => partyDisplay(lookups.suppliers.find((p) => p.id === id)) || 'Fornecedor';
 
   const totals = useMemo(() => sups.map((s) => {
     let goods = 0; let complete = true;

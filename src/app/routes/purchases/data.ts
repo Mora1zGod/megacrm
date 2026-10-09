@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { friendlyError, type ChartAccount, type Company, type CostCenter } from '../finance/data';
 
-export { rpc, fmtDate, fmtDateTime, todaySP, addDays, monthStart, monthEnd, friendlyError } from '../finance/data';
+export { rpc, fmtDate, fmtDateTime, todaySP, addDays, monthStart, monthEnd, friendlyError, partyDisplay, upperBR } from '../finance/data';
 
 // ---------------------------------------------------------------- tipos
 export type ReqStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'returned' | 'quoting' | 'ordered' | 'done' | 'canceled';

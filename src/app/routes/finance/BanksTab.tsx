@@ -9,7 +9,7 @@ import { usePermission } from '@/app/providers/PermissionsProvider';
 import { formatBRL } from '@/lib/money';
 import { addDays, fmtDate, friendlyError, rpc, todaySP, type Account, type Lookups } from './data';
 import { CompanySelect, EmptyRow, Field, inputCls, MoneyInput, ReasonDialog, tdCls, thCls } from './ui';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 
 interface Transfer {
   id: string; from_account_id: string; to_account_id: string; amount_cents: number; transfer_date: string;
@@ -72,7 +72,7 @@ export function BanksTab({ lookups }: { lookups: Lookups }) {
         ))}
       </div>
 
-      <h3 className="pt-2 text-sm font-semibold text-[var(--color-text-primary)]">Transferências</h3>
+      <div className="flex items-center justify-between pt-2"><h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Transferências</h3><GridReset grid={grid} /></div>
       <DataGrid grid={grid} rowKey={(t) => t.id} emptyText="Nenhuma transferência." actionsWidth={130}
         rowClassName={(t) => (t.reversed_at || t.reversal_of) && 'text-[var(--color-text-muted)]'}
         actions={(t) => (t.reversed_at ? <span className="text-xs" title={t.reverse_reason ?? ''}>Estornada</span>

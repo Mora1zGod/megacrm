@@ -758,7 +758,11 @@ Regras:
   (etiqueta com o nome da lista quando não é a primeira); arrastar para outra coluna leva à lista de mesmo nome (ou à primeira);
   título da coluna arrasta para reordenar (`boards.position` renumerado 1000, 2000…). `useBoardContent` aceita 1 id ou vários.
 - Posições: `card_checklists.position` é **integer** — nunca `Date.now()`; usar maior posição + 1000.
-- `DataGrid` cabe na largura da tela (larguras viram proporções, com mínimo por coluna) e tem menu "Colunas" (mostrar/esconder, padrão).
+- `DataGrid` cabe na largura da tela (larguras viram proporções, com mínimo por coluna) e tem menu "Colunas" (mostrar/esconder, arrastar,
+  ↑↓, ordenar, padrão) em todas as listas de Financeiro e Compras. Arrastar título para a direita entra depois da coluna alvo.
+- Fornecedor/cliente nas listas = nome fantasia em MAIÚSCULAS (`partyDisplay` em finance/data.ts) + coluna opcional "Razão social".
+- Contas a pagar/receber: status com caixinhas (`StatusMulti`), padrão ao entrar = aberto + vencido + parcial (vencidos de meses
+  anteriores entram junto); atalhos "A pagar", "Só pagas", "Todas".
 
 ## Notificações WhatsApp (08/10/2026) — `20261008200000_wa_notifications.sql`
 - Avisos internos saem por UM número UAZAPI (sem janela de 24 h): `wa_notify_settings` (1 linha por org, `channel_id`) +

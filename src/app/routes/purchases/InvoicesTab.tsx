@@ -19,6 +19,7 @@ import { StatusBadge } from '../finance/ui';
 import {
   addDays, DOC_TYPE, fmtDate, fmtDateTime, INVOICE_STATUS, monthStart, purError, qtyFmt, rpc, sefazApi, SOURCE, todaySP,
   type Invoice, type InvoiceItem, type InvoiceStatus, type PurLookups, type TabProps,
+  partyDisplay, upperBR,
 } from './data';
 import { Badge, Card, Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useDebounced, useOpenDoc } from './ui';
 import { ChartPicker } from '../finance/ui';
@@ -89,12 +90,16 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
     const t = q.trim().replace(/[,()]/g, ' ');
     if (t) {
       const d = t.replace(/\D/g, '');
-      query = query.or([`number.ilike.%${t}%`, `supplier_name.ilike.%${t}%`, `party_name.ilike.%${t}%`, d.length >= 4 ? `access_key.ilike.%${d}%` : '', d.length >= 4 ? `supplier_doc.ilike.%${d}%` : ''].filter(Boolean).join(','));
+      // Também acha pelo nome fantasia do cadastro.
+      const tl = t.toLowerCase();
+      const byFantasy = lookups.suppliers.filter((p) => p.trade_name?.toLowerCase().includes(tl)).map((p) => p.id).slice(0, 50);
+      query = query.or([`number.ilike.%${t}%`, `supplier_name.ilike.%${t}%`, `party_name.ilike.%${t}%`, d.length >= 4 ? `access_key.ilike.%${d}%` : '', d.length >= 4 ? `supplier_doc.ilike.%${d}%` : '',
+        byFantasy.length ? `party_id.in.(${byFantasy.join(',')})` : ''].filter(Boolean).join(','));
     }
     const { data, error } = await query;
     if (error) toast.error(purError(error));
     setRows((data ?? []) as Invoice[]);
-  }, [from, to, by, companyId, partyId, status, source, finRec, stockRec, q]);
+  }, [from, to, by, companyId, partyId, status, source, finRec, stockRec, q, lookups.suppliers]);
   useEffect(() => { void load(); }, [load]);
   const current = useOpenDoc('pur_invoices_v', openId, rows);
 
@@ -151,11 +156,16 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const sumOf = (a: Invoice[]) => a.reduce((s, n) => s + n.total_cents, 0);
   const canRemove = (n: Invoice) => perms.can('purchases.invoice') && !n.fin_entry_id && !n.stock_reconciled && n.status !== 'posted';
 
+  // Fornecedor pelo nome fantasia (cadastro), senão a razão social da nota.
+  const supById = useMemo(() => new Map(lookups.suppliers.map((p) => [p.id, p])), [lookups.suppliers]);
+  const supName = useCallback((n: Invoice) => partyDisplay(n.party_id ? supById.get(n.party_id) : null, n.party_name ?? n.supplier_name), [supById]);
   const columns = useMemo<GridColumn<Invoice>[]>(() => [
     { id: 'number', label: 'Número', width: 110, sortValue: (n) => n.number, exportValue: (n) => `${n.number}${n.series ? `/${n.series}` : ''}`,
       render: (n) => <span className="font-semibold">{n.doc_type !== 'nfe' && <span className="mr-1 text-xs font-normal text-[var(--color-text-muted)]">{DOC_TYPE[n.doc_type]}</span>}{n.number}{n.series ? `/${n.series}` : ''}</span> },
-    { id: 'supplier', label: 'Fornecedor', width: 250, minWidth: 140, sortValue: (n) => n.party_name ?? n.supplier_name ?? '',
-      render: (n) => <span className="block truncate" title={n.party_name ?? n.supplier_name ?? ''}>{n.party_name ?? n.supplier_name ?? '—'}</span> },
+    { id: 'supplier', label: 'Fornecedor', width: 250, minWidth: 140, sortValue: (n) => supName(n),
+      render: (n) => <span className="block truncate" title={n.party_name ?? n.supplier_name ?? ''}>{supName(n) || '—'}</span> },
+    { id: 'supplier_legal', label: 'Razão social', width: 220, defaultHidden: true, sortValue: (n) => upperBR(n.party_name ?? n.supplier_name),
+      render: (n) => <span className="block truncate text-[var(--color-text-secondary)]" title={n.party_name ?? n.supplier_name ?? ''}>{upperBR(n.party_name ?? n.supplier_name) || '—'}</span> },
     { id: 'doc', label: 'CNPJ/CPF', width: 145, sortValue: (n) => n.supplier_doc ?? '', exportValue: (n) => formatDoc(n.supplier_doc),
       render: (n) => <span className="whitespace-nowrap tabular-nums text-[var(--color-text-secondary)]">{formatDoc(n.supplier_doc)}</span> },
     { id: 'company', label: 'Empresa', width: 110, sortValue: (n) => n.company_name ?? '', render: (n) => <span className="block truncate text-[var(--color-text-secondary)]">{n.company_name}</span> },
@@ -174,7 +184,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         const [l, tone] = displayStatus(n);
         return <span className="inline-flex items-center gap-1"><Badge tone={tone}>{l}</Badge>{n.sefaz_situation === 'cancelada' && n.status !== 'canceled_sefaz' && <Badge tone="error">cancelada!</Badge>}</span>;
       } },
-  ], [lookups.companies.length]);
+  ], [lookups.companies.length, supName]);
   const grid = useGrid('megacrm_grid_nfe_entrada', columns, list);
 
   const { orgLogoUrl, orgName } = useAppUser();
@@ -279,7 +289,7 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
           <Field label="Fornecedor" htmlFor="nf-party">
             <select id="nf-party" value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputCls}>
               <option value="">Todos os fornecedores</option>
-              {lookups.suppliers.filter((p) => p.kind !== 'customer').map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {lookups.suppliers.filter((p) => p.kind !== 'customer').map((p) => ({ id: p.id, label: partyDisplay(p) })).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </Field>
           <Field label="Conciliação financeira" htmlFor="nf-fin">

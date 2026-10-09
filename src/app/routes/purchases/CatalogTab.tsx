@@ -8,7 +8,7 @@ import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { fmtDate, purError, qtyFmt, type InvItem, type InvLocation, type PurLookups } from './data';
 import { Badge, EmptyRow, Field, inputCls, MoneyInput, SubTabs, TableWrap, tdCls, thCls } from './ui';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 import { ChartPicker } from '../finance/ui';
 
 interface Balance { item_id: string; item_name: string; unit: string; location_id: string; location_name: string; lot: string | null; expiry: string | null; qty: number }
@@ -48,6 +48,7 @@ export function CatalogTab({ lookups }: { lookups: PurLookups }) {
         {can && sec === 'itens' && <Button onClick={() => setEditItem('new')}><Plus className="h-4 w-4" /> Novo item</Button>}
         {can && sec === 'locais' && <Button onClick={() => setEditLoc('new')}><Plus className="h-4 w-4" /> Novo local</Button>}
       </div>
+      {sec === 'itens' && <div className="flex justify-end"><GridReset grid={grid} /></div>}
       {sec === 'itens' && (
         <DataGrid grid={grid} rowKey={(r) => r.id} emptyText="Nenhum item cadastrado." actionsWidth={60} actions={can ? (i) => <Button size="sm" variant="ghost" onClick={() => setEditItem(i)} aria-label="Editar item"><Pencil className="h-3.5 w-3.5" /></Button> : undefined} />
       )}

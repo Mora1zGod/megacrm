@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Pencil, Plus, Search, Star } from 'lucide-react';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { formatBRL } from '@/lib/money';
-import { chartTree, friendlyError, NATURE_LABEL, type Account, type ChartAccount, type Company, type CostCenter, type Lookups, type Nature, type Party } from './data';
+import { chartTree, friendlyError, partyDisplay, upperBR, NATURE_LABEL, type Account, type ChartAccount, type Company, type CostCenter, type Lookups, type Nature, type Party } from './data';
 import { EmptyRow, Field, inputCls, MoneyInput, SubTabs, TableWrap, tdCls, thCls } from './ui';
 import { formatDoc, formatPhone, maskCNPJ, onlyDigits } from '@/lib/format';
 import { SupplierFormDialog } from '../purchases/SupplierForm';
@@ -358,9 +358,10 @@ function Parties({ lookups }: { lookups: Lookups }) {
   const [q, setQ] = useState('');
   const t = q.trim().toLowerCase();
   const digits = t.replace(/\D/g, '');
-  const list = lookups.parties.filter((p) => !t || p.name.toLowerCase().includes(t) || (digits && (p.doc ?? '').includes(digits)));
+  const list = lookups.parties.filter((p) => !t || p.name.toLowerCase().includes(t) || (p.trade_name ?? '').toLowerCase().includes(t) || (digits && (p.doc ?? '').includes(digits)));
   const grid = useGrid<Party>('megacrm_grid_fin_parties', [
-    { id: 'name', label: 'Nome', width: 280, minWidth: 140, sortValue: (p) => p.name, render: (p) => <b className="block truncate">{p.name}</b> },
+    { id: 'name', label: 'Nome', width: 280, minWidth: 140, sortValue: (p) => partyDisplay(p), render: (p) => <b className="block truncate" title={p.name}>{partyDisplay(p)}</b> },
+    { id: 'legal', label: 'Razão social', width: 240, defaultHidden: true, sortValue: (p) => upperBR(p.name), render: (p) => <span className="block truncate text-[var(--color-text-secondary)]">{upperBR(p.name)}</span> },
     { id: 'kind', label: 'Tipo', width: 150, sortValue: (p) => p.kind, exportValue: (p) => ({ supplier: 'Fornecedor', customer: 'Cliente', both: 'Fornecedor e cliente' }[p.kind]), render: (p) => <span className="text-xs">{{ supplier: 'Fornecedor', customer: 'Cliente', both: 'Fornecedor e cliente' }[p.kind]}</span> },
     { id: 'doc', label: 'CPF/CNPJ', width: 160, sortValue: (p) => p.doc ?? '', exportValue: (p) => formatDoc(p.doc), render: (p) => <span className="tabular-nums">{formatDoc(p.doc)}</span> },
     { id: 'contact', label: 'Contato', width: 260, sortValue: (p) => p.email ?? p.phone ?? '', exportValue: (p) => [p.email, formatPhone(p.phone)].filter(Boolean).join(' · '), render: (p) => <span className="block truncate text-xs text-[var(--color-text-secondary)]">{[p.email, formatPhone(p.phone)].filter(Boolean).join(' · ') || '—'}</span> },
@@ -373,6 +374,7 @@ function Parties({ lookups }: { lookups: Lookups }) {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou CPF/CNPJ" className={cn(inputCls, 'pl-9')} />
         </label>
+        <GridReset grid={grid} />
         {can && <Button onClick={() => setEdit('new')}><Plus className="h-4 w-4" /> Novo</Button>}
       </div>
       <DataGrid grid={grid} rowKey={(p) => p.id} emptyText="Ninguém encontrado." actionsWidth={60}

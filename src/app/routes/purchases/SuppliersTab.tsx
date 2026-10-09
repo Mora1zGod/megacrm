@@ -17,7 +17,7 @@ import {
 } from './data';
 import { SupplierForm } from './SupplierForm';
 import { Badge, Card, EmptyRow, Field, inputCls, KV, Metric, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, useDebounced } from './ui';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 
 interface Dash {
   can_finance: boolean; can_purchases: boolean;
@@ -101,6 +101,7 @@ export function SuppliersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) 
         <div className="flex-1" />
         {canEditSuppliers(perms.can) && <Button onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Novo fornecedor</Button>}
       </div>
+      <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!rows ? <Spinner /> : (
         <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('supplier', r.id)} emptyText="Nenhum fornecedor." />
       )}

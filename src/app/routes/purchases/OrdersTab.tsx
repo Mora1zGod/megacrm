@@ -11,9 +11,10 @@ import { formatCEP, formatDoc, formatPhone } from '@/lib/format';
 import {
   fmtDate, fmtDateTime, ORDER_STATUS, purError, qtyFmt, RECEIPT_STATUS, rpc, todaySP,
   type Order, type OrderItem, type OrderStatus, type PurLookups, type Receipt, type TabProps,
+  partyDisplay, upperBR,
 } from './data';
 import { Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useOpenDoc } from './ui';
-import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { DataGrid, GridReset, useGrid } from '@/components/ui/GridTable';
 
 export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   const perms = usePermission();
@@ -31,14 +32,16 @@ export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
   }, [status]);
   useEffect(() => { void load(); }, [load]);
   const current = useOpenDoc('pur_orders_v', openId, rows);
+  const supName = useCallback((r: Order) => partyDisplay(lookups.suppliers.find((p) => p.id === r.party_id), r.party_name), [lookups.suppliers]);
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return !t || !rows ? rows : rows.filter((r) => [r.number, r.party_name, r.party_doc].some((x) => x?.toLowerCase().includes(t)));
-  }, [rows, q]);
+    return !t || !rows ? rows : rows.filter((r) => [r.number, r.party_name, r.party_doc, supName(r)].some((x) => x?.toLowerCase().includes(t)));
+  }, [rows, q, supName]);
 
   const grid = useGrid('megacrm_grid_pur_order', [
     { id: 'number', label: 'Número', width: 120, sortValue: (r: Order) => r.number ?? '', render: (r: Order) => <span className="font-semibold">{r.number ?? 'rascunho'}{r.revision > 0 && <span className="ml-1 text-xs font-normal text-[var(--color-text-muted)]">rev. {r.revision}</span>}</span> },
-    { id: 'party', label: 'Fornecedor', width: 260, sortValue: (r: Order) => r.party_name ?? '', render: (r: Order) => <span className="block truncate">{r.party_name ?? '—'}</span> },
+    { id: 'party', label: 'Fornecedor', width: 260, sortValue: (r: Order) => supName(r), render: (r: Order) => <span className="block truncate" title={r.party_name ?? ''}>{supName(r) || '—'}</span> },
+    { id: 'party_legal', label: 'Razão social', width: 220, defaultHidden: true, sortValue: (r: Order) => upperBR(r.party_name), render: (r: Order) => <span className="block truncate text-[var(--color-text-secondary)]">{upperBR(r.party_name) || '—'}</span> },
     { id: 'company', label: 'Empresa', width: 120, sortValue: (r: Order) => r.company_name ?? '', render: (r: Order) => <span className="block truncate">{r.company_name}</span> },
     { id: 'issued', label: 'Emitido', width: 140, sortValue: (r: Order) => r.issued_at ?? '', render: (r: Order) => (r.issued_at ? fmtDateTime(r.issued_at) : '—') },
     { id: 'expected', label: 'Previsão', width: 105, sortValue: (r: Order) => r.expected_date ?? '', render: (r: Order) => fmtDate(r.expected_date) },
@@ -54,6 +57,7 @@ export function OrdersTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
         <div className="flex-1" />
         {perms.can('purchases.order') && <Button variant="outline" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Pedido avulso</Button>}
       </div>
+      <div className="flex justify-end"><GridReset grid={grid} /></div>
       {!filtered ? <Spinner /> : (
         <DataGrid grid={grid} rowKey={(r) => r.id} onRowClick={(r) => onOpen('order', r.id)} emptyText="Nenhum pedido." />
       )}
