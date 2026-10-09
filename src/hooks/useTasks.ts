@@ -49,11 +49,13 @@ export function useTasks() {
   useEffect(() => {
     void load();
     const supabase = getSupabase();
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const ch = supabase
       .channel(`tasks-page-${Math.random().toString(36).slice(2, 8)}`)
-      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'tasks' }, () => void load())
+      // Várias mudanças seguidas (ex.: rotina que cria tarefas em lote) = 1 recarga.
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'tasks' }, () => { if (timer) clearTimeout(timer); timer = setTimeout(() => void load(), 800); })
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
   }, [load]);
 
   const createTask = useCallback(async (input: NewTaskInput) => {
@@ -89,4 +91,29 @@ export function useTasks() {
   const pendingCount = tasks.filter((t) => t.status === 'pending').length;
 
   return { tasks, loading, error, reload: load, createTask, toggleTask, deleteTask, pendingCount };
+}
+
+// Só o número de tarefas pendentes (para o selo do menu). Antes o menu baixava TODAS as tarefas e
+// rebaixava a cada mudança de qualquer pessoa — em toda tela do sistema.
+export function usePendingTasksCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const supabase = getSupabase();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let alive = true;
+    const load = async () => {
+      const { count: c } = await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+      if (alive) setCount(c ?? 0);
+    };
+    void load();
+    const ch = supabase
+      .channel(`tasks-badge-${Math.random().toString(36).slice(2, 8)}`)
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'tasks' }, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => void load(), 1500); // várias mudanças seguidas = 1 consulta
+      })
+      .subscribe();
+    return () => { alive = false; if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
+  }, []);
+  return count;
 }

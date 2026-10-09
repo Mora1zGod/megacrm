@@ -1,4 +1,6 @@
-import { lazy, Suspense, type ReactElement } from 'react';
+import { Suspense, type ReactElement } from 'react';
+import { PageLoading } from '@/components/PageLoading';
+import { lazyRetry } from '@/lib/lazyRetry';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
 import { useSupabaseConfig } from '@/hooks/useSupabase';
@@ -7,51 +9,36 @@ import { useAppUser } from './providers/AppUserProvider';
 import { usePermission } from './providers/PermissionsProvider';
 import { firstAllowedPath } from './layout/nav-config';
 import { AccessGate } from './AccessGate';
-import { Skeleton } from '@/components/ui/skeleton';
 
 // Lazy loading the page chunks keeps the initial bundle lean.
-const SetupPage = lazy(() => import('./routes/setup/SetupPage'));
-const LoginPage = lazy(() => import('./routes/auth/LoginPage'));
-const SignupPage = lazy(() => import('./routes/auth/SignupPage'));
-const InvitePage = lazy(() => import('./routes/invite/InvitePage'));
-const SelfSignupPage = lazy(() => import('./routes/auth/SelfSignupPage'));
-const DashboardPage = lazy(() => import('./routes/dashboard/DashboardPage'));
-const InboxPage = lazy(() => import('./routes/inbox/InboxPage'));
-const CampaignsPage = lazy(() => import('./routes/campaigns/CampaignsPage'));
-const ContactsPage = lazy(() => import('./routes/contacts/ContactsPage'));
-const ContactDetailPage = lazy(() => import('./routes/contacts/ContactDetailPage'));
-const FunilPage = lazy(() => import('./routes/funil/FunilPage'));
-const VisitsPage = lazy(() => import('./routes/visits/VisitsPage'));
-const BoardsPage = lazy(() => import('./routes/boards/BoardsPage'));
-const AIAgentPage = lazy(() => import('./routes/ai-agent/AIAgentPage'));
-const AutomationsPage = lazy(() => import('./routes/automations/AutomationsPage'));
-const SettingsPage = lazy(() => import('./routes/settings/SettingsPage'));
-const LegacySettingsRedirect = lazy(() => import('./routes/settings/SettingsPage').then((m) => ({ default: m.LegacySettingsRedirect })));
-const FinancePage = lazy(() => import('./routes/finance/FinancePage'));
-const PurchasesPage = lazy(() => import('./routes/purchases/PurchasesPage'));
-const EmailPage = lazy(() => import('./routes/email/EmailPage'));
-const ReportsPage = lazy(() => import('./routes/reports/ReportsPage'));
-const FilesPage = lazy(() => import('./routes/files/FilesPage'));
-const ChatPage = lazy(() => import('./routes/chat/ChatPage'));
-const SalesTvPage = lazy(() => import('./routes/tv/SalesTvPage'));
-const AccessDeniedPage = lazy(() => import('./routes/errors/AccessDeniedPage'));
+const SetupPage = lazyRetry(() => import('./routes/setup/SetupPage'));
+const LoginPage = lazyRetry(() => import('./routes/auth/LoginPage'));
+const SignupPage = lazyRetry(() => import('./routes/auth/SignupPage'));
+const InvitePage = lazyRetry(() => import('./routes/invite/InvitePage'));
+const SelfSignupPage = lazyRetry(() => import('./routes/auth/SelfSignupPage'));
+const DashboardPage = lazyRetry(() => import('./routes/dashboard/DashboardPage'));
+const InboxPage = lazyRetry(() => import('./routes/inbox/InboxPage'));
+const CampaignsPage = lazyRetry(() => import('./routes/campaigns/CampaignsPage'));
+const ContactsPage = lazyRetry(() => import('./routes/contacts/ContactsPage'));
+const ContactDetailPage = lazyRetry(() => import('./routes/contacts/ContactDetailPage'));
+const FunilPage = lazyRetry(() => import('./routes/funil/FunilPage'));
+const VisitsPage = lazyRetry(() => import('./routes/visits/VisitsPage'));
+const BoardsPage = lazyRetry(() => import('./routes/boards/BoardsPage'));
+const AIAgentPage = lazyRetry(() => import('./routes/ai-agent/AIAgentPage'));
+const AutomationsPage = lazyRetry(() => import('./routes/automations/AutomationsPage'));
+const SettingsPage = lazyRetry(() => import('./routes/settings/SettingsPage'));
+const LegacySettingsRedirect = lazyRetry(() => import('./routes/settings/SettingsPage').then((m) => ({ default: m.LegacySettingsRedirect })));
+const FinancePage = lazyRetry(() => import('./routes/finance/FinancePage'));
+const PurchasesPage = lazyRetry(() => import('./routes/purchases/PurchasesPage'));
+const EmailPage = lazyRetry(() => import('./routes/email/EmailPage'));
+const ReportsPage = lazyRetry(() => import('./routes/reports/ReportsPage'));
+const FilesPage = lazyRetry(() => import('./routes/files/FilesPage'));
+const ChatPage = lazyRetry(() => import('./routes/chat/ChatPage'));
+const SalesTvPage = lazyRetry(() => import('./routes/tv/SalesTvPage'));
+const AccessDeniedPage = lazyRetry(() => import('./routes/errors/AccessDeniedPage'));
 
 function PageFallback() {
-  return (
-    <div className="max-w-7xl mx-auto space-y-6 p-6" aria-busy="true" aria-label="Carregando página">
-      <div className="space-y-2">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-4 w-72" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-      </div>
-      <Skeleton className="h-64" />
-    </div>
-  );
+  return <PageLoading />;
 }
 
 function RequireSetup({ children }: { children: ReactElement }) {

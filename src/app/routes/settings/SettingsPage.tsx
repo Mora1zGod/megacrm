@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
+import { lazyRetry } from '@/lib/lazyRetry';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Activity, BellRing, ArrowLeft, Bot, Building2, Cake, ChevronRight, Clock, GitBranchPlus, KeyRound, ListOrdered, Lock, Mail, MessagesSquare, Moon,
@@ -27,8 +28,8 @@ import { WaNotifySettings } from './integrations/WaNotifySettings';
 import { MailAccountsSettings } from '../email/MailAccountsSettings';
 import { SettingsTab as AsaasSettings } from '../finance/SettingsTab';
 
-const AuditLogPage = lazy(() => import('../admin/AuditLogPage'));
-const AdminPage = lazy(() => import('../admin/AdminPage'));
+const AuditLogPage = lazyRetry(() => import('../admin/AuditLogPage'));
+const AdminPage = lazyRetry(() => import('../admin/AdminPage'));
 
 // ============================================================================
 // Configurações = centro administrativo. 6 categorias → cartões → tela do item.

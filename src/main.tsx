@@ -2,7 +2,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { registerServiceWorker } from './lib/registerSW';
+import { reloadForNewVersion } from './lib/lazyRetry';
 import './styles/globals.css';
+
+// Arquivo de tela de uma versão antiga (depois de um deploy): recarrega para pegar a nova em vez de travar.
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForNewVersion()) event.preventDefault();
+});
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

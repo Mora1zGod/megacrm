@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Suspense, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { PageLoading } from '@/components/PageLoading';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
@@ -7,6 +9,7 @@ import { SupportBanner } from './SupportBanner';
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { pathname } = useLocation();
 
   return (
     // h-screen + overflow-hidden: a altura da janela é a referência e o scroll
@@ -20,7 +23,12 @@ export function AppLayout() {
         <SupportBanner />
         <Header onMenuClick={() => setMobileNavOpen(true)} />
         <main className="flex-1 min-h-0 p-3 sm:p-5 overflow-auto" role="main">
-          <Outlet />
+          {/* Erro numa tela não derruba o menu; carregar uma tela mostra a barrinha no topo, não tela branca. */}
+          <AppErrorBoundary key={pathname} scope="page">
+            <Suspense fallback={<PageLoading />}>
+              <Outlet />
+            </Suspense>
+          </AppErrorBoundary>
         </main>
       </div>
     </div>

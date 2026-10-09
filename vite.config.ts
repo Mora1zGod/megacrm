@@ -37,5 +37,19 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
     },
+    // Bibliotecas base num arquivo separado: mudam pouco, então o navegador
+    // mantém em cache entre um deploy e outro (só o código do CRM é baixado de novo).
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run)\//.test(id)) return 'vendor-react';
+            if (/node_modules\/@supabase\//.test(id)) return 'vendor-supabase';
+            return undefined;
+          },
+        },
+      },
+    },
   };
 });

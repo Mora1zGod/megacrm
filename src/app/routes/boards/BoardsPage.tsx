@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazyRetry } from '@/lib/lazyRetry';
 import { useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -25,7 +26,7 @@ import { BOARD_BG, boardBg } from './boardBg';
 export { BOARD_BG, boardBg };
 import { positionBetween, useAllBoardMembers, useBoardContent, useBoards, type Board, type BoardCard } from '@/hooks/useBoards';
 
-const TasksPage = lazy(() => import('../tasks/TasksPage'));
+const TasksPage = lazyRetry(() => import('../tasks/TasksPage'));
 
 // Quadro aberto: ALL = tela inicial com todos os quadros lado a lado (como o quadro principal do Trello).
 const ALL = 'todos';

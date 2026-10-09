@@ -785,3 +785,13 @@ Regras:
 - Tela: pastas · lista (busca IMAP, não lidos, estrela, páginas de 40) · leitura em iframe sandbox (sem script; imagens de fora bloqueadas até
   "Mostrar imagens"). Boleto no texto (`lib/boleto.ts`: linha digitável 47/48 dígitos, fator de vencimento com a virada de 22/02/2025) →
   "Lançar conta a pagar" (`EntryFormDialog` com `prefill`, PDF anexado, fornecedor por e-mail/CNPJ/domínio); XML de NF-e → `import_xml`.
+
+## Tela branca e lentidão (09/10/2026) — `20261009120000_inbox_summary.sql`
+- **Toda tela lazy usa `lazyRetry`** (`src/lib/lazyRetry.ts`), nunca `lazy` direto: arquivo antigo depois de deploy → recarrega 1x (guarda de 20 s em sessionStorage), depois mostra aviso.
+- **`AppErrorBoundary`** em volta do app (`App.tsx`) e de cada página (`AppLayout`, `key={pathname}`): erro de tela vira aviso com Recarregar/Início, menu e topo continuam. `main.tsx` trata `vite:preloadError`.
+- **`<Suspense>` da página fica dentro do layout** (`AppLayout`) com `<PageLoading/>` (barra no topo + esqueleto) — não substitui mais a tela inteira.
+- **`supabase.ts`**: `fetch` com timeout de 30 s só em `/rest/v1/` (sem signal próprio). Uploads/realtime/functions não passam pelo timeout.
+- **Lista do Atendimento**: prévia/24 h/"esperando desde" vêm da RPC `inbox_message_summary(uuid[])` (1 linha por conversa, SECURITY INVOKER). Sem a RPC, `useConversations` cai no jeito antigo (baixar mensagens).
+- **Realtime sempre com debounce** (tarefas 800 ms, popover 1 s, contador do menu 1,5 s). Contador do menu = `usePendingTasksCount()` (count `head:true`), não baixa tarefas.
+- **`vite.config.ts`**: `vendor-react` e `vendor-supabase` separados (ficam em cache entre deploys). Código do CRM no `index-*.js` ≈ 88 KB gzip (antes 214 KB tudo junto).
+- Teste de tela com Playwright: usar `serviceWorkers: 'block'` no contexto — o `public/sw.js` (cache-first em `/assets/`) responde antes do `page.route`.

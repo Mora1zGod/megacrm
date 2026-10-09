@@ -31,9 +31,21 @@ export function isSupabaseConfigured(): boolean {
   return getSupabaseCredentials() !== null;
 }
 
+// Consulta que nunca responde deixava a tela em "carregando" para sempre. Leituras/RPC do banco (REST) têm
+// limite de 30 s; upload, Edge Functions, auth e realtime seguem sem limite (podem demorar de verdade).
+const REST_TIMEOUT_MS = 30_000;
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (!url.includes('/rest/v1/') || init?.signal) return fetch(input, init);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(new DOMException('A consulta demorou demais. Tente de novo.', 'TimeoutError')), REST_TIMEOUT_MS);
+  return fetch(input, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+};
+
 function buildClient(creds: SupabaseCredentials) {
   return createClient(creds.url, creds.anonKey, {
     db: { schema: APP_SCHEMA },
+    global: { fetch: fetchWithTimeout },
     auth: {
       persistSession: true,
       autoRefreshToken: true,

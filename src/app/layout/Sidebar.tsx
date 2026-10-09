@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { NAV_ITEMS, navItemVisible, type NavItem } from './nav-config';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
-import { useTasks } from '@/hooks/useTasks';
+import { usePendingTasksCount } from '@/hooks/useTasks';
 import { useInternalChat } from '@/hooks/useInternalChat';
 import { Avatar } from '@/components/ui/Avatar';
 import { BrandMark } from './BrandMark';
@@ -14,7 +14,7 @@ const GROUP_ORDER: NavItem['group'][] = ['Operação', 'Engajamento', 'Gestão',
 
 export function Sidebar() {
   const { role, isSuperAdmin, displayName, avatarUrl } = useAppUser();
-  const { pendingCount } = useTasks();
+  const pendingCount = usePendingTasksCount();
   const { unreadTotal } = useInternalChat();
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('sidebar_collapsed') === '1',

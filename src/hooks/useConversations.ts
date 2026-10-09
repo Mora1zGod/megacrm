@@ -57,6 +57,59 @@ async function fetchInChunks<T>(
   return { data: out, error: null };
 }
 
+interface MsgSummary {
+  latest: Map<string, string>;
+  lastDir: Map<string, 'inbound' | 'outbound'>;
+  lastInbound: Map<string, string>;
+  waiting: Map<string, string>;
+}
+
+// Prévia / última do cliente / "esperando desde": 1 linha por conversa pela RPC inbox_message_summary.
+// Sem a RPC (SQL ainda não rodado) cai no jeito antigo (baixar as mensagens).
+let summaryRpcMissing = false;
+async function loadMessageSummary(ids: string[]): Promise<MsgSummary> {
+  const out: MsgSummary = { latest: new Map(), lastDir: new Map(), lastInbound: new Map(), waiting: new Map() };
+  if (!ids.length) return out;
+  const supabase = getSupabase();
+  if (!summaryRpcMissing) {
+    const parts: string[][] = [];
+    for (let i = 0; i < ids.length; i += 400) parts.push(ids.slice(i, i + 400));
+    const res = await Promise.all(parts.map((p) => supabase.rpc('inbox_message_summary', { p_ids: p })));
+    const bad = res.find((r) => r.error);
+    if (!bad) {
+      for (const r of res) {
+        for (const m of (r.data ?? []) as Array<{ conversation_id: string; preview: string | null; preview_type: string | null; last_direction: 'inbound' | 'outbound' | null; last_inbound_at: string | null; waiting_since: string | null }>) {
+          if (m.last_direction) {
+            out.latest.set(m.conversation_id, m.preview ?? (m.preview_type === 'text' ? '' : `[${m.preview_type}]`));
+            out.lastDir.set(m.conversation_id, m.last_direction);
+          }
+          if (m.last_inbound_at) out.lastInbound.set(m.conversation_id, m.last_inbound_at);
+          if (m.waiting_since) out.waiting.set(m.conversation_id, m.waiting_since);
+        }
+      }
+      return out;
+    }
+    if (/inbox_message_summary|schema cache|does not exist|PGRST202/i.test(`${bad.error?.message} ${bad.error?.code}`)) summaryRpcMissing = true;
+    else throw new Error(bad.error!.message);
+  }
+  const q = await fetchInChunks(ids, (chunk) =>
+    supabase.from('messages').select('conversation_id, content, content_type, created_at, is_private_note, direction')
+      .in('conversation_id', chunk).order('created_at', { ascending: false }));
+  const waitDone = new Set<string>();
+  for (const m of (q.data ?? []) as Array<{ conversation_id: string; content: string | null; content_type: string; is_private_note: boolean; direction: 'inbound' | 'outbound'; created_at: string }>) {
+    if (!out.latest.has(m.conversation_id) && !m.is_private_note) {
+      out.latest.set(m.conversation_id, m.content ?? (m.content_type === 'text' ? '' : `[${m.content_type}]`));
+      out.lastDir.set(m.conversation_id, m.direction);
+    }
+    if (m.direction === 'inbound' && !out.lastInbound.has(m.conversation_id)) out.lastInbound.set(m.conversation_id, m.created_at);
+    if (!m.is_private_note && !waitDone.has(m.conversation_id)) {
+      if (m.direction === 'inbound') out.waiting.set(m.conversation_id, m.created_at);
+      else waitDone.add(m.conversation_id);
+    }
+  }
+  return out;
+}
+
 export function useConversations(): UseConversationsResult {
   const { userId } = useAppUser();
   const [conversations, setConversations] = useState<ConversationWithContact[]>([]);
@@ -109,13 +162,7 @@ export function useConversations(): UseConversationsResult {
           .select('contact_id, tag_id')
           .in('contact_id', chunk),
       ),
-      fetchInChunks(conversationIds, (chunk) =>
-        supabase
-          .from('messages')
-          .select('conversation_id, content, content_type, created_at, is_private_note, direction')
-          .in('conversation_id', chunk)
-          .order('created_at', { ascending: false }),
-      ),
+      loadMessageSummary(conversationIds),
       fetchInChunks<{ contact_id: string }>(contactIds, (chunk) =>
         supabase
           .from('deals')
@@ -147,36 +194,10 @@ export function useConversations(): UseConversationsResult {
       tagsByContact.set(t.contact_id, arr);
     }
 
-    // Percorre mensagens (ordenadas desc): 1ª não-privada = preview; 1ª inbound
-    // = última mensagem do contato (janela de 24h).
-    const latestByConv = new Map<string, string>();
-    const lastDirByConv = new Map<string, 'inbound' | 'outbound'>();
-    const lastInboundByConv = new Map<string, string>();
-    // SLA: anda do mais novo para o mais antigo; enquanto só houver inbound,
-    // "esperando desde" recua; a 1ª outbound (não-nota) encerra a contagem.
-    const waitingByConv = new Map<string, string>();
-    const waitDone = new Set<string>();
-    for (const m of (lastMsgsQ.data ?? []) as Array<{
-      conversation_id: string;
-      content: string | null;
-      content_type: string;
-      is_private_note: boolean;
-      direction: 'inbound' | 'outbound';
-      created_at: string;
-    }>) {
-      if (!latestByConv.has(m.conversation_id) && !m.is_private_note) {
-        const preview = m.content ?? (m.content_type === 'text' ? '' : `[${m.content_type}]`);
-        latestByConv.set(m.conversation_id, preview);
-        lastDirByConv.set(m.conversation_id, m.direction);
-      }
-      if (m.direction === 'inbound' && !lastInboundByConv.has(m.conversation_id)) {
-        lastInboundByConv.set(m.conversation_id, m.created_at);
-      }
-      if (!m.is_private_note && !waitDone.has(m.conversation_id)) {
-        if (m.direction === 'inbound') waitingByConv.set(m.conversation_id, m.created_at);
-        else waitDone.add(m.conversation_id);
-      }
-    }
+    const latestByConv = lastMsgsQ.latest;
+    const lastDirByConv = lastMsgsQ.lastDir;
+    const lastInboundByConv = lastMsgsQ.lastInbound;
+    const waitingByConv = lastMsgsQ.waiting;
 
     const clienteSet = new Set(
       ((clientesQ.data ?? []) as Array<{ contact_id: string }>).map((d) => d.contact_id),

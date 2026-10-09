@@ -5,9 +5,11 @@ import { AppUserProvider } from './app/providers/AppUserProvider';
 import { PermissionsProvider } from './app/providers/PermissionsProvider';
 import { AppRouter } from './app/router';
 import { Toaster } from './components/ui/sonner';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 
 export default function App() {
   return (
+    <AppErrorBoundary>
     <SupabaseProvider>
       <AuthProvider>
         <AppUserProvider>
@@ -20,5 +22,6 @@ export default function App() {
         </AppUserProvider>
       </AuthProvider>
     </SupabaseProvider>
+    </AppErrorBoundary>
   );
 }

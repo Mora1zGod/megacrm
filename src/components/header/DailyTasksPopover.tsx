@@ -51,11 +51,12 @@ export function DailyTasksPopover() {
   useEffect(() => {
     void load();
     const supabase = getSupabase();
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const ch = supabase
       .channel(`daily-tasks-${Math.random().toString(36).slice(2, 8)}`)
-      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'tasks' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'tasks' }, () => { if (timer) clearTimeout(timer); timer = setTimeout(() => void load(), 1000); })
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
   }, [load]);
 
   const done = tasks.filter((t) => t.status === 'done').length;
