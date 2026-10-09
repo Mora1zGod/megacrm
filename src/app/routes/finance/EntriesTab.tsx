@@ -73,7 +73,25 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return rows ?? [];
-    return (rows ?? []).filter((r) => `${r.description} ${r.party_name ?? ''} ${partyLabel(r)} ${r.chart_name}`.toLowerCase().includes(t));
+    // Valor: "898,85", "1.250", "R$ 1250", "898" — compara com o valor e com o saldo da parcela.
+    // Sem vírgula = começo dos reais ("898" acha 898,85; "1250" acha 1.250,00); com vírgula = reais exatos + centavos.
+    // A busca por texto (descrição, fornecedor, plano de contas) continua valendo junto.
+    const isMoney = /^(r\$)?\s*[\d.,\s]+$/.test(t) && /\d/.test(t);
+    const digits = t.replace(/\D/g, '');
+    const moneyHit = (r: InstallmentRow) => {
+      if (!isMoney) return false;
+      // Com vírgula = valor exato em centavos (898,85 / 1.250,00); sem vírgula = começo do valor (1250 → 1.250,xx).
+      const exact = t.includes(',');
+      const [rPart, cPart = ''] = t.split(',');
+      const wantReais = String(Number(rPart.replace(/\D/g, '') || '0'));
+      const wantCents = cPart.replace(/\D/g, '').slice(0, 2);
+      return [r.amount_cents, r.remaining_cents].some((c) => {
+        const reais = String(Math.floor(Math.abs(c) / 100));
+        if (exact) return reais === wantReais && String(Math.abs(c) % 100).padStart(2, '0').startsWith(wantCents);
+        return reais.startsWith(digits);
+      });
+    };
+    return (rows ?? []).filter((r) => moneyHit(r) || `${r.description} ${r.party_name ?? ''} ${partyLabel(r)} ${r.chart_name}`.toLowerCase().includes(t));
   }, [rows, q, partyLabel]);
 
   const pay = kind === 'payable';
@@ -273,7 +291,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
         </select>
         <label className="relative min-w-[160px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar descrição" className={cn(inputCls, 'pl-9')} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar descrição, fornecedor ou valor (ex.: 898,85)" className={cn(inputCls, 'pl-9')} />
         </label>
       </div>
 
