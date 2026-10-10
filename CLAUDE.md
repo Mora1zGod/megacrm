@@ -807,4 +807,8 @@ Regras:
 - **Lista do Atendimento**: prévia/24 h/"esperando desde" vêm da RPC `inbox_message_summary(uuid[])` (1 linha por conversa, SECURITY INVOKER). Sem a RPC, `useConversations` cai no jeito antigo (baixar mensagens).
 - **Realtime sempre com debounce** (tarefas 800 ms, popover 1 s, contador do menu 1,5 s). Contador do menu = `usePendingTasksCount()` (count `head:true`), não baixa tarefas.
 - **`vite.config.ts`**: `vendor-react` e `vendor-supabase` separados (ficam em cache entre deploys). Código do CRM no `index-*.js` ≈ 88 KB gzip (antes 214 KB tudo junto).
+- **RLS rápido (10/10/2026, `20261010090000_rls_fast.sql`)**: policy NUNCA chama função SECURITY DEFINER por linha. Use
+  `org_id = (SELECT current_org_id()) AND (SELECT current_org_active())` e `(SELECT has_perm('x'))` — vira InitPlan (1x por consulta).
+  `in_org(org_id)`/`has_perm()` sem `(SELECT …)` recalculavam a permissão em cada linha: lista de contas 29 s → 0,07 s (15 mil parcelas).
+  A migração reescreve todas as policies do schema com ALTER POLICY (idempotente). Policy nova já deve nascer nesse formato.
 - Teste de tela com Playwright: usar `serviceWorkers: 'block'` no contexto — o `public/sw.js` (cache-first em `/assets/`) responde antes do `page.route`.
