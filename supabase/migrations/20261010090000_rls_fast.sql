@@ -14,7 +14,7 @@
 --   current_org_id() etc.   → (SELECT current_org_id())
 --   auth.uid()              → (SELECT auth.uid())
 -- Mesmo resultado (as funções são STABLE: não mudam dentro da consulta).
--- Só ALTER POLICY no schema whatsapp_hub — nada é apagado. Pode rodar de novo.
+-- Só ALTER POLICY no schema whatsapp_hub — nada é apagado. Pode rodar de novo (e deve, se "faltam" > 0).
 -- ============================================================================
 CREATE SCHEMA IF NOT EXISTS whatsapp_hub;
 SET search_path TO whatsapp_hub;
@@ -37,6 +37,9 @@ BEGIN
 END
 $f$;
 
+-- Cada tabela é ajustada num sub-bloco próprio e espera no máximo 0,5 s pela trava: se o sistema estiver
+-- usando a tabela (ou der deadlock), ela é PULADA e o resto segue. Rodar de novo até "faltam = 0".
+SET lock_timeout = '500ms';
 DO $$
 DECLARE
   r      record;
@@ -44,6 +47,7 @@ DECLARE
   nc     text;
   stmt   text;
   n      int := 0;
+  pulou  int := 0;
 BEGIN
   -- Nomes sempre com schema na leitura das policies (para o regex achar "whatsapp_hub.").
   PERFORM set_config('search_path', 'pg_catalog', true);
@@ -58,14 +62,26 @@ BEGIN
     stmt := format('ALTER POLICY %I ON %I.%I', r.policyname, r.schemaname, r.tablename);
     IF nq IS NOT NULL THEN stmt := stmt || format(' USING (%s)', nq); END IF;
     IF nc IS NOT NULL THEN stmt := stmt || format(' WITH CHECK (%s)', nc); END IF;
-    EXECUTE stmt;
-    n := n + 1;
+    BEGIN
+      EXECUTE stmt;
+      n := n + 1;
+    EXCEPTION WHEN lock_not_available OR deadlock_detected OR query_canceled THEN
+      pulou := pulou + 1;   -- tabela ocupada agora: fica para a próxima rodada
+    END;
   END LOOP;
-  RAISE NOTICE 'RLS: % policy(s) ajustada(s).', n;
+  RAISE NOTICE 'RLS: % ajustada(s), % pulada(s) (rode de novo).', n, pulou;
 END
 $$;
+RESET lock_timeout;
 
 -- Última cobrança da parcela (usada pela lista de contas).
 CREATE INDEX IF NOT EXISTS fin_charges_inst_created_idx ON whatsapp_hub.fin_charges (installment_id, created_at DESC);
 
 NOTIFY pgrst, 'reload schema';
+
+-- Resultado: quantas regras ainda estão no formato lento (0 = pronto; >0 = rode o arquivo de novo).
+SELECT count(*) FILTER (WHERE pg_temp._rls_fast_expr(qual) IS DISTINCT FROM qual
+                           OR pg_temp._rls_fast_expr(with_check) IS DISTINCT FROM with_check) AS faltam,
+       count(*) AS regras_no_total
+  FROM (SELECT qual, with_check FROM pg_catalog.pg_policies WHERE schemaname = 'whatsapp_hub') p,
+       LATERAL (SELECT set_config('search_path', 'pg_catalog', true)) sp;
