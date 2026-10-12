@@ -18,7 +18,11 @@ interface AvatarProps {
   name?: string | null;
   size?: AvatarSize;
   className?: string;
+  // Bolinha de presença: true = verde (online), false = cinza. Sem a prop = sem bolinha.
+  online?: boolean;
 }
+
+const DOT_CLASS: Record<AvatarSize, string> = { sm: 'h-2.5 w-2.5', md: 'h-3 w-3', lg: 'h-4 w-4' };
 
 // Iniciais: até duas letras. Se o nome tem espaço, pega a inicial das duas
 // primeiras palavras; senão, os dois primeiros caracteres.
@@ -32,7 +36,24 @@ function initialsFrom(name: string | null | undefined): string {
   return value.slice(0, 2).toUpperCase();
 }
 
-export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
+export function Avatar({ online, ...props }: AvatarProps) {
+  if (online === undefined) return <AvatarImage {...props} />;
+  return (
+    <span className="relative inline-flex shrink-0" title={online ? 'Online agora' : 'Offline'}>
+      <AvatarImage {...props} />
+      <span
+        aria-label={online ? 'Online' : 'Offline'}
+        className={cn(
+          'absolute bottom-0 right-0 rounded-full ring-2 ring-[var(--color-surface)]',
+          DOT_CLASS[props.size ?? 'md'],
+          online ? 'bg-[#22C55E]' : 'bg-[var(--color-text-muted)]',
+        )}
+      />
+    </span>
+  );
+}
+
+function AvatarImage({ src, name, size = 'md', className }: Omit<AvatarProps, 'online'>) {
   const sizeClass = SIZE_CLASS[size];
   // Fotos do Instagram vêm da CDN da Meta com link assinado que EXPIRA em
   // poucos dias. Sem este fallback o navegador mostrava imagem quebrada; agora

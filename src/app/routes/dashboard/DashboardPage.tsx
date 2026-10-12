@@ -251,7 +251,7 @@ export default function DashboardPage() {
 
       {/* Filtro de período (global) */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--color-border-card)] p-1 bg-[var(--color-fill-subtle)]">
+        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-[var(--color-border-card)] p-1 bg-[var(--color-fill-subtle)]">
           {PERIOD_PRESETS.map((p) => (
             <button
               key={p.key}

@@ -825,3 +825,10 @@ Regras:
   `in_org(org_id)`/`has_perm()` sem `(SELECT …)` recalculavam a permissão em cada linha: lista de contas 29 s → 0,07 s (15 mil parcelas).
   A migração reescreve todas as policies do schema com ALTER POLICY (idempotente). Policy nova já deve nascer nesse formato.
 - Teste de tela com Playwright: usar `serviceWorkers: 'block'` no contexto — o `public/sw.js` (cache-first em `/assets/`) responde antes do `page.route`.
+- Altura das telas (12/10/2026): tela de altura cheia usa a altura do `<main>` (`h-full min-h-0` ou `-m-3 h-[calc(100%+1.5rem)]` como Quadros/E-mail),
+  NUNCA `100vh` — o Chat Interno usava `calc(100vh-…)` e cortava a caixa de mensagem. Barras de botões/abas: `flex-wrap max-w-full` (celular 390 px).
+  Varredura Playwright: 62 telas × 1366/1280/1536/1920/390 sem rolagem lateral e sem corte nas telas de altura cheia.
+- Online agora (12/10/2026): `src/hooks/usePresence.ts` — Presence do Supabase Realtime no canal `presence:<org_id>` (chave = user_id), montado no
+  `AppLayout` (`<PresenceTracker/>`). Bolinha verde/cinza no `Avatar` com a prop `online` (sem a prop = sem bolinha). Usado no Chat Interno
+  (lista, cabeçalho "Online agora", participantes, Nova conversa com online primeiro). Não grava no banco e NÃO é o `app_users.is_online`
+  (esse é o "disponível para o rodízio").

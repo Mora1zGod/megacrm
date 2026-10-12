@@ -79,7 +79,7 @@ export function DispatchMetrics() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--color-border-card)] p-1 bg-[var(--color-fill-subtle)]">
+        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-[var(--color-border-card)] p-1 bg-[var(--color-fill-subtle)]">
           {PERIODS.map((p) => (
             <button
               key={p.value}

@@ -281,7 +281,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
       </div>
 
       <div ref={menuRef} className="flex flex-wrap items-center gap-2">
-        <div className="flex overflow-visible rounded-[var(--radius-control)] shadow-sm">
+        <div className="flex max-w-full flex-wrap overflow-visible rounded-[var(--radius-control)] shadow-sm">
           <div className="relative">
             <button type="button" onClick={() => setMenu(menu === 'actions' ? null : 'actions')} aria-expanded={menu === 'actions'}
               className={cn(barBtn, 'rounded-l-[var(--radius-control)] bg-[#1E2A5A]')}>
@@ -317,7 +317,7 @@ export function EntriesTab({ kind, lookups }: { kind: EntryKind; lookups: Lookup
             <button type="button" onClick={() => { if (need(1, 'excluir')) setBulk('delete'); }} className={cn(barBtn, 'rounded-r-[var(--radius-control)] bg-[#E11D48]')}><Trash2 className="h-4 w-4" /> Excluir</button>
           )}
         </div>
-        <div className="relative ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex max-w-full flex-wrap items-center gap-2">
           <GridReset grid={grid} />
           <Button variant="outline" onClick={() => void sendWhatsApp()} disabled={!rowsView.length} title={chosen.length ? 'Envia as contas marcadas' : 'Envia as contas da lista'}><MessageCircle className="h-4 w-4 text-[#16a34a]" /> WhatsApp{chosen.length ? ` (${chosen.length})` : ''}</Button>
           <Button variant="outline" onClick={() => doReport('print')} disabled={!rowsView.length}><Printer className="h-4 w-4" /> Imprimir</Button>

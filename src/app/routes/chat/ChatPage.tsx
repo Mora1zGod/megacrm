@@ -92,7 +92,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-var(--header-h,4rem))] flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-4 px-4 pb-3 pt-1">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl glass-card">
           <MessagesSquare className="h-4.5 w-4.5 text-[var(--accent-primary)]" />

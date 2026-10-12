@@ -4,6 +4,7 @@ import { ArrowLeft, Check, LogOut, Pencil, UserPlus, Users, X } from 'lucide-rea
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/Avatar';
+import { useOnlineUsers, usePresenceReady } from '@/hooks/usePresence';
 import { operatorLabel, type Operator } from '@/hooks/useOperators';
 import { chatTitle, type ChatListItem, type ChatMemberRow } from '@/types/chat';
 
@@ -35,6 +36,9 @@ export function ChatHeader({
   const isGroup = chat.kind === 'group';
   const title = chatTitle(chat);
   const isCreator = chat.created_by === userId;
+  const onlineUsers = useOnlineUsers();
+  const presenceReady = usePresenceReady();
+  const peerOnline = !isGroup && presenceReady && chat.peer_user_id ? onlineUsers.has(chat.peer_user_id) : undefined;
 
   const commitRename = async () => {
     const next = draftName.trim();
@@ -95,7 +99,7 @@ export function ChatHeader({
             <Users className="h-4 w-4 text-[var(--accent-primary)]" />
           </span>
         ) : (
-          <Avatar src={chat.peer_avatar_url} name={title} size="md" />
+          <Avatar src={chat.peer_avatar_url} name={title} size="md" online={peerOnline} />
         )}
 
         <div className="min-w-0 flex-1">
@@ -137,7 +141,9 @@ export function ChatHeader({
               <p className="truncate text-[11px] text-[var(--color-text-secondary)]">
                 {isGroup
                   ? `${members.length || chat.member_count} participante${(members.length || chat.member_count) > 1 ? 's' : ''}`
-                  : chat.peer_email}
+                  : peerOnline === true
+                    ? <span className="font-medium text-[#16A34A]">Online agora</span>
+                    : chat.peer_email}
               </p>
             </>
           )}
@@ -166,7 +172,7 @@ export function ChatHeader({
               const isSelf = m.user_id === userId;
               return (
                 <li key={m.user_id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-                  <Avatar src={op?.avatar_url} name={label} size="sm" />
+                  <Avatar src={op?.avatar_url} name={label} size="sm" online={presenceReady ? onlineUsers.has(m.user_id) : undefined} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-[var(--color-text-primary)]">
                       {label}{isSelf && ' (você)'}

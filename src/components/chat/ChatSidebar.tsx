@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, Search, Users } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { useOnlineUsers, usePresenceReady } from '@/hooks/usePresence';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,8 @@ function relativeTime(iso: string | null): string {
 
 export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: ChatSidebarProps) {
   const [search, setSearch] = useState('');
+  const onlineUsers = useOnlineUsers();
+  const presenceReady = usePresenceReady();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -88,7 +91,7 @@ export function ChatSidebar({ chats, loading, activeChatId, onSelect, onNew }: C
                         <Users className="h-4 w-4 text-[var(--accent-primary)]" />
                       </span>
                     ) : (
-                      <Avatar src={chat.peer_avatar_url} name={title} size="sm" />
+                      <Avatar src={chat.peer_avatar_url} name={title} size="sm" online={presenceReady && chat.peer_user_id ? onlineUsers.has(chat.peer_user_id) : undefined} />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline gap-2">

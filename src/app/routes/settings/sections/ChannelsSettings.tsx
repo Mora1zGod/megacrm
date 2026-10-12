@@ -745,7 +745,7 @@ export function ChannelsSettings() {
               )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
             {channel.provider === 'uazapi' ? (
               <button
                 onClick={() => openQrModal(channel)}

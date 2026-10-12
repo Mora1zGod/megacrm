@@ -199,7 +199,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome, e-mail, cargo ou perfil" aria-label="Buscar usuário" className={cn(inputCls, 'pl-9')} />
         </label>
-        <div className="flex gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-1">
+        <div className="flex max-w-full flex-wrap gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-1">
           {([['all', 'Todos'], ['active', 'Ativos'], ['approval', 'Aguardando aprovação'], ['pending', 'Convite pendente'], ['inactive', 'Inativos']] as const).map(([k, l]) => (
             <button key={k} type="button" onClick={() => setStatus(k)}
               className={cn('rounded-[8px] px-3 py-1.5 text-xs font-semibold', status === k ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]')}>
@@ -492,7 +492,7 @@ function AuditTab({ members, user, onClearUser }: { members: Member[]; user: Mem
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-1">
+        <div className="flex max-w-full flex-wrap gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-1">
           {([['all', 'Tudo'], ['auth', 'Login/Logout'], ['user', 'Usuários'], ['role', 'Perfis'], ['team', 'Equipes']] as const).map(([k, l]) => (
             <button key={k} type="button" onClick={() => setKind(k)}
               className={cn('rounded-[8px] px-3 py-1.5 text-xs font-semibold', kind === k ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]')}>

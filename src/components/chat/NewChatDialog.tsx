@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/Avatar';
+import { useOnlineUsers, usePresenceReady } from '@/hooks/usePresence';
 import { operatorLabel, type Operator } from '@/hooks/useOperators';
 
 interface NewChatDialogProps {
@@ -28,13 +29,16 @@ export function NewChatDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const onlineUsers = useOnlineUsers();
+  const presenceReady = usePresenceReady();
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return candidates;
-    return candidates.filter(
+    const list = !q ? candidates : candidates.filter(
       (op) => operatorLabel(op).toLowerCase().includes(q) || op.email.toLowerCase().includes(q),
     );
-  }, [candidates, search]);
+    // Quem está online aparece primeiro (ordem original mantida dentro de cada grupo).
+    return [...list].sort((a, b) => Number(onlineUsers.has(b.user_id)) - Number(onlineUsers.has(a.user_id)));
+  }, [candidates, search, onlineUsers]);
 
   const reset = () => {
     setMode('dm');
@@ -150,7 +154,7 @@ export function NewChatDialog({
                       : 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--color-surface-hover)] disabled:opacity-60'
                   }
                 >
-                  <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" />
+                  <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" online={presenceReady ? onlineUsers.has(op.user_id) : undefined} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-[var(--color-text-primary)]">
                       {operatorLabel(op)}

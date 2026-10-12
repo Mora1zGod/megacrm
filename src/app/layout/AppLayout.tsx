@@ -7,6 +7,7 @@ import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { SupportBanner } from './SupportBanner';
 import { MailWatcher } from '@/app/routes/email/mailWatch';
+import { PresenceTracker } from '@/hooks/usePresence';
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -20,6 +21,7 @@ export function AppLayout() {
     <div className="h-screen flex overflow-hidden bg-[var(--color-bg-primary)]">
       <Sidebar />
       <MailWatcher />
+      <PresenceTracker />
       <MobileNav open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <SupportBanner />
