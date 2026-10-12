@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import type { ChatListItem, ChatMemberRow } from '@/types/chat';
@@ -87,6 +88,8 @@ export function useInternalChat(): UseInternalChatResult {
       .rpc('chat_open_dm', { p_other: otherUserId });
     if (rpcError) {
       setError(rpcError.message);
+      // Mostra o motivo real (antes era só "Não foi possível abrir a conversa").
+      toast.error('Não foi possível abrir a conversa.', { description: chatErrorText(rpcError.message) });
       return null;
     }
     await reload();
@@ -185,4 +188,14 @@ export function useChatMembers(chatId: string | null, version = 0) {
   }, [chatId, version]);
 
   return members;
+}
+
+// Mensagens do banco (chat_open_dm) em português claro.
+function chatErrorText(msg: string): string {
+  if (/sessão inválida/i.test(msg)) return 'Sua sessão expirou. Saia e entre de novo.';
+  if (/organização inativa/i.test(msg)) return 'Seu acesso a esta organização está desativado.';
+  if (/destinatário inválido/i.test(msg)) return 'Escolha outra pessoa.';
+  if (/membro não encontrado/i.test(msg)) return 'Esta pessoa não faz parte desta organização.';
+  if (/Could not find the function|schema cache/i.test(msg)) return 'O chat não está instalado no banco (falta rodar o SQL do chat).';
+  return msg;
 }

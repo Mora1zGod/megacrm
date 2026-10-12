@@ -606,6 +606,8 @@ Regras:
   `operators` = só ativos (use em TODO seletor: nova conversa, atribuir, transferir, compartilhar, responsável, rodízio) e `allOperators` = todos
   (só para mostrar nome de quem fez algo: histórico, autor, relatórios). Trigger `_app_users_offline_when_inactive`: desativado fica
   `is_online=false` — o rodízio (`_on_handoff_autoassign`, só online) para de mandar conversa para ele.
+  `20261012140000_operators_banned.sql`: login bloqueado (ban do Auth, jeito antigo de desativar antes de 07/10) também conta como 'inactive'
+  na leitura. Chat: erro de `chat_open_dm` aparece com o motivo real (`chatErrorText` em useInternalChat).
 
 ## Cadastro por link + aprovação (08/10/2026)
 

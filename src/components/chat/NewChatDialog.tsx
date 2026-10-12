@@ -53,7 +53,7 @@ export function NewChatDialog({
     const chatId = await onOpenDm(userId);
     setSaving(false);
     if (!chatId) {
-      toast.error('Não foi possível abrir a conversa.');
+      // o motivo já aparece no aviso do useInternalChat
       return;
     }
     onOpened(chatId);

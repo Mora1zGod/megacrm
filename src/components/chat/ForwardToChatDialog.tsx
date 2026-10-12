@@ -85,7 +85,7 @@ export function ForwardToChatDialog({
     }
     if (!chatId) {
       setSending(false);
-      toast.error('Não foi possível abrir a conversa de destino.');
+      // o motivo já aparece no aviso do useInternalChat
       return;
     }
 
