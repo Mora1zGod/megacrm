@@ -183,6 +183,41 @@ async function deleteAccount(ctx: MailCtx, b: Record<string, unknown>) {
   return { ok: true };
 }
 
+// Aviso de e-mail novo: só a Caixa de entrada, sem baixar corpo. `since` = { [account_id]: uidNext já visto }.
+// Devolve não lidos, o uidNext atual e até 5 mensagens novas (uid >= since) para o aviso.
+async function checkNew(ctx: MailCtx, b: Record<string, unknown>) {
+  const ids = Array.isArray(b.account_ids) ? (b.account_ids as unknown[]).map((x) => str(x, 64)).filter(Boolean).slice(0, 5) : [];
+  const since = (b.since && typeof b.since === 'object' ? b.since : {}) as Record<string, unknown>;
+  const out: Array<{ account_id: string; unseen: number; uidNext: number; fresh: Array<{ uid: number; from: { name: string; address: string } | null; subject: string; date: string | null }>; error?: string }> = [];
+  for (const id of ids) {
+    try {
+      const acc = await loadAccount(ctx, id);
+      if (!acc.is_active) continue;
+      const c = await credsOf(ctx, acc);
+      const r = await withImap(c, async (client) => {
+        const st = await client.status('INBOX', { unseen: true, uidNext: true });
+        const uidNext = Number(st.uidNext ?? 0);
+        const from = Math.floor(Number(since[id] ?? 0));
+        const fresh: Array<{ uid: number; from: { name: string; address: string } | null; subject: string; date: string | null }> = [];
+        if (from > 0 && uidNext > from) {
+          const lock = await client.getMailboxLock('INBOX');
+          try {
+            for await (const m of client.fetch(`${Math.max(from, uidNext - 5)}:*`, { uid: true, envelope: true, flags: true }, { uid: true })) {
+              if (m.uid < from || m.flags?.has('\\Seen')) continue;
+              fresh.push({ uid: m.uid, from: addr(m.envelope?.from)[0] ?? null, subject: m.envelope?.subject ?? '(sem assunto)', date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : null });
+            }
+          } finally { lock.release(); }
+        }
+        return { unseen: Number(st.unseen ?? 0), uidNext, fresh: fresh.slice(-5) };
+      });
+      out.push({ account_id: id, ...r });
+    } catch (e) {
+      out.push({ account_id: id, unseen: 0, uidNext: 0, fresh: [], error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return { ok: true, accounts: out };
+}
+
 async function folders(ctx: MailCtx, b: Record<string, unknown>) {
   const acc = await loadAccount(ctx, b.account_id);
   const c = await credsOf(ctx, acc);
@@ -433,6 +468,7 @@ export async function mailAction(ctx: MailCtx, action: string, b: Record<string,
     case 'mail_save_account': return saveAccount(ctx, b);
     case 'mail_delete_account': return deleteAccount(ctx, b);
     case 'mail_folders': return folders(ctx, b);
+    case 'mail_check': return checkNew(ctx, b);
     case 'mail_list': return listMessages(ctx, b);
     case 'mail_get': return getMessage(ctx, b);
     case 'mail_attachment': return getAttachment(ctx, b);

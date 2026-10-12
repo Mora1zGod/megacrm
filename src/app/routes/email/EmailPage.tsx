@@ -16,6 +16,7 @@ import { EntryFormDialog, type EntryPrefill } from '../finance/EntryFormDialog';
 import { useFinanceLookups } from '../finance/data';
 import { sefazApi } from '../purchases/data';
 import { MailAccountsSettings } from './MailAccountsSettings';
+import { requestMailCheck, useMailVersion } from './mailWatch';
 import {
   addrLabel, fetchAttachment, fmtBytes, FOLDER_LABEL, mailApi, saveBlob, useMailAccounts,
   type MailAccount, type MailAttachment, type MailFolder, type MailFull, type MailRow,
@@ -88,6 +89,14 @@ function Mailbox({ account, accounts, onPick, onSetup, canSend }: { account: Mai
   }, [account.id, folder, page, query, unread]);
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadList(); }, [loadList]);
+  // E-mail novo chegou (vigia do layout): atualiza pastas e, se estiver na Caixa de entrada, a lista.
+  const mailVersion = useMailVersion();
+  const firstVersion = useRef(mailVersion);
+  useEffect(() => {
+    if (mailVersion === firstVersion.current) return;
+    void loadFolders();
+    if (folder.toUpperCase() === 'INBOX' && page === 0) void loadList();
+  }, [mailVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const refresh = () => { void loadFolders(); void loadList(); };
 
   const patchRow = (uid: number, p: Partial<MailRow>) => setRows((cur) => cur?.map((r) => (r.uid === uid ? { ...r, ...p } : r)) ?? cur);
@@ -95,6 +104,7 @@ function Mailbox({ account, accounts, onPick, onSetup, canSend }: { account: Mai
     try {
       await mailApi(action, { account_id: account.id, folder, uids, ...extra });
       if (ok) toast.success(ok);
+      requestMailCheck();
       if (action === 'mail_move') { setRows((cur) => cur?.filter((r) => !uids.includes(r.uid)) ?? cur); if (openUid && uids.includes(openUid)) setOpenUid(null); void loadFolders(); }
     } catch (e) { toast.error('Não deu certo.', { description: e instanceof Error ? e.message : String(e) }); void loadList(); }
   };
@@ -210,7 +220,7 @@ function MessageView({ account, folder, uid, canSend, isTrash, onBack, onCompose
   const [busyAtt, setBusyAtt] = useState<string | null>(null);
   const [launch, setLaunch] = useState<{ prefill: EntryPrefill; fromEmail: string; cnpjs: string[] } | null>(null);
   useEffect(() => {
-    void mailApi<MailFull>('mail_get', { account_id: account.id, folder, uid }).then(setMsg).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    void mailApi<MailFull>('mail_get', { account_id: account.id, folder, uid }).then((m) => { setMsg(m); requestMailCheck(); }).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [account.id, folder, uid]);
 
   const plain = useMemo(() => (msg ? `${msg.subject}\n${msg.text || htmlToText(msg.html)}` : ''), [msg]);

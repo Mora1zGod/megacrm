@@ -23,7 +23,7 @@ export function MailAccountsSettings({ onChanged }: { onChanged?: () => void }) 
   const mine = accounts.filter((a) => a.owner_id === userId);
   const shared = accounts.filter((a) => a.owner_id !== userId);
   const del = async (a: MailAccount) => {
-    try { await mailApi('mail_delete_account', { account_id: a.id }); toast.success('Caixa desligada do CRM.', { description: 'Nada foi apagado na Hostinger.' }); setConfirmDel(null); await reload(); onChanged?.(); }
+    try { await mailApi('mail_delete_account', { account_id: a.id }); toast.success('Caixa desligada do CRM.', { description: 'Nada foi apagado na Hostinger.' }); setConfirmDel(null); await reload(); onChanged?.(); window.dispatchEvent(new Event('megacrm-mail-accounts')); }
     catch (e) { toast.error('Não consegui remover.', { description: e instanceof Error ? e.message : String(e) }); }
   };
 
@@ -100,6 +100,7 @@ function AccountForm({ account, onClose, onSaved }: { account: MailAccount | nul
         imap_host: imapHost.trim(), imap_port: Number(imapPort), smtp_host: smtpHost.trim(), smtp_port: Number(smtpPort), signature, is_active: active,
       });
       toast.success(account ? 'Caixa atualizada.' : 'E-mail ligado! Entrada e envio testados.');
+      window.dispatchEvent(new Event('megacrm-mail-accounts')); // vigia de e-mail novo passa a olhar esta caixa
       onSaved();
     } catch (e) { toast.error('Não consegui ligar o e-mail.', { description: e instanceof Error ? e.message : String(e) }); }
     finally { setBusy(false); }

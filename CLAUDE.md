@@ -799,6 +799,12 @@ Regras:
   "Mostrar imagens"). Boleto no texto (`lib/boleto.ts`: linha digitável 47/48 dígitos, fator de vencimento com a virada de 22/02/2025) →
   "Lançar conta a pagar" (`EntryFormDialog` com `prefill`, PDF anexado, fornecedor por e-mail/CNPJ/domínio); XML de NF-e → `import_xml`.
 
+- Aviso de e-mail novo (12/10/2026): `routes/email/mailWatch.ts` (`<MailWatcher/>` no `AppLayout`) chama `mail_check` a cada 2 min (e ao voltar
+  para a aba): IMAP `STATUS INBOX` (não lidos + UIDNEXT) e envelopes das novas (uid ≥ último visto, guardado no navegador
+  `megacrm_mail_uidnext:<conta>`; 1ª vez só marca o ponto de partida). Novo = toast com "Abrir" + `Notification` do navegador se a aba estiver em
+  segundo plano. Contador no menu "E-mail" (`useMailUnseen`); a tela de E-mail recarrega com `useMailVersion` e pede conferência ao ler/mover
+  (`requestMailCheck`, máx. 1 a cada 15 s). Só funciona com o CRM aberto (sem servidor vigiando a caixa).
+
 ## Tela branca e lentidão (09/10/2026) — `20261009120000_inbox_summary.sql`
 - **Toda tela lazy usa `lazyRetry`** (`src/lib/lazyRetry.ts`), nunca `lazy` direto: arquivo antigo depois de deploy → recarrega 1x (guarda de 20 s em sessionStorage), depois mostra aviso.
 - **`AppErrorBoundary`** em volta do app (`App.tsx`) e de cada página (`AppLayout`, `key={pathname}`): erro de tela vira aviso com Recarregar/Início, menu e topo continuam. `main.tsx` trata `vite:preloadError`.
