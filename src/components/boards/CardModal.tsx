@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/Avatar';
-import { operatorLabel, type Operator } from '@/hooks/useOperators';
+import { operatorLabel, type Operator, isActiveOperator } from '@/hooks/useOperators';
 import { positionBetween, type Attachment, type BoardCard, type BoardList, type Label } from '@/hooks/useBoards';
 
 const fieldCls =
@@ -423,7 +423,7 @@ export function CardModal({
               <div className="ml-9 max-w-sm rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-3 shadow-[var(--shadow-lg)]">
                 <div className="mb-2 flex items-center justify-between text-sm font-semibold">Membros <button type="button" aria-label="Fechar" onClick={() => setMemberPickerOpen(false)}><X className="h-4 w-4" /></button></div>
                 <div className="max-h-64 space-y-0.5 overflow-y-auto">
-                  {operators.map((o) => (
+                  {operators.filter((o) => isActiveOperator(o) || card.memberIds.includes(o.user_id)).map((o) => (
                     <button key={o.user_id} type="button" onClick={() => void toggleMember(o.user_id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--color-surface-hover)]">
                       <Avatar src={o.avatar_url} name={o.display_name ?? o.email} className="h-7 w-7 text-[10px]" /><span className="flex-1 truncate">{operatorLabel(o)}</span>
                       {card.memberIds.includes(o.user_id) && <CheckCircle2 className="h-4 w-4 text-[var(--accent-primary)]" />}

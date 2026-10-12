@@ -91,7 +91,7 @@ export default function VisitsPage() {
   const [todayCount, setTodayCount] = useState<number | null>(null);
   const { userId } = useAppUser();
   const perms = usePermission();
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const [layers, setLayers] = useState<Record<Layer, boolean>>({ visitas: true, tarefas: true, lembretes: true });
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
   const [detailTask, setDetailTask] = useState<AgendaTask | null>(null);

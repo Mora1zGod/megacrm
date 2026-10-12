@@ -10,7 +10,7 @@ import { openNewSale } from '@/hooks/useSales';
 export function RevenueGoalCard() {
   const { data, loading } = useMonthRevenue();
   const { hidden, toggle } = useHideValues();
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   if (loading) return null;
 
   const pct = data.goal ? Math.min(100, (data.sold / data.goal) * 100) : 0;

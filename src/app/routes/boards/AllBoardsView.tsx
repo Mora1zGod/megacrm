@@ -20,7 +20,7 @@ export function AllBoardsView({ boards, onBoardsChanged, onOpenBoard, onSwitch }
   const sortedBoards = useMemo(() => [...boards].sort((a, b) => a.position - b.position), [boards]);
   const ids = useMemo(() => sortedBoards.map((b) => b.id), [sortedBoards]);
   const { lists, cards, labels, loading, error, reload, setCards, moveCard } = useBoardContent(ids);
-  const { operators } = useOperators();
+  const { allOperators } = useOperators();
   const { userId } = useAppUser();
   const [filter, setFilter] = useState('');
   const [mine, setMine] = useState(false);
@@ -173,7 +173,7 @@ export function AllBoardsView({ boards, onBoardsChanged, onOpenBoard, onSwitch }
         <div className="flex h-full items-start gap-3 p-3 pb-24">
           {sortedBoards.map((b) => (
             <BoardColumn key={b.id} board={b} cards={byBoard.get(b.id) ?? []} lists={listsByBoard.get(b.id) ?? []} listById={listById}
-              labels={labels.filter((l) => l.board_id === b.id)} operators={operators} currentUserId={userId} loading={loading}
+              labels={labels.filter((l) => l.board_id === b.id)} operators={allOperators} currentUserId={userId} loading={loading}
               draggingCardId={dragCard} isDropTarget={!!dragCard && overBoard === b.id} isHeaderTarget={!!dragBoard && overBoardHeader === b.id}
               onCardDragStart={setDragCard} onCardDragOver={() => setOverBoard(b.id)} onCardDrop={(before) => void dropCard(b.id, before)}
               onHeaderDragStart={() => setDragBoard(b.id)} onHeaderDragOver={() => setOverBoardHeader(b.id)} onHeaderDrop={() => void dropBoard(b.id)}
@@ -189,7 +189,7 @@ export function AllBoardsView({ boards, onBoardsChanged, onOpenBoard, onSwitch }
 
       {cardOpen && openList && (
         <CardModal card={cardOpen} boardId={openList.board_id} lists={allListsNamed} labels={labels.filter((l) => l.board_id === openList.board_id)}
-          operators={operators} currentUserId={userId}
+          operators={allOperators} currentUserId={userId}
           onClose={() => setOpenCard(null)} onPatch={(p) => patchCard(cardOpen.id, p)} onReload={reload}
           onArchived={() => { setOpenCard(null); void reload(); }} onDeleted={() => { setOpenCard(null); setCards((p) => p.filter((c) => c.id !== cardOpen.id)); }} />
       )}

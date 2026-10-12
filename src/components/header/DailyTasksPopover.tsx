@@ -30,7 +30,7 @@ function dayBounds() {
 export function DailyTasksPopover() {
   const { userId } = useAppUser();
   const perms = usePermission();
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const [tasks, setTasks] = useState<DayTask[]>([]);
   const [open, setOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);

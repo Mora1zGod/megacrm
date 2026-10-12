@@ -602,6 +602,11 @@ Regras:
   de senha (`must_change_password` → `clear_my_password_flag()`); login/logout com IP e
   dispositivo pela Edge Function `log-access` (fallback RPC `log_access_event`).
 
+- Desativados fora dos seletores (12/10/2026, `20261012120000_operators_status.sql`): `list_operators()` devolve `status`. `useOperators()` →
+  `operators` = só ativos (use em TODO seletor: nova conversa, atribuir, transferir, compartilhar, responsável, rodízio) e `allOperators` = todos
+  (só para mostrar nome de quem fez algo: histórico, autor, relatórios). Trigger `_app_users_offline_when_inactive`: desativado fica
+  `is_online=false` — o rodízio (`_on_handoff_autoassign`, só online) para de mandar conversa para ele.
+
 ## Cadastro por link + aprovação (08/10/2026)
 
 - `signup_links` (token secreto por org, perfil/equipe sugeridos, validade/limite opcionais) —

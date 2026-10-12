@@ -136,7 +136,7 @@ function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch
   openCardId: string | null; onCardOpened: () => void;
 }) {
   const { lists, cards, labels, loading, error, reload, setCards, moveCard, moveList } = useBoardContent(board.id);
-  const { operators } = useOperators();
+  const { operators, allOperators } = useOperators();
   const { userId } = useAppUser();
   const [openCard, setOpenCard] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -221,7 +221,7 @@ function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch
     toast.success(`${src.length} cartão(ões) movido(s).`);
     await reload();
   };
-  const boardMembers = members.map((id) => operators.find((o) => o.user_id === id)).filter(Boolean) as typeof operators;
+  const boardMembers = members.map((id) => allOperators.find((o) => o.user_id === id)).filter(Boolean) as typeof operators;
 
   return (
     <div className="board-canvas flex h-full min-h-0 flex-col" style={{ background: boardBg(board) }}>
@@ -255,7 +255,7 @@ function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         <div className="flex h-full items-start gap-3 p-3 pb-24">
           {sortedLists.map((l) => (
-            <ListColumn key={l.id} list={l} cards={byList.get(l.id) ?? []} labels={labels} operators={operators} currentUserId={userId} loading={loading}
+            <ListColumn key={l.id} list={l} cards={byList.get(l.id) ?? []} labels={labels} operators={allOperators} currentUserId={userId} loading={loading}
               isDropTarget={!!dragCard && overList === l.id} isListDropTarget={!!dragList && overListHeader === l.id} draggingCardId={dragCard}
               onCardDragStart={setDragCard} onCardDragOverList={() => setOverList(l.id)} onCardDrop={(before) => void dropCard(l.id, before)}
               onListDragStart={() => setDragList(l.id)} onListDragOver={() => setOverListHeader(l.id)} onListDrop={() => void dropList(l.id)}
@@ -270,7 +270,7 @@ function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch
       </div>
 
       {cardOpen && (
-        <CardModal card={cardOpen} boardId={board.id} lists={sortedLists} labels={labels} operators={operators} currentUserId={userId}
+        <CardModal card={cardOpen} boardId={board.id} lists={sortedLists} labels={labels} operators={allOperators} currentUserId={userId}
           onClose={() => setOpenCard(null)} onPatch={(p) => patchCard(cardOpen.id, p)} onReload={reload}
           onArchived={() => { setOpenCard(null); void reload(); }} onDeleted={() => { setOpenCard(null); setCards((p) => p.filter((c) => c.id !== cardOpen.id)); }} />
       )}

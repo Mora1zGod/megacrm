@@ -123,7 +123,7 @@ export default function InboxPage() {
       localStorage.setItem('inbox_panel_collapsed', v ? '0' : '1');
       return !v;
     });
-  const { operators } = useOperators();
+  const { operators, allOperators } = useOperators();
   const { queues } = useQueues();
   const { tags } = useTags();
   const { userId, role } = useAppUser();
@@ -136,10 +136,10 @@ export default function InboxPage() {
   const operatorName = useCallback(
     (uid: string | null) => {
       if (!uid) return null;
-      const op = operators.find((o) => o.user_id === uid);
+      const op = allOperators.find((o) => o.user_id === uid);
       return op ? operatorLabel(op) : null;
     },
-    [operators],
+    [allOperators],
   );
 
   // Escopo do perfil (Configurações → Usuários e acessos): "só próprias"

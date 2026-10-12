@@ -35,7 +35,7 @@ function playCashSound(ctx: AudioContext) {
 
 export default function SalesTvPage() {
   const { orgName, orgLogoUrl } = useAppUser();
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const [celebrate, setCelebrate] = useState<MonthSale | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);

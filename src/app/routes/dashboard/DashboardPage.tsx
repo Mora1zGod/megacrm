@@ -63,7 +63,7 @@ export default function DashboardPage() {
 
   const { metrics, loading, error, reload } = useSalesDashboard(range);
   const { visibleMap, toggle } = useDashboardPrefs();
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const { role, displayName } = useAppUser();
   const { user } = useAuth();
   const { costs, save: saveCosts } = useSalesCosts();

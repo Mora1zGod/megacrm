@@ -16,7 +16,7 @@ import { NewChatDialog } from '@/components/chat/NewChatDialog';
 export default function ChatPage() {
   const { userId } = useAppUser();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { operators } = useOperators();
+  const { operators, allOperators } = useOperators();
   const {
     chats, loading, openDm, createGroup, markRead,
     addMembers, removeMember, rename,
@@ -67,13 +67,13 @@ export default function ChatPage() {
   const chatOperators = useMemo(() => {
     if (!activeChat) return [];
     if (activeChat.kind === 'dm') {
-      return operators.filter(
+      return allOperators.filter(
         (op) => op.user_id === activeChat.peer_user_id || op.user_id === userId,
       );
     }
     const ids = new Set(members.map((m) => m.user_id));
-    return operators.filter((op) => ids.has(op.user_id));
-  }, [activeChat, members, operators, userId]);
+    return allOperators.filter((op) => ids.has(op.user_id));
+  }, [activeChat, members, allOperators, userId]);
 
   const memberLabels = useMemo(
     () => chatOperators.map(operatorLabel),

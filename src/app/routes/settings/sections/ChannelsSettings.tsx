@@ -103,7 +103,7 @@ function MemberAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | n
 
 export function ChannelsSettings() {
   const { session } = useAuth();
-  const { operators } = useOperators();
+  const { operators, allOperators } = useOperators();
   const [channels, setChannels] = useState<ChannelRow[] | null>(null);
   const [instagram, setInstagram] = useState<ConnState>(null);
   const [uazapiConnection, setUazapiConnection] = useState<
@@ -693,7 +693,7 @@ export function ChannelsSettings() {
   };
 
   const findOperator = (userId: string | null) =>
-    userId ? operators.find((o) => o.user_id === userId) : undefined;
+    userId ? allOperators.find((o) => o.user_id === userId) : undefined;
 
   // Card de um número — usado nas duas seções (Zernio e UAZAPI).
   const renderChannelCard = (channel: ChannelRow) => {

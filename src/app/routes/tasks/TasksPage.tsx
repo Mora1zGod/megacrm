@@ -44,7 +44,7 @@ function dueText(iso: string, now: Date) {
 export default function TasksPage() {
   const { userId } = useAppUser();
   const perms = usePermission();
-  const { operators } = useOperators();
+  const { operators, allOperators } = useOperators();
   const { tasks, loading, error, reload, toggleTask, deleteTask } = useTasks();
   const [tab, setTab] = useState<Tab>('pending');
   const [who, setWho] = useState<string>('all'); // all | me | none | <user_id>
@@ -118,7 +118,7 @@ export default function TasksPage() {
   ];
 
   const renderRow = (t: Task) => (
-    <TaskRow key={t.id} task={t} now={now} operator={operators.find((o) => o.user_id === t.assigned_to)}
+    <TaskRow key={t.id} task={t} now={now} operator={allOperators.find((o) => o.user_id === t.assigned_to)}
       onToggle={perms.can('tasks.complete') ? () => void onToggle(t) : undefined}
       onEdit={perms.can('tasks.edit') ? () => setForm({ task: t }) : undefined}
       onDelete={perms.can('tasks.delete') ? () => void onDelete(t) : undefined} />

@@ -12,7 +12,7 @@ export default function ReportsPage() {
   const [period, setPeriod] = useState<PeriodKey>('30d');
   const range = periodRange(period);
   const { metrics, loading } = useSalesDashboard(range);
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const ownerName = (id: string | null) => {
     if (!id) return 'Não atribuído';
     return operators.find((o) => o.user_id === id)?.email ?? 'Vendedor';

@@ -44,7 +44,7 @@ export default function ContactDetailPage() {
   const { contact, deals, loading, error, reload, saveContact } = useContactProfile(id);
   const { groups, addNoteToDay, reload: reloadTimeline } = useContactTimeline(id);
   const channelLinks = useContactChannelLinks(id);
-  const { operators } = useOperators();
+  const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showPipelineModal, setShowPipelineModal] = useState(false);
   const [tab, setTab] = useState<ProfileTab>('geral');

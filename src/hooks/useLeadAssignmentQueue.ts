@@ -50,14 +50,15 @@ export function useLeadAssignmentQueue(): UseLeadAssignmentQueueResult {
 
     setEnabled(Boolean((settingsRes.data as { auto_assign_enabled?: boolean } | null)?.auto_assign_enabled));
 
-    const ops = (opsRes.data ?? []) as Array<{ user_id: string; email: string; display_name?: string | null }>;
+    const ops = (opsRes.data ?? []) as Array<{ user_id: string; email: string; display_name?: string | null; status?: string | null }>;
     const labelByUser = new Map<string, string>(ops.map((o) => [o.user_id, labelFor(o)]));
     const rows = (queueRes.data ?? []) as Array<{ user_id: string; position: number }>;
     const inQueue = new Set(rows.map((r) => r.user_id));
     setQueue(rows.map((r) => ({ user_id: r.user_id, position: r.position, email: labelByUser.get(r.user_id) ?? r.user_id })));
     setAvailable(
       ops
-        .filter((o) => !inQueue.has(o.user_id))
+        // Desativado/bloqueado não entra no rodízio.
+        .filter((o) => !inQueue.has(o.user_id) && (!o.status || o.status === 'active'))
         .map((o) => ({ user_id: o.user_id, email: labelFor(o) })),
     );
     setLoading(false);
