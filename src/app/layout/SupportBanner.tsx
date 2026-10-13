@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { LifeBuoy, Loader2 } from 'lucide-react';
-import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { adminSwitchOrg, reloadHere } from '@/lib/orgMembers';
 
 // Barra fixa exibida quando o super admin está operando em uma org de suporte
 // (org_id do JWT ≠ home_org_id). O "Voltar" chama /api/admin/switch-org
@@ -29,22 +29,8 @@ export function SupportBanner() {
   const handleBack = async () => {
     setReturning(true);
     try {
-      const supabase = getSupabase();
-      const { data } = await supabase.auth.getSession();
-      const res = await fetch('/api/admin/switch-org', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${data.session?.access_token ?? ''}`,
-        },
-        body: JSON.stringify({ back: true }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.success) {
-        throw new Error(body.message ?? 'Falha ao voltar.');
-      }
-      await supabase.auth.refreshSession();
-      window.location.href = '/admin';
+      await adminSwitchOrg({ back: true });
+      reloadHere();
     } catch (err) {
       setReturning(false);
       toast.error('Falha ao voltar à sua organização', {

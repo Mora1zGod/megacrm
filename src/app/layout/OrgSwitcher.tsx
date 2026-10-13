@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { getSupabase } from '@/lib/supabase';
-import { loadMyOrgs, switchMyOrg, type MyOrg } from '@/lib/orgMembers';
+import { adminSwitchOrg, loadMyOrgs, reloadHere, switchMyOrg, type MyOrg } from '@/lib/orgMembers';
 
 // Seletor de organização no header.
 //  · Super admin: todas as orgs, troca via /api/admin/switch-org (modo suporte).
@@ -46,23 +46,17 @@ export function OrgSwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  // Carrega a lista de orgs ao abrir (super admin: todas pelo console).
+  // Super admin: lista direto da tabela (o RLS libera todas para ele) — sem passar pela Vercel.
   useEffect(() => {
     if (!open || orgs !== null || !session || !isSuperAdmin) return;
     void (async () => {
-      try {
-        const res = await fetch('/api/admin/orgs', {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.message ?? 'Falha ao listar organizações.');
-        setOrgs((body.orgs ?? body.data ?? []) as OrgOption[]);
-      } catch (err) {
-        toast.error('Falha ao listar organizações', {
-          description: err instanceof Error ? err.message : 'Erro interno',
-        });
+      const { data, error } = await getSupabase().from('organizations').select('id, name, slug, status').order('name');
+      if (error) {
+        toast.error('Falha ao listar organizações', { description: error.message });
         setOrgs([]);
+        return;
       }
+      setOrgs((data ?? []) as OrgOption[]);
     })();
   }, [open, orgs, session, isSuperAdmin]);
 
@@ -80,18 +74,8 @@ export function OrgSwitcher() {
       return;
     }
     try {
-      const res = await fetch('/api/admin/switch-org', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ orgId: target.id }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.success) throw new Error(body.message ?? 'Falha ao trocar de organização.');
-      await getSupabase().auth.refreshSession();
-      window.location.href = '/';
+      await adminSwitchOrg({ orgId: target.id });
+      reloadHere();
     } catch (err) {
       toast.error('Falha ao trocar de organização', {
         description: err instanceof Error ? err.message : 'Erro interno',

@@ -14,12 +14,39 @@ export async function loadMyOrgs(): Promise<MyOrg[]> {
   return (data ?? []) as MyOrg[];
 }
 
+// Depois de trocar de organização: recarrega NA MESMA tela (antes ia para o início = Visão geral, a tela mais
+// pesada). Tela de um registro específico (/contacts/<id>) volta para a lista — o registro é da outra org.
+export function reloadHere(fallback = '/') {
+  const { pathname, search } = window.location;
+  const path = pathname === '/' ? fallback : pathname.replace(/^\/contacts\/[^/]+$/, '/contacts');
+  window.location.replace(path + (path === pathname ? search : ''));
+}
+
 // Troca a organização em uso: o banco muda a claim do token, a sessão é renovada e a tela recarrega.
 export async function switchMyOrg(orgId: string): Promise<void> {
   const { error } = await db().rpc('switch_my_org', { p_org: orgId });
   if (error) throw new Error(error.message);
   await getSupabase().auth.refreshSession();
-  window.location.href = '/';
+  reloadHere();
+}
+
+// Super admin (modo suporte): troca direto no banco (admin_switch_org). Sem a função ainda no banco,
+// cai na rota antiga da Vercel (/api/admin/switch-org), que é mais lenta.
+export async function adminSwitchOrg(target: { orgId: string } | { back: true }): Promise<void> {
+  const back = 'back' in target;
+  const { error } = await db().rpc('admin_switch_org', back ? { p_back: true } : { p_org: target.orgId });
+  if (error) {
+    if (!/admin_switch_org|schema cache|could not find the function/i.test(error.message)) throw new Error(error.message);
+    const { data } = await getSupabase().auth.getSession();
+    const res = await fetch('/api/admin/switch-org', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+      body: JSON.stringify(back ? { back: true } : { orgId: target.orgId }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.success) throw new Error(body.message ?? 'Falha ao trocar de organização.');
+  }
+  await getSupabase().auth.refreshSession();
 }
 
 // O convite por e-mail recusa quem já tem conta (está em outra organização).

@@ -862,4 +862,9 @@ Regras:
   `DataGrid`: coluna que bate no mínimo tira o espaço das outras (antes a tabela passava da largura e ganhava rolagem lateral).
 - Notas de entrada → "Baixar PDF": `src/lib/danfe.ts` monta o DANFE (A4) do XML guardado (link assinado do Storage) e abre a página de
   imprimir/"Salvar como PDF". Código de barras Code 128-C próprio (`code128cSvg`), conferido contra o JsBarcode. Só aparece com XML.
+- Troca de organização rápida (13/10/2026, `20261013120000_fast_org_switch.sql`): super admin troca por `admin_switch_org(p_org | p_back)`
+  no banco (antes `/api/admin/switch-org` + `/api/admin/orgs`: funções da Vercel quase sem uso = cold start a cada troca, + 2 chamadas ao
+  Auth). Lista do seletor vem direto de `organizations` (RLS libera o super admin). Sem a função no banco, `adminSwitchOrg` cai na rota
+  antiga. Depois de trocar, `reloadHere()` recarrega NA MESMA tela (antes ia para `/` → Visão geral, a mais pesada); `/contacts/<id>` vai para
+  `/contacts`. Vale também para `switch_my_org` e o "Voltar" do modo suporte.
 
