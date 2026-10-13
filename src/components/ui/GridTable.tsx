@@ -206,7 +206,25 @@ export function DataGrid<T>({
   const avail = Math.max(0, boxW - fixed - 2);
   const scale = boxW > 0 && natural > 0 ? avail / natural : 1;
   const minOf = (c: GridColumn<T>) => c.minWidth ?? Math.min(grid.width(c), c.align === 'right' ? 112 : 88);
-  const widthOf = (c: GridColumn<T>) => Math.max(minOf(c), Math.floor(grid.width(c) * scale));
+  // Coluna que bateu no mínimo fica no mínimo e o espaço que ela usou sai das outras
+  // (antes cada uma subia para o mínimo sem descontar e a tabela passava da largura da tela).
+  const fitted = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!(boxW > 0 && natural > 0)) { for (const c of grid.cols) out.set(c.id, grid.width(c)); return out; }
+    let pool = grid.cols.slice();
+    let free = avail;
+    for (let guard = 0; guard < grid.cols.length + 1 && pool.length; guard++) {
+      const nat = pool.reduce((a, c) => a + grid.width(c), 0);
+      const k = nat > 0 ? free / nat : 1;
+      const below = pool.filter((c) => grid.width(c) * k < minOf(c));
+      if (!below.length) { for (const c of pool) out.set(c.id, Math.floor(grid.width(c) * k)); pool = []; break; }
+      for (const c of below) { out.set(c.id, minOf(c)); free -= minOf(c); }
+      pool = pool.filter((c) => !below.includes(c));
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid.cols, boxW, avail, natural, grid.width]);
+  const widthOf = (c: GridColumn<T>) => Math.max(minOf(c), fitted.get(c.id) ?? Math.floor(grid.width(c) * scale));
   const width = fixed + grid.cols.reduce((a, c) => a + widthOf(c), 0);
   const allOn = !!selection && rows.length > 0 && rows.every((r) => selection.selected.has(rowKey(r)));
   const someOn = !!selection && rows.some((r) => selection.selected.has(rowKey(r)));

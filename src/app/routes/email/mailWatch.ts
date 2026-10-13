@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { getSupabase } from '@/lib/supabase';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { mailApi, type MailAddr } from './mailApi';
+import { useEmailPerms } from './useEmailPerm';
 
 // Aviso de e-mail novo com o CRM aberto: confere a Caixa de entrada das caixas do usuário a cada
 // 2 min (e ao voltar para a aba). Novo e-mail = aviso na tela (+ aviso do navegador se a aba estiver
@@ -36,12 +37,15 @@ const who = (a: MailAddr | null) => (a ? a.name || a.address : 'Remetente descon
 
 export function useMailWatcher() {
   const { userId } = useAppUser();
+  const emailPerms = useEmailPerms();
+  // Sem permissão de E-mail no perfil: não confere a caixa.
+  const allowed = emailPerms.ready && emailPerms.can('email.view');
   const navigate = useNavigate();
   const navRef = useRef(navigate);
   navRef.current = navigate;
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !allowed) return;
     let stopped = false;
     let accounts: Array<{ id: string; email: string }> = [];
     let last = 0;
@@ -116,7 +120,7 @@ export function useMailWatcher() {
       window.removeEventListener('megacrm-mail-check', onAsk);
       window.removeEventListener('megacrm-mail-accounts', onAccounts);
     };
-  }, [userId]);
+  }, [userId, allowed]);
 }
 
 // Componente sem tela: montado uma vez no layout.

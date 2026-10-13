@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
 import { maskPhoneBR } from '@/lib/phone';
 import { toast } from 'sonner';
-import { Check, Minus, ShieldCheck, X } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { addExistingMember, isAlreadyRegistered, ADDED_EXISTING_MSG } from '@/lib/orgMembers';
 import { Drawer, Field, inputCls } from './ui';
+import { OverridesEditor, type Effect } from './OverridesEditor';
 import { invokeManage, type AccessRole, type Member, type Override, type Permission, type Team } from './useAccessData';
 
-type Effect = 'inherit' | 'allow' | 'deny';
 
 // Cadastro (convite) e edição de usuário, com permissões individuais.
 export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides, onClose, onSaved }: {
@@ -59,11 +58,6 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
   }, [ov, initialOv]);
   const ovCount = { allow: [...ov.values()].filter((v) => v === 'allow').length, deny: [...ov.values()].filter((v) => v === 'deny').length };
 
-  const setEffect = (key: string, e: Effect) => setOv((cur) => {
-    const next = new Map(cur);
-    if (e === 'inherit') next.delete(key); else next.set(key, e);
-    return next;
-  });
 
   const save = async () => {
     if (creating) {
@@ -191,47 +185,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
             Permissão final = perfil <b>{role?.name}</b> + liberadas − bloqueadas. Só para esta pessoa.
           </p>
           {showOverrides && base && (
-            <div className="mt-3 space-y-3">
-              {modules.map((g) => (
-                <div key={g.module} className="rounded-lg border border-[var(--color-border-soft)]">
-                  <div className="border-b border-[var(--color-border-soft)] bg-[var(--color-fill-subtle)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text-primary)]">{g.label}</div>
-                  <ul className="divide-y divide-[var(--color-border-soft)]">
-                    {g.perms.map((p) => {
-                      const inRole = base.has(p.key);
-                      const eff = ov.get(p.key) ?? 'inherit';
-                      const finalOn = eff === 'allow' || (eff === 'inherit' && inRole);
-                      return (
-                        <li key={p.key} className="flex items-center gap-3 px-3 py-1.5">
-                          <span className={cn('flex h-5 w-5 items-center justify-center rounded-full', finalOn ? 'bg-[var(--color-success)] text-white' : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-muted)]')}>
-                            {finalOn ? <Check className="h-3 w-3" strokeWidth={3} /> : <Minus className="h-3 w-3" />}
-                          </span>
-                          <span className="min-w-0 flex-1 text-sm text-[var(--color-text-primary)]">
-                            {p.label}
-                            <span className="ml-1.5 text-[11px] text-[var(--color-text-muted)]">{inRole ? '(no perfil)' : ''}</span>
-                          </span>
-                          <div className="flex overflow-hidden rounded-md border border-[var(--color-border-card)] text-[11px] font-semibold">
-                            {([['inherit', 'Padrão'], ['allow', 'Liberar'], ['deny', 'Bloquear']] as [Effect, string][]).map(([v, l]) => (
-                              <button key={v} type="button" onClick={() => setEffect(p.key, v)} aria-pressed={eff === v}
-                                className={cn('px-2 py-1 transition-colors',
-                                  eff === v
-                                    ? v === 'allow' ? 'bg-[var(--color-success)] text-white' : v === 'deny' ? 'bg-[var(--color-error)] text-white' : 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]'
-                                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]')}>
-                                {l}
-                              </button>
-                            ))}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-              {ov.size > 0 && (
-                <button type="button" onClick={() => setOv(new Map())} className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-error)]">
-                  <X className="h-3.5 w-3.5" /> Voltar tudo ao padrão do perfil
-                </button>
-              )}
-            </div>
+            <OverridesEditor modules={modules} base={base} ov={ov} onChange={setOv} roleName={role?.name} />
           )}
         </section>
       )}

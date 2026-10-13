@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CheckCircle2, ChevronDown, Loader2, Mail, Pencil, Plus, Share2, Trash2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useEmailPerms } from './useEmailPerm';
 import { Dialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,7 @@ import { mailApi, useMailAccounts, type MailAccount } from './mailApi';
 // IMAP/SMTP) e pode liberar para colegas. A senha é testada e guardada cifrada no servidor.
 export function MailAccountsSettings({ onChanged }: { onChanged?: () => void }) {
   const { accounts, members, missing, reload, userId } = useMailAccounts();
+  const emailPerms = useEmailPerms();
   const [editing, setEditing] = useState<MailAccount | 'new' | null>(null);
   const [sharing, setSharing] = useState<MailAccount | null>(null);
   const [confirmDel, setConfirmDel] = useState<MailAccount | null>(null);
@@ -36,7 +38,7 @@ export function MailAccountsSettings({ onChanged }: { onChanged?: () => void }) 
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Minhas caixas</h3>
-        <Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Ligar e-mail</Button>
+        {emailPerms.can('email.connect') && <Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Ligar e-mail</Button>}
       </div>
       {mine.length === 0 ? <p className="text-sm text-[var(--color-text-muted)]">Nenhuma caixa ligada ainda.</p> : (
         <ul className="divide-y divide-[var(--color-border-soft)] rounded-[var(--radius-card)] border border-[var(--color-border-card)]">
@@ -49,7 +51,7 @@ export function MailAccountsSettings({ onChanged }: { onChanged?: () => void }) 
                   <span className="block truncate text-sm font-semibold text-[var(--color-text-primary)]">{a.display_name ? `${a.display_name} · ` : ''}{a.email}</span>
                   <span className="block truncate text-xs text-[var(--color-text-muted)]">{a.imap_host} · {shares ? `liberada para ${shares} colega(s)` : 'só você'}{!a.is_active ? ' · desligada' : ''}{a.last_error ? ` · ${a.last_error}` : ''}</span>
                 </span>
-                <Button size="sm" variant="outline" onClick={() => setSharing(a)}><Share2 className="h-3.5 w-3.5" /> Liberar</Button>
+                {emailPerms.can('email.share') && <Button size="sm" variant="outline" onClick={() => setSharing(a)}><Share2 className="h-3.5 w-3.5" /> Liberar</Button>}
                 <Button size="sm" variant="outline" onClick={() => setEditing(a)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
                 <button type="button" aria-label={`Remover ${a.email}`} onClick={() => setConfirmDel(a)} className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-error)]"><Trash2 className="h-4 w-4" /></button>
               </li>

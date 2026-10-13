@@ -65,6 +65,7 @@ export const MODULE_LABELS: Record<string, string> = {
   files: 'Arquivos',
   chat: 'Chat da equipe',
   boards: 'Quadros',
+  email: 'E-mail',
   financial: 'Financeiro',
   purchases: 'Compras',
   inventory: 'Estoque',

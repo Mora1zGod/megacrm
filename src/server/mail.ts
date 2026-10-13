@@ -456,6 +456,21 @@ async function sendMessage(ctx: MailCtx, b: Record<string, unknown>) {
   });
 }
 
+// Permissão do perfil (20261013110000_email_permissions.sql). Banco ainda sem as permissões do
+// e-mail (SQL não rodado) = segue liberado como antes, para ninguém perder o acesso no meio do deploy.
+const MAIL_PERM_TEXT: Record<string, string> = {
+  'email.view': 'Seu perfil não tem acesso ao E-mail.',
+  'email.send': 'Seu perfil não pode enviar e-mails.',
+  'email.connect': 'Seu perfil não pode ligar uma caixa de e-mail.',
+};
+async function requireMailPerm(ctx: MailCtx, key: string) {
+  const { data: ok, error } = await ctx.asUser.rpc('has_perm', { p_key: key });
+  if (!error && ok === true) return;
+  const { data: known } = await db(ctx).from('permissions').select('key').eq('key', key).maybeSingle();
+  if (!known) return;
+  throw new MailError(403, MAIL_PERM_TEXT[key] ?? 'Seu perfil não tem esta permissão.');
+}
+
 // ------------------------------------------------------------------ despacho
 export async function mailAction(ctx: MailCtx, action: string, b: Record<string, unknown>) {
   if (!action.startsWith('mail_')) return null;
@@ -464,6 +479,8 @@ export async function mailAction(ctx: MailCtx, action: string, b: Record<string,
   const { data: active, error: activeErr } = await ctx.asUser.rpc('current_org_active');
   if (activeErr) throw new MailError(500, 'Não foi possível conferir seu acesso. Tente de novo.');
   if (active !== true) throw new MailError(403, 'Seu acesso está desativado.');
+  await requireMailPerm(ctx, action === 'mail_send' ? 'email.send'
+    : action === 'mail_save_account' && !b.id ? 'email.connect' : 'email.view');
   switch (action) {
     case 'mail_save_account': return saveAccount(ctx, b);
     case 'mail_delete_account': return deleteAccount(ctx, b);

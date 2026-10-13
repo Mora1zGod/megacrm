@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import {
   Copy, History, KeyRound, Link2, Mail, MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, UserCheck, UserPlus, UserX, Users,
@@ -114,7 +115,29 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'inactive' | 'pending' | 'approval'>('all');
   const [approving, setApproving] = useState<Member | null>(null);
-  const [menu, setMenu] = useState<string | null>(null);
+  // Menu "⋯" da linha: abre FORA da tabela (portal, posição fixa) — dentro dela era cortado pela rolagem
+  // e a tabela ganhava barra de rolagem. Sem espaço embaixo, abre para cima.
+  const [menuAt, setMenuAt] = useState<{ id: string; top?: number; bottom?: number; right: number } | null>(null);
+  const menu = menuAt?.id ?? null;
+  const setMenu = (id: string | null) => { if (!id) setMenuAt(null); };
+  const openMenu = (id: string, el: HTMLElement) => {
+    if (menuAt?.id === id) { setMenuAt(null); return; }
+    const r = el.getBoundingClientRect();
+    const right = Math.max(8, window.innerWidth - r.right);
+    setMenuAt(window.innerHeight - r.bottom < 280 && r.top > 280
+      ? { id, bottom: window.innerHeight - r.top + 4, right }
+      : { id, top: r.bottom + 4, right });
+  };
+  useEffect(() => {
+    if (!menuAt) return;
+    const opened = Date.now();
+    const close = () => setMenuAt(null);
+    // Rolagem logo ao abrir (o navegador ajustando a tela) não fecha o menu.
+    const onScroll = () => { if (Date.now() - opened > 250) setMenuAt(null); };
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', onScroll, true);
+    return () => { window.removeEventListener('resize', close); window.removeEventListener('scroll', onScroll, true); };
+  }, [menuAt]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const list = useMemo(() => {
@@ -164,7 +187,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
   };
 
   const grid = useGrid<Member>('megacrm_grid_users', [
-    { id: 'name', label: 'Nome', width: 280, minWidth: 160, sortValue: (m) => memberLabel(m), exportValue: (m) => memberLabel(m), render: (m) => (
+    { id: 'name', label: 'Nome', width: 240, minWidth: 160, sortValue: (m) => memberLabel(m), exportValue: (m) => memberLabel(m), render: (m) => (
       <div className="flex items-center gap-3">
         <Avatar src={m.avatar_url} name={memberLabel(m)} size="sm" className="!h-9 !w-9" />
         <div className="min-w-0">
@@ -174,15 +197,15 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
         </div>
       </div>
     ) },
-    { id: 'job', label: 'Cargo', width: 140, sortValue: (m) => m.job_title ?? '', render: (m) => <span className="block truncate text-[var(--color-text-secondary)]">{m.job_title || '—'}</span> },
-    { id: 'team', label: 'Equipe', width: 130, sortValue: (m) => m.team_name ?? '', render: (m) => <span className="block truncate text-[var(--color-text-secondary)]">{m.team_name || '—'}</span> },
-    { id: 'role', label: 'Perfil de acesso', width: 170, sortValue: (m) => (m.is_super_admin ? 'Super Admin' : m.role_name ?? ''), render: (m) => (
+    { id: 'job', label: 'Cargo', width: 110, sortValue: (m) => m.job_title ?? '', render: (m) => <span className="block truncate text-[var(--color-text-secondary)]">{m.job_title || '—'}</span> },
+    { id: 'team', label: 'Equipe', width: 100, sortValue: (m) => m.team_name ?? '', render: (m) => <span className="block truncate text-[var(--color-text-secondary)]">{m.team_name || '—'}</span> },
+    { id: 'role', label: 'Perfil', width: 150, sortValue: (m) => (m.is_super_admin ? 'Super Admin' : m.role_name ?? ''), render: (m) => (
       <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold', m.role_is_admin ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'bg-[var(--color-fill-subtle)] text-[var(--color-text-primary)]')}>
         {m.role_is_admin && <ShieldCheck className="h-3 w-3" />}{m.is_super_admin ? 'Super Admin' : m.role_name ?? '—'}
       </span>
     ) },
-    { id: 'status', label: 'Status', width: 150, sortValue: (m) => m.status, render: (m) => <StatusPill m={m} /> },
-    { id: 'last', label: 'Último acesso', width: 130, sortValue: (m) => m.last_sign_in_at ?? '', exportValue: (m) => formatWhen(m.last_sign_in_at), render: (m) => <span className="text-xs text-[var(--color-text-secondary)]">{formatWhen(m.last_sign_in_at)}</span> },
+    { id: 'status', label: 'Status', width: 100, sortValue: (m) => m.status, render: (m) => <StatusPill m={m} /> },
+    { id: 'last', label: 'Último acesso', width: 120, sortValue: (m) => m.last_sign_in_at ?? '', exportValue: (m) => formatWhen(m.last_sign_in_at), render: (m) => <span className="text-xs text-[var(--color-text-secondary)]">{formatWhen(m.last_sign_in_at)}</span> },
   ], list);
   return (
     <div className="space-y-3">
@@ -209,7 +232,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
         </div>
       </div>
 
-      <DataGrid grid={grid} rowKey={(m) => m.user_id} emptyText="Nenhum usuário encontrado." actionsWidth={170}
+      <DataGrid grid={grid} rowKey={(m) => m.user_id} emptyText="Nenhum usuário encontrado." actionsWidth={list.some((m) => m.status === 'pending') ? 190 : 124}
         rowClassName={(m) => m.status !== 'active' && m.status !== 'pending' && 'opacity-60'}
         actions={(m) => {
           const me = m.user_id === userId;
@@ -226,14 +249,15 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
             ) : (
             <div className="relative flex justify-end gap-1">
               <Button size="sm" variant="outline" onClick={() => onEdit(m)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>
-              <button type="button" onClick={() => setMenu(menu === m.user_id ? null : m.user_id)} disabled={busy === m.user_id}
+              <button type="button" onClick={(e) => openMenu(m.user_id, e.currentTarget)} disabled={busy === m.user_id}
                 aria-label="Mais ações" className="rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">
                 <MoreHorizontal className="h-4 w-4" />
               </button>
-              {menu === m.user_id && (
+              {menu === m.user_id && menuAt && createPortal(
                 <>
                   <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setMenu(null)} />
-                  <div className="absolute right-0 top-[calc(100%+4px)] z-[calc(var(--z-dropdown)+1)] w-56 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
+                  <div style={{ top: menuAt.top, bottom: menuAt.bottom, right: menuAt.right }}
+                    className="fixed z-[calc(var(--z-dropdown)+1)] w-56 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
                     <MenuItem icon={Pencil} label="Editar / alterar perfil" onClick={() => { setMenu(null); onEdit(m); }} />
                     {perms.isAdmin && !me && !m.role_is_admin && <MenuItem icon={KeyRound} label="Alterar permissões" onClick={() => { setMenu(null); onEdit(m); }} />}
                     {canManage && m.invite_pending && m.status === 'active' && perms.can('users.create') &&
@@ -245,7 +269,8 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
                       : <MenuItem icon={UserCheck} label="Reativar" onClick={() => void act(m, 'reactivate')} />)}
                     {perms.can('audit.view') && <MenuItem icon={History} label="Ver histórico" onClick={() => { setMenu(null); onHistory(m); }} />}
                   </div>
-                </>
+                </>,
+                document.body,
               )}
             </div>
             );

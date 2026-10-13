@@ -10,6 +10,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { usePermission } from '@/app/providers/PermissionsProvider';
+import { useEmailPerms } from './useEmailPerm';
+import AccessDeniedPage from '@/app/routes/errors/AccessDeniedPage';
 import { formatBRL } from '@/lib/money';
 import { findBoletos, findHints, htmlToText, type BoletoInfo } from '@/lib/boleto';
 import { EntryFormDialog, type EntryPrefill } from '../finance/EntryFormDialog';
@@ -36,11 +38,13 @@ const folderName = (f: MailFolder) => (f.special && FOLDER_LABEL[f.special]) || 
 // encaminhar e lançar boleto/nota direto no Financeiro e em Compras.
 export default function EmailPage() {
   const { accounts, missing, reload, canSend } = useMailAccounts();
+  const emailPerms = useEmailPerms();
   const [accId, setAccId] = useState<string | null>(() => { try { return localStorage.getItem(ACC_KEY); } catch { return null; } });
   const account = accounts?.find((a) => a.id === accId && a.is_active) ?? accounts?.find((a) => a.is_active) ?? null;
   useEffect(() => { if (account) try { localStorage.setItem(ACC_KEY, account.id); } catch { /* sem storage */ } }, [account]);
   const [setup, setSetup] = useState(false);
 
+  if (emailPerms.ready && !emailPerms.can('email.view')) return <AccessDeniedPage area="E-mail" />;
   if (accounts === null) return <div className="p-6"><Skeleton className="h-96" /></div>;
   if (missing || accounts.length === 0 || setup) {
     return (
@@ -54,7 +58,7 @@ export default function EmailPage() {
     );
   }
   if (!account) return <div className="p-6 text-sm text-[var(--color-text-secondary)]">Todas as caixas estão desligadas. <button type="button" className="font-semibold text-[var(--accent-primary)]" onClick={() => setSetup(true)}>Configurar</button></div>;
-  return <Mailbox key={account.id} account={account} accounts={accounts.filter((a) => a.is_active)} onPick={setAccId} onSetup={() => setSetup(true)} canSend={canSend(account)} />;
+  return <Mailbox key={account.id} account={account} accounts={accounts.filter((a) => a.is_active)} onPick={setAccId} onSetup={() => setSetup(true)} canSend={canSend(account) && emailPerms.can('email.send')} />;
 }
 
 function Mailbox({ account, accounts, onPick, onSetup, canSend }: { account: MailAccount; accounts: MailAccount[]; onPick: (id: string) => void; onSetup: () => void; canSend: boolean }) {

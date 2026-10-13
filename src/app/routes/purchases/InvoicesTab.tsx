@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
+import { openDanfe } from '@/lib/danfe';
 import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { AuditList } from '../finance/AuditList';
@@ -462,6 +463,12 @@ function InvoiceDetail({ inv, lookups, onClose, onOpen, onChanged }: { inv: Invo
     if (error || !data) { toast.error('Não foi possível baixar o XML.'); return; }
     window.open(data.signedUrl, '_blank');
   };
+  // PDF (DANFE) montado a partir do XML guardado da nota.
+  const downloadPdf = () => void openDanfe(async () => {
+    if (!inv.xml_path) return null;
+    const { data } = await getSupabase().storage.from('whatsapp-hub-purchases').createSignedUrl(inv.xml_path, 120);
+    return data?.signedUrl ?? null;
+  });
   const remove = async () => {
     const { error } = await getSupabase().from('pur_invoices').delete().eq('id', inv.id);
     if (error) { toast.error(purError(error)); return; }
@@ -550,6 +557,7 @@ function InvoiceDetail({ inv, lookups, onClose, onOpen, onChanged }: { inv: Invo
           {can && inv.status !== 'posted' && !closed && <Button variant="ghost" disabled={busy} onClick={() => setReason('ignore')}><Ban className="h-4 w-4" /> Ignorar</Button>}
           {can && inv.status === 'ignored' && <Button variant="outline" disabled={busy} onClick={() => act('pur_invoice_unignore', { p_id: inv.id }, 'Nota reativada.')}><RotateCcw className="h-4 w-4" /> Reativar</Button>}
           {can && inv.status !== 'canceled_sefaz' && <Button variant="ghost" disabled={busy} onClick={() => setReason('cancel')}><XCircle className="h-4 w-4" /> Cancelada na SEFAZ</Button>}
+          {inv.xml_path && <Button variant="outline" onClick={downloadPdf}><FileText className="h-4 w-4" /> Baixar PDF</Button>}
           {inv.xml_path && <Button variant="outline" onClick={downloadXml}><Download className="h-4 w-4" /> Baixar XML</Button>}
           {can && inv.status === 'summary' && <Button disabled={busy} onClick={() => sefaz('manifest')}><Eye className="h-4 w-4" /> Dar ciência e baixar XML</Button>}
           {can && inv.status === 'summary' && inv.manifested_at && <Button variant="outline" disabled={busy} onClick={() => sefaz('fetch_by_key')}><CloudDownload className="h-4 w-4" /> Tentar baixar de novo</Button>}

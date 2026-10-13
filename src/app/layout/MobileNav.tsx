@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS, navItemVisible, type NavItem } from './nav-config';
+import { useEmailPerms, type EmailPerm } from '@/app/routes/email/useEmailPerm';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { BrandMark } from './BrandMark';
@@ -18,7 +19,8 @@ const GROUP_ORDER: NavItem['group'][] = ['Operação', 'Engajamento', 'Gestão',
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const { isSuperAdmin } = useAppUser();
   const perms = usePermission();
-  const visibleItems = NAV_ITEMS.filter((item) => navItemVisible(item, perms.can, isSuperAdmin));
+  const emailPerms = useEmailPerms();
+  const visibleItems = NAV_ITEMS.filter((item) => navItemVisible(item, (k) => (k.startsWith('email.') ? emailPerms.can(k as EmailPerm) : perms.can(k)), isSuperAdmin));
   const groups = GROUP_ORDER.map((group) => ({
     group,
     items: visibleItems.filter((item) => item.group === group),

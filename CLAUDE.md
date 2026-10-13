@@ -848,3 +848,18 @@ Regras:
 - Seletor: `OrgSwitcher` mostra o menu para quem tem 2+ orgs; a tela "Acesso desativado" (`AccessGate`) oferece "Entrar em <outra org>".
 - Caixas de e-mail, notificações, chat e presença são por org: a caixa ligada numa org não aparece na outra.
 - A migração troca trechos no texto ATUAL das funções (`pg_temp._patch`): se produção divergir, ela para com "trecho não encontrado".
+
+## Permissões do E-mail, editor de permissões e DANFE (13/10/2026)
+- `20261013110000_email_permissions.sql`: `email.view/send/connect/share` (módulo `email`). Todos os perfis existentes receberam as 4
+  (ninguém perdeu acesso); org nova: trigger `zz_org_seed_email_perms` (roda depois de `trg_org_seed_access_roles`). Liberar caixa
+  (`mail_account_members` INSERT/UPDATE) exige `email.share` (policies RESTRICTIVE). Servidor: `requireMailPerm` em `src/server/mail.ts`
+  (`mail_send` → send, criar caixa → connect, resto → view). Front: `useEmailPerms()` (`routes/email/useEmailPerm.ts`) — se o catálogo
+  ainda não tem `email.*` (SQL não rodado), tudo segue liberado; menu, rota, "Escrever/Responder", "Ligar e-mail", "Liberar" e o aviso de
+  e-mail novo respeitam a permissão.
+- Permissões individuais (`access/OverridesEditor.tsx`): busca, Liberar tudo / Bloquear tudo / Tudo igual ao perfil (no que está filtrado),
+  Padrão/Liberar/Bloquear por módulo, módulos recolhíveis com contador "x/y".
+- Lista de Usuários: menu "⋯" em portal (`createPortal`, posição fixa, abre para cima sem espaço) — dentro da tabela era cortado.
+  `DataGrid`: coluna que bate no mínimo tira o espaço das outras (antes a tabela passava da largura e ganhava rolagem lateral).
+- Notas de entrada → "Baixar PDF": `src/lib/danfe.ts` monta o DANFE (A4) do XML guardado (link assinado do Storage) e abre a página de
+  imprimir/"Salvar como PDF". Código de barras Code 128-C próprio (`code128cSvg`), conferido contra o JsBarcode. Só aparece com XML.
+
