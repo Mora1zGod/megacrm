@@ -1,9 +1,9 @@
 // ============================================================================
 // delete-team-member
 // ----------------------------------------------------------------------------
-// Admin remove um membro da equipe. Apaga o usuário do Supabase Auth
-// (auth.users) — o registro em whatsapp_hub.app_users cai junto (FK) e, por
-// segurança, é removido explicitamente também.
+// Admin remove um membro da equipe DESTA organização. Se a pessoa não estiver em
+// nenhuma outra organização, a conta (auth.users) também é apagada; se estiver,
+// só o acesso a esta org sai e ela continua entrando nas outras.
 //
 // Só `admin` pode remover. Um admin não pode remover a si mesmo (evita a
 // instância ficar sem owner por acidente).
@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
       .from('app_users')
       .select('user_id, org_id')
       .eq('user_id', userId)
+      .eq('org_id', caller.orgId)
       .maybeSingle();
     if (!target || (target as { org_id: string }).org_id !== caller.orgId) {
       return jsonResponse({ ok: false, error: 'Membro não encontrado.' }, { status: 404 });
@@ -50,7 +51,14 @@ Deno.serve(async (req) => {
 
     // Remove o registro de membro (FK cobre, mas fazemos explícito para o caso
     // de a FK não ser ON DELETE CASCADE).
-    await db.from('app_users').delete().eq('user_id', userId);
+    const { error: rowErr } = await db.from('app_users').delete().eq('user_id', userId).eq('org_id', caller.orgId);
+    if (rowErr) return jsonResponse({ ok: false, error: rowErr.message }, { status: 500 });
+
+    // Está em outra organização: mantém a conta.
+    const { count: others, error: othersErr } = await db
+      .from('app_users').select('org_id', { count: 'exact', head: true }).eq('user_id', userId);
+    if (othersErr) return jsonResponse({ ok: false, error: othersErr.message }, { status: 500 });
+    if ((others ?? 0) > 0) return jsonResponse({ ok: true, user_id: userId, kept_account: true });
 
     // Remove o usuário do Auth.
     const authAdmin = getAuthAdminClient();

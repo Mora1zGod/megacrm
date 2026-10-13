@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const device = ua ? describeDevice(ua) : null;
 
     const { data: me } = await db
-      .from('app_users').select('display_name').eq('user_id', caller.userId).maybeSingle();
+      .from('app_users').select('display_name').eq('user_id', caller.userId).eq('org_id', caller.orgId).maybeSingle();
     const name = (me as { display_name?: string | null } | null)?.display_name?.trim()
       || caller.email?.split('@')[0] || 'Usuário';
 

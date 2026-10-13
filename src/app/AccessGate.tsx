@@ -1,7 +1,8 @@
-import { useState, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { KeyRound, LogOut, ShieldOff } from 'lucide-react';
+import { Building2, KeyRound, LogOut, ShieldOff } from 'lucide-react';
+import { loadMyOrgs, switchMyOrg, type MyOrg } from '@/lib/orgMembers';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -25,6 +26,10 @@ export function AccessGate({ children }: { children: ReactElement }) {
 function BlockedScreen() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  // Desativado nesta organização, mas ativo em outra: oferece entrar nela.
+  const [others, setOthers] = useState<MyOrg[]>([]);
+  const [going, setGoing] = useState<string | null>(null);
+  useEffect(() => { void loadMyOrgs().then((l) => setOthers(l.filter((o) => !o.is_current))); }, []);
   return (
     <AuthShell title="Acesso desativado" subtitle="Sua conta foi desativada por um administrador.">
       <div className="flex flex-col items-center gap-4 py-2 text-center">
@@ -34,6 +39,15 @@ function BlockedScreen() {
         <p className="text-sm text-[var(--color-text-secondary)]">
           Se isso for um engano, fale com o administrador do CRM para reativar o seu acesso.
         </p>
+        {others.map((o) => (
+          <Button key={o.id} variant="outline" className="w-full" disabled={going !== null}
+            onClick={async () => {
+              setGoing(o.id);
+              try { await switchMyOrg(o.id); } catch (e) { setGoing(null); toast.error('Não foi possível entrar', { description: e instanceof Error ? e.message : '' }); }
+            }}>
+            <Building2 className="h-4 w-4" /> Entrar em {o.name}
+          </Button>
+        ))}
         <Button className="w-full" onClick={async () => { await signOut(); navigate('/auth/login', { replace: true }); }}>
           <LogOut className="h-4 w-4" /> Sair
         </Button>

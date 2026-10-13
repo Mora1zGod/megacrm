@@ -310,7 +310,7 @@ async function createOwner(ref: string, pat: string, body: Required<BootstrapBod
 
        INSERT INTO whatsapp_hub.app_users (user_id, org_id, role, is_super_admin, accepted_at)
        VALUES ('${id}', v_org, 'admin', true, now())
-       ON CONFLICT (user_id) DO UPDATE
+       ON CONFLICT (user_id, org_id) DO UPDATE
          SET role = 'admin',
              is_super_admin = true,
              org_id = COALESCE(whatsapp_hub.app_users.org_id, v_org),

@@ -6,7 +6,7 @@ import { useAppUser } from '@/app/providers/AppUserProvider';
 // Assinatura do atendente ("*Maria:*" no começo da mensagem). Preferência
 // pessoal, salva em app_users.sign_messages (vale em qualquer computador).
 export function useSignaturePref() {
-  const { userId, displayName } = useAppUser();
+  const { userId, displayName, orgId } = useAppUser();
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
@@ -14,20 +14,20 @@ export function useSignaturePref() {
     let alive = true;
     void getSupabase()
       .from('app_users')
-      .select('*')
+      .select('org_id, sign_messages')
       .eq('user_id', userId)
-      .maybeSingle()
       .then(({ data }) => {
-        if (alive) setEnabled(Boolean((data as { sign_messages?: boolean } | null)?.sign_messages));
+        const rows = (data ?? []) as Array<{ org_id: string; sign_messages?: boolean }>;
+        if (alive) setEnabled(Boolean((rows.find((r) => r.org_id === orgId) ?? rows[0])?.sign_messages));
       });
     return () => { alive = false; };
-  }, [userId]);
+  }, [userId, orgId]);
 
   const toggle = useCallback(async () => {
     if (!userId) return;
     const next = !enabled;
     setEnabled(next);
-    const { error } = await getSupabase().from('app_users').update({ sign_messages: next }).eq('user_id', userId);
+    const { error } = await getSupabase().from('app_users').update({ sign_messages: next }).eq('user_id', userId).eq('org_id', orgId ?? '');
     if (error) {
       setEnabled(!next);
       toast.error('Não consegui salvar a assinatura', {
@@ -36,7 +36,7 @@ export function useSignaturePref() {
       return;
     }
     toast.success(next ? 'Assinatura ligada: suas mensagens saem com o seu nome.' : 'Assinatura desligada.');
-  }, [enabled, userId]);
+  }, [enabled, userId, orgId]);
 
   const name = displayName?.trim() || null;
 

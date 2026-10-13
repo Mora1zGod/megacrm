@@ -4,11 +4,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { getSupabase } from '@/lib/supabase';
+import { loadMyOrgs, switchMyOrg, type MyOrg } from '@/lib/orgMembers';
 
-// Seletor de organização no header. Membro comum pertence a UMA org: exibe só
-// o nome dela. O super admin vê um dropdown com todas as orgs e troca de
-// contexto via /api/admin/switch-org (atualiza a claim org_id no JWT →
-// refreshSession → reload).
+// Seletor de organização no header.
+//  · Super admin: todas as orgs, troca via /api/admin/switch-org (modo suporte).
+//  · Membro em mais de uma org (13/10/2026): as orgs em que está ativo (my_orgs), troca via
+//    switch_my_org — cada org com o perfil de acesso dele lá. Em uma org só: só o nome.
+// Nos dois casos a claim org_id do JWT muda → refreshSession → recarrega.
 
 interface OrgOption {
   id: string;
@@ -24,6 +26,15 @@ export function OrgSwitcher() {
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const [mine, setMine] = useState<MyOrg[]>([]);
+
+  // Membro comum: em quantas organizações ele está ativo?
+  useEffect(() => {
+    if (isSuperAdmin || !session) return;
+    let alive = true;
+    void loadMyOrgs().then((list) => { if (alive) setMine(list); });
+    return () => { alive = false; };
+  }, [isSuperAdmin, session, orgId]);
 
   // Fecha o dropdown em clique fora.
   useEffect(() => {
@@ -35,9 +46,9 @@ export function OrgSwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  // Carrega a lista de orgs ao abrir (só super admin chega aqui).
+  // Carrega a lista de orgs ao abrir (super admin: todas pelo console).
   useEffect(() => {
-    if (!open || orgs !== null || !session) return;
+    if (!open || orgs !== null || !session || !isSuperAdmin) return;
     void (async () => {
       try {
         const res = await fetch('/api/admin/orgs', {
@@ -53,7 +64,7 @@ export function OrgSwitcher() {
         setOrgs([]);
       }
     })();
-  }, [open, orgs, session]);
+  }, [open, orgs, session, isSuperAdmin]);
 
   const switchTo = async (target: OrgOption) => {
     if (!session || target.id === orgId) {
@@ -61,6 +72,13 @@ export function OrgSwitcher() {
       return;
     }
     setSwitching(target.id);
+    if (!isSuperAdmin) {
+      try { await switchMyOrg(target.id); } catch (err) {
+        toast.error('Falha ao trocar de organização', { description: err instanceof Error ? err.message : 'Erro interno' });
+        setSwitching(null);
+      }
+      return;
+    }
     try {
       const res = await fetch('/api/admin/switch-org', {
         method: 'POST',
@@ -90,10 +108,13 @@ export function OrgSwitcher() {
     </div>
   );
 
-  // Membro comum: apenas o nome da própria org, sem dropdown.
-  if (!isSuperAdmin) {
+  // Membro de uma org só: apenas o nome, sem dropdown.
+  if (!isSuperAdmin && mine.length <= 1) {
     return <div className="hidden md:block pr-2 border-r border-[var(--color-border-card)]">{label}</div>;
   }
+  const list: OrgOption[] | null = isSuperAdmin
+    ? orgs
+    : mine.map((o) => ({ id: o.id, name: o.name, slug: '', status: 'active' as const }));
 
   return (
     <div ref={rootRef} className="relative hidden md:block pr-2 border-r border-[var(--color-border-card)]">
@@ -113,14 +134,14 @@ export function OrgSwitcher() {
           <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
             Organizações
           </div>
-          {orgs === null ? (
+          {list === null ? (
             <div className="flex items-center gap-2 px-2.5 py-2 text-sm text-[var(--color-text-secondary)]">
               <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
             </div>
-          ) : orgs.length === 0 ? (
+          ) : list.length === 0 ? (
             <div className="px-2.5 py-2 text-sm text-[var(--color-text-secondary)]">Nenhuma organização.</div>
           ) : (
-            orgs.map((org) => (
+            list.map((org) => (
               <button
                 key={org.id}
                 onClick={() => void switchTo(org)}

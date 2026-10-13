@@ -6,6 +6,7 @@ import { extractFunctionErrorMessage } from '@/lib/functionError';
 import { Skeleton } from '@/components/ui/skeleton';
 import { logAudit } from '@/hooks/useAuditLog';
 import { useAppUser } from '@/app/providers/AppUserProvider';
+import { addExistingMember, isAlreadyRegistered, ADDED_EXISTING_MSG } from '@/lib/orgMembers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,7 +44,7 @@ interface Channel {
 }
 
 export function TeamSettings() {
-  const { role: callerRole, userId } = useAppUser();
+  const { role: callerRole, userId, orgId } = useAppUser();
   const isAdmin = callerRole === 'admin';
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -63,6 +64,7 @@ export function TeamSettings() {
     const [mem, qs, chs, qm, ops] = await Promise.all([
       supabase.from('app_users')
         .select('id, user_id, role, display_name, avatar_url, is_online, accepted_at')
+        .eq('org_id', orgId ?? '')
         .order('invited_at'),
       supabase.from('queues').select('id, name, description, color, is_default, position').order('position'),
       supabase.from('channels').select('id, label, provider, queue_id'),
@@ -105,7 +107,7 @@ export function TeamSettings() {
     }
     setMembership(map);
     setLoading(false);
-  }, []);
+  }, [orgId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -401,7 +403,7 @@ export function TeamSettings() {
 }
 
 function ConviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const { userId } = useAppUser();
+  const { userId, orgId } = useAppUser();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('operator');
   const [enviando, setEnviando] = useState(false);
@@ -417,6 +419,16 @@ function ConviteDialog({ onClose, onDone }: { onClose: () => void; onDone: () =>
     const erro = (data as { ok?: boolean; error?: string } | null)?.ok === false || error
       ? await extractFunctionErrorMessage(error, (data as { error?: string } | null)?.error)
       : null;
+    if (erro && isAlreadyRegistered(erro)) {
+      // Já tem conta em outra organização: dá acesso a esta com o perfil padrão do papel.
+      const { data: perfil } = await getSupabase().from('access_roles').select('id')
+        .eq('org_id', orgId ?? '').eq('is_system', true).eq('name', role === 'admin' ? 'Administrador' : 'Atendimento').maybeSingle();
+      const err2 = perfil ? await addExistingMember({ email: e, access_role_id: (perfil as { id: string }).id }) : 'Perfil padrão não encontrado.';
+      if (err2) { toast.error('Não consegui dar acesso.', { description: err2 }); return; }
+      toast.success('Acesso liberado', { description: ADDED_EXISTING_MSG, duration: 9000 });
+      onDone();
+      return;
+    }
     if (erro) { toast.error('Não consegui convidar.', { description: erro }); return; }
     const { data: authData } = await getSupabase().auth.getUser();
     void logAudit({

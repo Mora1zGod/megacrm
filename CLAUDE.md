@@ -142,7 +142,8 @@ Nunca usar o schema `public` para lógica de aplicação.
   - Espelha a role em `auth.users.raw_app_meta_data.role` para que policies
     possam consultá-la via JWT sem ler `app_users`.
 - `app_users` é a tabela de membros da instância (substitui `tenant_members`
-  do build SaaS antigo). UNIQUE por `user_id`.
+  do build SaaS antigo). Desde 13/10/2026: **UNIQUE (user_id, org_id)** — uma linha por organização
+  (ver "Várias organizações" abaixo). Toda leitura por `user_id` precisa filtrar `org_id`.
 - Policies RLS gateiam por `whatsapp_hub.current_user_role()`:
   - `'admin'` — controla templates, campanhas, knowledge, settings, equipe.
   - `'operator'` — opera inbox + contatos + tags do dia a dia.
@@ -832,3 +833,18 @@ Regras:
   `AppLayout` (`<PresenceTracker/>`). Bolinha verde/cinza no `Avatar` com a prop `online` (sem a prop = sem bolinha). Usado no Chat Interno
   (lista, cabeçalho "Online agora", participantes, Nova conversa com online primeiro). Não grava no banco e NÃO é o `app_users.is_online`
   (esse é o "disponível para o rodízio").
+
+## Várias organizações com o mesmo usuário (13/10/2026) — `20261013100000_multi_org_members.sql`
+- `app_users` = 1 linha POR ORGANIZAÇÃO (perfil, equipe, status, assinatura e `is_online` de cada org). A org em uso é a claim `org_id`
+  do JWT. **Toda query de app_users por `user_id` tem de filtrar `org_id`** (o RLS deixa a pessoa ver as próprias linhas de todas as orgs).
+- `current_org_active()` agora exige linha ATIVA do usuário na org (antes bastava não ter linha inativa). Super admin e service role passam.
+- `my_orgs()` (orgs ativas do usuário) · `switch_my_org(org)` (muda a claim org_id + role; o front chama `refreshSession` e recarrega) ·
+  `org_add_member(email, perfil, equipe?, cargo?, telefone?)` (`users.create`; dá acesso a esta org para quem JÁ tem conta — o convite por
+  e-mail recusa e-mail cadastrado, então `UserDrawer`/`TeamSettings` caem nele sozinhos: `src/lib/orgMembers.ts`).
+- Trigger `_app_users_follow_claim`: desativado/removido da org em uso → token passa para outra org ativa; ativado numa org com o token
+  apontando para org sem acesso → passa para esta. `manage-team-member` desativa/recusa SÓ na org de quem age; o ban do login e o
+  apagar a conta (`delete-team-member`, recusar cadastro) só acontecem se a pessoa não tiver outra org.
+- Desativados do jeito antigo (só ban, status 'active') viraram `inactive` nesta migração.
+- Seletor: `OrgSwitcher` mostra o menu para quem tem 2+ orgs; a tela "Acesso desativado" (`AccessGate`) oferece "Entrar em <outra org>".
+- Caixas de e-mail, notificações, chat e presença são por org: a caixa ligada numa org não aparece na outra.
+- A migração troca trechos no texto ATUAL das funções (`pg_temp._patch`): se produção divergir, ela para com "trecho não encontrado".

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useAppUser } from '@/app/providers/AppUserProvider';
+import { addExistingMember, isAlreadyRegistered, ADDED_EXISTING_MSG } from '@/lib/orgMembers';
 import { Drawer, Field, inputCls } from './ui';
 import { invokeManage, type AccessRole, type Member, type Override, type Permission, type Team } from './useAccessData';
 
@@ -24,7 +25,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
   onSaved: () => void;
 }) {
   const perms = usePermission();
-  const { userId } = useAppUser();
+  const { userId, orgId } = useAppUser();
   const creating = !member;
   const isSelf = member?.user_id === userId;
   const defaultRole = roles.find((r) => r.name === 'Atendimento') ?? roles.find((r) => !r.is_admin) ?? roles[0];
@@ -73,6 +74,15 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
         action: 'invite', email: email.trim(), display_name: name, phone, job_title: job,
         team_id: teamId || null, access_role_id: roleId, must_change_password: mustChange,
       });
+      if (err && isAlreadyRegistered(err)) {
+        // Já tem conta (outra organização): dá acesso a esta, com o perfil escolhido.
+        const err2 = await addExistingMember({ email, access_role_id: roleId, team_id: teamId || null, job_title: job, phone });
+        setSaving(false);
+        if (err2) { toast.error('Não foi possível dar acesso', { description: err2 }); return; }
+        toast.success('Acesso liberado', { description: ADDED_EXISTING_MSG, duration: 9000 });
+        onSaved();
+        return;
+      }
       setSaving(false);
       if (err) { toast.error('Não foi possível criar o usuário', { description: err }); return; }
       toast.success('Usuário criado. O convite foi enviado por e-mail.');
@@ -93,7 +103,7 @@ export function UserDrawer({ member, roles, teams, modules, rolePerms, overrides
 
     const sb = getSupabase();
     if (Object.keys(patch).length) {
-      const { error } = await sb.from('app_users').update(patch).eq('user_id', member.user_id);
+      const { error } = await sb.from('app_users').update(patch).eq('user_id', member.user_id).eq('org_id', orgId ?? '');
       if (error) { setSaving(false); toast.error('Não foi possível salvar', { description: error.message }); return; }
     }
     if (canEditOverrides && ovChanged) {

@@ -6,7 +6,8 @@
 //
 //   invite        { email, display_name?, phone?, job_title?, team_id?,
 //                   access_role_id, must_change_password? }   → users.create
-//   deactivate    { user_id }   → users.deactivate  (bloqueia o login: ban)
+//   deactivate    { user_id }   → users.deactivate  (tira o acesso NESTA org; o login só é
+//                                  bloqueado (ban) se a pessoa não tiver outra org ativa)
 //   reactivate    { user_id }   → users.deactivate
 //   reset_password{ user_id }   → users.reset_password (e-mail de redefinição)
 //   resend_invite { user_id }   → users.create (convite ainda não aceito)
@@ -84,6 +85,15 @@ async function stampActor(db: ReturnType<typeof getAdminClient>, caller: OrgCall
     .eq('target_user_id', target)
     .is('actor_id', null)
     .gte('created_at', since);
+}
+
+// A pessoa tem acesso (ativo, se onlyActive) em alguma organização além desta?
+async function hasOtherOrgs(db: ReturnType<typeof getAdminClient>, userId: string, orgId: string, onlyActive: boolean): Promise<boolean> {
+  let q = db.from('app_users').select('org_id', { count: 'exact', head: true }).eq('user_id', userId).neq('org_id', orgId);
+  if (onlyActive) q = q.eq('status', 'active');
+  const { count, error } = await q;
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
 }
 
 Deno.serve(async (req) => {
@@ -171,7 +181,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: 'Você não pode fazer isso na sua própria conta.' }, { status: 400 });
     }
     const { data: memberRow } = await db
-      .from('app_users').select('user_id, org_id, is_super_admin, status, display_name').eq('user_id', userId).maybeSingle();
+      .from('app_users').select('user_id, org_id, is_super_admin, status, display_name')
+      .eq('user_id', userId).eq('org_id', caller.orgId).maybeSingle();
     const member = memberRow as { user_id: string; org_id: string; is_super_admin: boolean; status: string; display_name: string | null } | null;
     if (!member || member.org_id !== caller.orgId) return jsonResponse({ ok: false, error: 'Usuário não encontrado.' }, { status: 404 });
     if (member.is_super_admin && !caller.isSuperAdmin) {
@@ -191,8 +202,11 @@ Deno.serve(async (req) => {
         // Mesmo padrão do delete-team-member: a linha da equipe primeiro.
         const { error: rowErr } = await db.from('app_users').delete().eq('user_id', userId).eq('org_id', caller.orgId);
         if (rowErr) return jsonResponse({ ok: false, error: rowErr.message }, { status: 500 });
-        const { error: delErr } = await authAdmin.auth.admin.deleteUser(userId);
-        if (delErr) return jsonResponse({ ok: false, error: delErr.message }, { status: 400 });
+        // A conta só é apagada se a pessoa não estiver em nenhuma outra organização.
+        if (!(await hasOtherOrgs(db, userId, caller.orgId, false))) {
+          const { error: delErr } = await authAdmin.auth.admin.deleteUser(userId);
+          if (delErr) return jsonResponse({ ok: false, error: delErr.message }, { status: 400 });
+        }
         await stampActor(db, caller, userId);
         return jsonResponse({ ok: true });
       }
@@ -234,9 +248,14 @@ Deno.serve(async (req) => {
 
     if (action === 'deactivate' || action === 'reactivate') {
       const active = action === 'reactivate';
-      const { error: banErr } = await authAdmin.auth.admin.updateUserById(userId, { ban_duration: active ? 'none' : BAN_FOREVER });
-      if (banErr) return jsonResponse({ ok: false, error: banErr.message }, { status: 400 });
-      const { error: stErr } = await db.from('app_users').update({ status: active ? 'active' : 'inactive' }).eq('user_id', userId);
+      // Desativar vale só para ESTA organização. O login (ban) só é bloqueado quando a pessoa
+      // não tem acesso ativo em outra; reativar sempre libera o login.
+      if (active || !(await hasOtherOrgs(db, userId, caller.orgId, true))) {
+        const { error: banErr } = await authAdmin.auth.admin.updateUserById(userId, { ban_duration: active ? 'none' : BAN_FOREVER });
+        if (banErr) return jsonResponse({ ok: false, error: banErr.message }, { status: 400 });
+      }
+      const { error: stErr } = await db.from('app_users').update({ status: active ? 'active' : 'inactive' })
+        .eq('user_id', userId).eq('org_id', caller.orgId);
       if (stErr) return jsonResponse({ ok: false, error: stErr.message }, { status: 500 });
       await stampActor(db, caller, userId);
       return jsonResponse({ ok: true });

@@ -123,12 +123,14 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
     const { data } = await supabase
       .schema('whatsapp_hub')
       .from('app_users')
-      .select('display_name, avatar_url')
-      .eq('user_id', userId)
-      .maybeSingle();
-    setDisplayName((data?.display_name as string | null) ?? null);
-    setAvatarUrl((data?.avatar_url as string | null) ?? null);
-  }, [userId]);
+      .select('org_id, display_name, avatar_url')
+      .eq('user_id', userId);
+    // Uma linha por organização: vale a da org em uso (super admin em suporte: a dele).
+    const rows = (data ?? []) as Array<{ org_id: string; display_name: string | null; avatar_url: string | null }>;
+    const mine = rows.find((r) => r.org_id === orgId) ?? rows[0];
+    setDisplayName(mine?.display_name ?? null);
+    setAvatarUrl(mine?.avatar_url ?? null);
+  }, [userId, orgId]);
 
   useEffect(() => {
     void refreshProfile();
