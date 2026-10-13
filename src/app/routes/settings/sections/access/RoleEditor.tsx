@@ -118,7 +118,7 @@ export function RoleEditor({ role, modules, rolePerms, onClose, onSaved }: {
                 </div>
               ))}
             </div>
-            <p className="mt-1.5 text-[11px] text-[var(--color-text-muted)]">“Somente próprios” inclui também o que está sem responsável. Por enquanto vale para as conversas do Atendimento; leads, tarefas e agenda entram na próxima etapa.</p>
+            <p className="mt-1.5 text-[11px] text-[var(--color-text-muted)]">Conversas: cada uma é de quem é o responsável. “Somente próprios” = as dele + as sem responsável (fila); “Próprios + equipe” = também as da equipe; “Todos” = todas. Para uma pessoa só, use a permissão “Ver as conversas de todos os responsáveis” em Permissões individuais.</p>
           </section>
 
           <section className="mt-6">

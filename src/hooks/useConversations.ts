@@ -301,6 +301,12 @@ export function useConversations(): UseConversationsResult {
 
   const setAssigned: UseConversationsResult['setAssigned'] = async (id, assignee) => {
     const supabase = getSupabase();
+    // Conversas separadas por responsável (20261013130000_inbox_ownership.sql): transferir para OUTRA pessoa
+    // tira a conversa da vista de quem transfere, e o banco só aceita isso pela função. Sem a função
+    // (SQL ainda não rodado), segue o jeito antigo.
+    const { error: rpcErr } = await supabase.schema('whatsapp_hub').rpc('inbox_set_assignee', { p_conversation: id, p_to: assignee });
+    if (!rpcErr) return;
+    if (!/inbox_set_assignee|schema cache|could not find the function/i.test(rpcErr.message)) throw new Error(translateDbError(rpcErr.message));
     const { error } = await supabase
       .schema('whatsapp_hub')
       .from('conversations')

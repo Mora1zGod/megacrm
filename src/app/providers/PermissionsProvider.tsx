@@ -153,7 +153,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PermissionsContextValue>(() => {
     const can = (key: string) => state.isAdmin || (state.active && state.permissions.has(key));
-    const scope = (module: ScopeModule): Scope => (state.isAdmin ? 'all' : state.scopes[module]);
+    // "Ver as conversas de todos" (inbox.view_all) vale como escopo "Todas" no Atendimento.
+    const scope = (module: ScopeModule): Scope => (state.isAdmin || (module === 'inbox' && can('inbox.view_all')) ? 'all' : state.scopes[module]);
     return {
       ...state,
       can,

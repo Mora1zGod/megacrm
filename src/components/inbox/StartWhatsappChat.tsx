@@ -15,6 +15,7 @@ interface StartWhatsappChatProps {
 type Resultado =
   | { tipo: 'existente'; conversationId: string; nome: string | null }
   | { tipo: 'novo'; phone: string; contactId: string }
+  | { tipo: 'outro'; dono: string; nome: string | null }
   | null;
 
 // Normaliza para E.164 brasileiro. Aceita "(68) 99975-5247", "68999755247",
@@ -64,6 +65,14 @@ export function StartWhatsappChat({ onClose, onOpenConversation }: StartWhatsapp
       const conversationId = (conv as { id: string } | null)?.id ?? null;
       if (conversationId) {
         setResultado({ tipo: 'existente', conversationId, nome });
+        setBuscando(false);
+        return;
+      }
+      // Conversas separadas por responsável: o contato pode estar em atendimento com outra pessoa
+      // (a conversa não aparece para quem não é o dono). Diz com quem, sem abrir a conversa.
+      const { data: dono } = await supabase.schema('whatsapp_hub').rpc('inbox_contact_owner', { p_contact: contactId });
+      if (typeof dono === 'string' && dono) {
+        setResultado({ tipo: 'outro', dono, nome });
         setBuscando(false);
         return;
       }
@@ -118,6 +127,15 @@ export function StartWhatsappChat({ onClose, onOpenConversation }: StartWhatsapp
             >
               Abrir conversa
             </Button>
+          </div>
+        )}
+
+        {resultado?.tipo === 'outro' && (
+          <div className="rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-3 text-sm text-[var(--color-text-primary)]">
+            <p className="font-semibold">{resultado.nome?.trim() || 'Este número'} já está em atendimento com {resultado.dono}.</p>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              Para assumir, peça para {resultado.dono} transferir a conversa para você (ou para quem vê todas as conversas).
+            </p>
           </div>
         )}
 

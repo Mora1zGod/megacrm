@@ -868,3 +868,19 @@ Regras:
   antiga. Depois de trocar, `reloadHere()` recarrega NA MESMA tela (antes ia para `/` → Visão geral, a mais pesada); `/contacts/<id>` vai para
   `/contacts`. Vale também para `switch_my_org` e o "Voltar" do modo suporte.
 
+## Conversas separadas por responsável (13/10/2026) — `20261013130000_inbox_ownership.sql`
+- Dono da conversa = `conversations.assigned_to` (preenchido pelo número do vendedor — `channels.assigned_member` — ou pelo rodízio).
+  Sem responsável = fila: todo mundo vê até alguém assumir. Com responsável: só ele, a equipe dele (escopo "equipe") e quem vê todas.
+- "Ver todas": `inbox.view_all` (por pessoa em Permissões individuais ou no perfil) OU escopo "Todas" do perfil OU admin/super admin.
+  `inbox_scope()` = escopo efetivo ('all'/'team'/'own'); "Bloquear" `inbox.view_all` na pessoa vence o "Todas" do perfil.
+  `my_permissions().scopes.inbox` já vem com `inbox_scope()`. Na migração, perfis que tinham escopo "Todas" ganharam `inbox.view_all`.
+- RLS RESTRICTIVE (soma às regras da org): `conversations_owner_scope_sel/upd/del` e `messages_owner_scope` (mensagem só de conversa
+  visível). Equipe: `inbox_team_ids()` (usar `IN (SELECT unnest(...))`, nunca `= ANY((SELECT ...))` — compara uuid com uuid[]).
+- Transferir para OUTRA pessoa pela tabela é recusado (a linha sai da vista de quem altera) → `inbox_set_assignee(conversa, para)`
+  (precisa enxergar a conversa; para outro exige `inbox.transfer` e destino ativo). `useConversations.setAssigned` usa a função
+  (sem ela, cai no update antigo). "Iniciar conversa" com contato de outro: `inbox_contact_owner(contato)` diz com quem está.
+- Aviso de mensagem nova (`_on_inbound_notify`): com responsável → só ele; sem → todos os ATIVOS (`_fanout_notification` agora filtra
+  `status='active'`). Antes ia para todos com o texto da mensagem.
+- Pendente: `send-operator-message`/`send-operator-media` usam service role e não conferem o dono (só a permissão) — a tela não expõe o id
+  de conversa alheia, mas o ideal é conferir também lá.
+
