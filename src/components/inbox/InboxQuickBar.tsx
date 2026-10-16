@@ -1,5 +1,6 @@
-import { useMemo, type ReactNode } from 'react';
-import { Search, X } from 'lucide-react';
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ConversationWithContact } from '@/types/inbox';
 import type { InboxFilterState } from './inbox-filters';
@@ -109,27 +110,12 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, 
     { id: 'grupos', label: 'Grupos', count: contagem.grupos },
   ];
 
+  // Aba sem nada para mostrar (fora Tudo/Grupos) fica oculta.
+  const shown = chips.filter((c) => c.id === 'todas' || c.id === 'grupos' || c.count > 0 || chip === c.id);
+
   return (
     <div className="space-y-2.5">
-      <div className="inbox-quick-filters" role="tablist" aria-label="Filtrar conversas">
-        {chips.map((c) => {
-          const ativo = chip === c.id;
-          // Aba sem nada para mostrar (fora Tudo/Grupos) fica oculta.
-          if (c.id !== 'todas' && c.id !== 'grupos' && c.count === 0 && !ativo) return null;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              title={c.title}
-              aria-pressed={ativo}
-              onClick={() => onChipChange(ativo && c.id !== 'todas' ? 'todas' : c.id)}
-            >
-              {c.label}
-              {c.count > 0 && <span className="count">{c.count}</span>}
-            </button>
-          );
-        })}
-      </div>
+      <QuickChips chips={shown} active={chip} onPick={(id) => onChipChange(chip === id && id !== 'todas' ? 'todas' : id)} />
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
@@ -156,6 +142,95 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, 
         </div>
         {trailing}
       </div>
+    </div>
+  );
+}
+
+// Abas que cabem na largura + "Mais ▾" com as outras (antes a faixa rolava para o lado com a barra
+// escondida e, no computador, as últimas abas — Grupos, Favoritas… — ficavam inalcançáveis).
+// A aba escolhida fica sempre à vista: se ela estiver no "Mais", ocupa o lugar da última que coube.
+type Chip = { id: QuickChip; label: string; count: number; title?: string };
+const GAP = 6;
+const MORE_W = 78;
+
+function QuickChips({ chips, active, onPick }: { chips: Chip[]; active: QuickChip; onPick: (id: QuickChip) => void }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const [fit, setFit] = useState(chips.length);
+  const [menu, setMenu] = useState<{ top: number; right: number } | null>(null);
+  const key = chips.map((c) => `${c.id}:${c.count}`).join('|');
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const meas = measureRef.current;
+    if (!box || !meas) return;
+    const calc = () => {
+      const widths = Array.from(meas.children).map((el) => (el as HTMLElement).offsetWidth);
+      const avail = box.clientWidth;
+      const total = widths.reduce((a, w) => a + w + GAP, -GAP);
+      if (total <= avail) { setFit(widths.length); return; }
+      let used = MORE_W, n = 0;
+      for (const w of widths) { if (used + w + GAP > avail) break; used += w + GAP; n++; }
+      setFit(Math.max(1, n));
+    };
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [key]);
+
+  let visible = chips.slice(0, fit);
+  const activeChip = chips.find((c) => c.id === active);
+  if (activeChip && !visible.includes(activeChip) && visible.length) visible = [...visible.slice(0, -1), activeChip];
+  const hidden = chips.filter((c) => !visible.includes(c));
+
+  const renderChip = (c: Chip, extra?: { tabIndex?: number }) => (
+    <button key={c.id} type="button" title={c.title} aria-pressed={active === c.id} onClick={() => onPick(c.id)} {...extra}>
+      {c.label}
+      {c.count > 0 && <span className="count">{c.count}</span>}
+    </button>
+  );
+
+  const openMenu = () => {
+    const r = moreRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setMenu(menu ? null : { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+  };
+
+  return (
+    <div ref={boxRef} className="relative">
+      {/* Medição invisível de cada aba (largura real com o contador). */}
+      <div ref={measureRef} aria-hidden className="inbox-quick-filters pointer-events-none invisible absolute left-0 top-0 !overflow-visible">
+        {chips.map((c) => renderChip(c, { tabIndex: -1 }))}
+      </div>
+      <div className="inbox-quick-filters !overflow-visible" role="tablist" aria-label="Filtrar conversas">
+        {visible.map((c) => renderChip(c))}
+        {hidden.length > 0 && (
+          <button ref={moreRef} type="button" onClick={openMenu} aria-expanded={!!menu} aria-haspopup="menu" title="Mais filtros">
+            Mais
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {menu && createPortal(
+        <>
+          <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setMenu(null)} />
+          <div role="menu" style={{ top: menu.top, right: menu.right }}
+            className="fade-scale-in fixed z-[calc(var(--z-dropdown)+1)] w-56 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
+            {hidden.map((c) => (
+              <button key={c.id} type="button" role="menuitem" title={c.title}
+                onClick={() => { onPick(c.id); setMenu(null); }}
+                className="flex w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
+                <span className="flex-1">{c.label}</span>
+                {c.count > 0 && <span className="rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-[11px] font-bold text-[var(--color-text-secondary)]">{c.count}</span>}
+                {active === c.id && <Check className="h-4 w-4 text-[var(--accent-primary)]" />}
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   );
 }

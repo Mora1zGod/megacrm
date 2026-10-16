@@ -883,4 +883,7 @@ Regras:
   `status='active'`). Antes ia para todos com o texto da mensagem.
 - Pendente: `send-operator-message`/`send-operator-media` usam service role e não conferem o dono (só a permissão) — a tela não expõe o id
   de conversa alheia, mas o ideal é conferir também lá.
+- Abas do Atendimento (16/10/2026, `InboxQuickBar.tsx` → `QuickChips`): mostra as abas que cabem na largura (medição invisível + ResizeObserver)
+  e o resto num "Mais ▾" (menu em portal). A aba escolhida fica sempre à vista. Antes a faixa rolava para o lado com a barra escondida e,
+  com mouse, Grupos/Favoritas ficavam inalcançáveis.
 
