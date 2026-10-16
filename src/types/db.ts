@@ -18,6 +18,8 @@ export interface Contact {
   name: string | null;
   email: string | null;
   instagram_id?: string | null;
+  // @ do Instagram; name = nome de exibição (20261016100000_inbox_search_instagram.sql).
+  instagram_username?: string | null;
   source?: string | null;
   // Foto de perfil do lead (via UAZAPI). Leads Zernio não têm — fallback iniciais.
   profile_pic_url?: string | null;

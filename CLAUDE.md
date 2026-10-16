@@ -887,3 +887,23 @@ Regras:
   e o resto num "Mais ▾" (menu em portal). A aba escolhida fica sempre à vista. Antes a faixa rolava para o lado com a barra escondida e,
   com mouse, Grupos/Favoritas ficavam inalcançáveis.
 
+
+## Busca da inbox em todas as conversas + @ do Instagram (16/10/2026) — `20261016100000_inbox_search_instagram.sql`
+- Busca (`InboxPage` → `useInboxRemoteList`): com 2+ letras (debounce 300 ms) chama `inbox_search(p_q, p_limit, p_offset)` — SECURITY
+  INVOKER (vale o RLS da org e o de responsável), qualquer status, casa por nome, `instagram_username` (com ou sem @), telefone (só
+  dígitos, 3+) e texto de mensagem (trecho em `snippet`). Índices pg_trgm (schema `extensions`) em messages.content, contacts.name e
+  contacts.instagram_username. Sem a função no banco → volta para a busca antiga na lista carregada (`matchesBusca`).
+- Aba "Concluídas": `status='closed'` e `archived=false`, mais recentes primeiro, 30 por página ("Carregar mais"); o contador vem do
+  `count: exact`. "Tudo" e as outras abas não mudaram. Linhas do servidor passam por `hydrateConversations` (mesma montagem da lista
+  principal) e, se a conversa já estiver carregada, a versão da lista principal vence (status/não lidas atualizados).
+- Selo de status `closed` = "Concluída" (verde, `--inbox-done-text`).
+- Instagram: `contacts.name` = nome de exibição, `contacts.instagram_username` = o @. O payload do Zernio só traz `sender.name` /
+  `participantName` (chega como o @); o nome de exibição vem de `GET /accounts/{accountId}/follow-status/{IGSID}` (`getInstagramProfile`,
+  username + name), consultado no máx. 1x/semana por contato (`instagram_profile_checked_at`). Regras em `_shared/instagram-identity.ts`:
+  nome só é trocado se vazio ou igual ao @/id (nome editado pela equipe fica); sem perfil, só copia o nome para o @ quando é
+  "claramente um @" (minúsculas/dígitos/._ e com ponto, _ ou dígito). Banco sem as colunas → caminho antigo (Legacy).
+- UI: `instagramHandle()` (`src/lib/instagram.ts`) mostra "@usuário" em cinza embaixo do nome (lista, cabeçalho, painel, ficha).
+- Backfill: edge function `instagram-profile-backfill` (POST `{apply, cursor}`, 100 por página, `settings.edit`), dry-run por padrão.
+  Tela: Configurações → Canais → "Nomes dos contatos do Instagram" (Ver o que muda → Aplicar).
+- `webhook_events.payload`: payload bruto só de `message.*` do Instagram (tabela sem policy). `messages.external_url`: link instagram.com
+  do post/story quando vier no payload → botão "Abrir no Instagram" no balão (o aviso de conteúdo que a Meta não libera continua igual).

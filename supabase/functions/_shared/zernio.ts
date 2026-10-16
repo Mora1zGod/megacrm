@@ -557,6 +557,34 @@ export interface ZernioNumberInfo {
   verified_name: string | null;
 }
 
+// GET /accounts/{accountId}/follow-status/{userId} — perfil público de quem mandou DM no Instagram.
+// Doc: docs.zernio.com/accounts/get-instagram-follow-status — userId = IGSID (sender.id do
+// message.received); a resposta traz `username` (o @) e `name` (nome de exibição), ambos podendo
+// vir null. Best-effort: qualquer erro/timeout devolve null (nunca atrasa o webhook mais que ~4s).
+export interface InstagramProfile { username: string | null; name: string | null }
+export async function getInstagramProfile(input: {
+  apiKey: string;
+  accountId: string;
+  userId: string;
+  timeoutMs?: number;
+}): Promise<InstagramProfile | null> {
+  try {
+    const res = await zfetch(
+      input.apiKey,
+      `/accounts/${encodeURIComponent(input.accountId)}/follow-status/${encodeURIComponent(input.userId)}`,
+      { signal: AbortSignal.timeout(input.timeoutMs ?? 4000) },
+    );
+    const root = (res ?? {}) as Record<string, unknown>;
+    const body = root.data && typeof root.data === 'object' ? (root.data as Record<string, unknown>) : root;
+    const username = pickString(body, ['username'])?.trim().replace(/^@/, '') || null;
+    const name = pickString(body, ['name'])?.trim() || null;
+    if (!username && !name) return null;
+    return { username, name };
+  } catch {
+    return null;
+  }
+}
+
 // Resposta real aninhada: { phone: { display_phone_number, verified_name,
 // quality_rating, messaging_limit_tier, status, health_status }, waba: {...} }.
 export async function getNumberInfo(apiKey: string, accountId: string): Promise<ZernioNumberInfo> {

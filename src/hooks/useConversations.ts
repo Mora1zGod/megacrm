@@ -30,6 +30,7 @@ interface ChannelRow {
 interface ContactRow {
   id: string;
   phone: string;
+  instagram_username?: string | null;
   name: string | null;
   email: string | null;
   profile_pic_url: string | null;
@@ -110,6 +111,99 @@ async function loadMessageSummary(ids: string[]): Promise<MsgSummary> {
   return out;
 }
 
+// Contatos da lista. Pede também o @ do Instagram; banco sem a coluna (SQL 20261016100000 não
+// rodado) → pede sem ela, como antes.
+const CONTACT_COLS = 'id, phone, name, email, profile_pic_url, custom_fields, source';
+let igUsernameMissing = false;
+async function loadContacts(ids: string[]) {
+  const supabase = getSupabase();
+  if (!igUsernameMissing) {
+    const r = await fetchInChunks<ContactRow>(ids, (chunk) =>
+      supabase.from('contacts').select(`${CONTACT_COLS}, instagram_username`).in('id', chunk));
+    if (!r.error || !/instagram_username/.test(r.error.message)) return r;
+    igUsernameMissing = true;
+  }
+  return fetchInChunks<ContactRow>(ids, (chunk) => supabase.from('contacts').select(CONTACT_COLS).in('id', chunk));
+}
+
+// Completa linhas de conversations com contato, tags, prévia, canal etc. — usado pela lista
+// principal e pelas listas do servidor (busca em todas as conversas, aba Concluídas).
+export async function hydrateConversations(rows: Conversation[]): Promise<ConversationWithContact[]> {
+  const supabase = getSupabase();
+  const contactIds = Array.from(new Set(rows.map((c) => c.contact_id)));
+  const conversationIds = rows.map((c) => c.id);
+  const channelIds = Array.from(
+    new Set(rows.map((c) => c.channel_id).filter((id): id is string => Boolean(id))),
+  );
+
+  // Batch: contacts + tags do contato + latest messages + clientes (deals)
+  // + canais (número/label pra etiqueta da lista quando há vários UAZAPI).
+  // Cada lista de ids vai fatiada (fetchInChunks) para a URL não estourar.
+  const [contactsQ, tagsQ, lastMsgsQ, clientesQ, channelsQ] = await Promise.all([
+    loadContacts(contactIds),
+    fetchInChunks<{ contact_id: string; tag_id: string }>(contactIds, (chunk) =>
+      supabase
+        .from('contact_tags')
+        .select('contact_id, tag_id')
+        .in('contact_id', chunk),
+    ),
+    loadMessageSummary(conversationIds),
+    fetchInChunks<{ contact_id: string }>(contactIds, (chunk) =>
+      supabase
+        .from('deals')
+        .select('contact_id')
+        .eq('lead_type', 'Cliente')
+        .in('contact_id', chunk),
+    ),
+    fetchInChunks<ChannelRow>(channelIds, (chunk) =>
+      supabase
+        .from('channels')
+        .select('id, phone, label')
+        .in('id', chunk),
+    ),
+  ]);
+
+  if (contactsQ.error) throw new Error(contactsQ.error.message);
+  const contactsById = new Map<string, ContactRow>();
+  for (const c of (contactsQ.data ?? []) as ContactRow[]) contactsById.set(c.id, c);
+
+  // Tags por contato (para o filtro de Tags do inbox).
+  const tagsByContact = new Map<string, string[]>();
+  for (const t of (tagsQ.data ?? []) as Array<{ contact_id: string; tag_id: string }>) {
+    const arr = tagsByContact.get(t.contact_id) ?? [];
+    arr.push(t.tag_id);
+    tagsByContact.set(t.contact_id, arr);
+  }
+
+  const latestByConv = lastMsgsQ.latest;
+  const lastDirByConv = lastMsgsQ.lastDir;
+  const lastInboundByConv = lastMsgsQ.lastInbound;
+  const waitingByConv = lastMsgsQ.waiting;
+
+  const clienteSet = new Set(
+    ((clientesQ.data ?? []) as Array<{ contact_id: string }>).map((d) => d.contact_id),
+  );
+
+  const channelsById = new Map<string, ChannelRow>();
+  for (const ch of (channelsQ.data ?? []) as ChannelRow[]) channelsById.set(ch.id, ch);
+
+  return rows.map((c) => {
+    const ch = c.channel_id ? channelsById.get(c.channel_id) : undefined;
+    return {
+      ...c,
+      contact: contactsById.get(c.contact_id) ?? null,
+      lastMessagePreview: latestByConv.get(c.id) ?? null,
+      lastMessageDirection: lastDirByConv.get(c.id) ?? null,
+      tagIds: tagsByContact.get(c.contact_id) ?? [],
+      lastInboundAt: lastInboundByConv.get(c.id) ?? null,
+      isCliente: clienteSet.has(c.contact_id),
+      channelPhone: ch?.phone ?? null,
+      channelLabel: ch?.label ?? null,
+      waitingSince: c.status === 'closed' ? null : (waitingByConv.get(c.id) ?? null),
+    };
+  });
+}
+
 export function useConversations(): UseConversationsResult {
   const { userId } = useAppUser();
   const [conversations, setConversations] = useState<ConversationWithContact[]>([]);
@@ -139,89 +233,14 @@ export function useConversations(): UseConversationsResult {
       return;
     }
 
-    const rows = (convs ?? []) as Conversation[];
-    const contactIds = Array.from(new Set(rows.map((c) => c.contact_id)));
-    const conversationIds = rows.map((c) => c.id);
-    const channelIds = Array.from(
-      new Set(rows.map((c) => c.channel_id).filter((id): id is string => Boolean(id))),
-    );
-
-    // Batch: contacts + tags do contato + latest messages + clientes (deals)
-    // + canais (número/label pra etiqueta da lista quando há vários UAZAPI).
-    // Cada lista de ids vai fatiada (fetchInChunks) para a URL não estourar.
-    const [contactsQ, tagsQ, lastMsgsQ, clientesQ, channelsQ] = await Promise.all([
-      fetchInChunks<ContactRow>(contactIds, (chunk) =>
-        supabase
-          .from('contacts')
-          .select('id, phone, name, email, profile_pic_url, custom_fields, source')
-          .in('id', chunk),
-      ),
-      fetchInChunks<{ contact_id: string; tag_id: string }>(contactIds, (chunk) =>
-        supabase
-          .from('contact_tags')
-          .select('contact_id, tag_id')
-          .in('contact_id', chunk),
-      ),
-      loadMessageSummary(conversationIds),
-      fetchInChunks<{ contact_id: string }>(contactIds, (chunk) =>
-        supabase
-          .from('deals')
-          .select('contact_id')
-          .eq('lead_type', 'Cliente')
-          .in('contact_id', chunk),
-      ),
-      fetchInChunks<ChannelRow>(channelIds, (chunk) =>
-        supabase
-          .from('channels')
-          .select('id, phone, label')
-          .in('id', chunk),
-      ),
-    ]);
-
-    if (contactsQ.error) {
-      setError(contactsQ.error.message);
+    let merged: ConversationWithContact[];
+    try {
+      merged = await hydrateConversations((convs ?? []) as Conversation[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha ao carregar as conversas.');
       setLoading(false);
       return;
     }
-    const contactsById = new Map<string, ContactRow>();
-    for (const c of (contactsQ.data ?? []) as ContactRow[]) contactsById.set(c.id, c);
-
-    // Tags por contato (para o filtro de Tags do inbox).
-    const tagsByContact = new Map<string, string[]>();
-    for (const t of (tagsQ.data ?? []) as Array<{ contact_id: string; tag_id: string }>) {
-      const arr = tagsByContact.get(t.contact_id) ?? [];
-      arr.push(t.tag_id);
-      tagsByContact.set(t.contact_id, arr);
-    }
-
-    const latestByConv = lastMsgsQ.latest;
-    const lastDirByConv = lastMsgsQ.lastDir;
-    const lastInboundByConv = lastMsgsQ.lastInbound;
-    const waitingByConv = lastMsgsQ.waiting;
-
-    const clienteSet = new Set(
-      ((clientesQ.data ?? []) as Array<{ contact_id: string }>).map((d) => d.contact_id),
-    );
-
-    const channelsById = new Map<string, ChannelRow>();
-    for (const ch of (channelsQ.data ?? []) as ChannelRow[]) channelsById.set(ch.id, ch);
-
-    const merged: ConversationWithContact[] = rows.map((c) => {
-      const ch = c.channel_id ? channelsById.get(c.channel_id) : undefined;
-      return {
-        ...c,
-        contact: contactsById.get(c.contact_id) ?? null,
-        lastMessagePreview: latestByConv.get(c.id) ?? null,
-        lastMessageDirection: lastDirByConv.get(c.id) ?? null,
-        tagIds: tagsByContact.get(c.contact_id) ?? [],
-        lastInboundAt: lastInboundByConv.get(c.id) ?? null,
-        isCliente: clienteSet.has(c.contact_id),
-        channelPhone: ch?.phone ?? null,
-        channelLabel: ch?.label ?? null,
-        waitingSince: c.status === 'closed' ? null : (waitingByConv.get(c.id) ?? null),
-      };
-    });
-
     setConversations(merged);
     setLoading(false);
   }, [userId]);

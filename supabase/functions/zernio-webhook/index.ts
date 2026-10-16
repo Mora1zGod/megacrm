@@ -29,7 +29,8 @@
 import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { getCredential, setCredential } from '../_shared/credentials.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
-import { getNumberInfo, loadZernioContext } from '../_shared/zernio.ts';
+import { getInstagramProfile, getNumberInfo, loadZernioContext, type InstagramProfile } from '../_shared/zernio.ts';
+import { cleanUsername, decideIgIdentity, needsProfileLookup } from '../_shared/instagram-identity.ts';
 import { getChannelByZernioAccount, type ChannelRow } from '../_shared/channels.ts';
 import { maybeAddLeadToFunnel } from '../_shared/funnel.ts';
 
@@ -241,7 +242,118 @@ async function findOrCreateContact(
 
 // Instagram: o contato é identificado pelo IG-scoped id (não tem telefone).
 // Dedup por instagram_id (por org); se não existir, cria com source='instagram'.
+//
+// Nome de exibição × @usuário (20261016100000_inbox_search_instagram.sql): o payload do Zernio traz
+// só sender.name / participantName — que no Instagram chega como o @. O nome de exibição vem da
+// rota de perfil do Zernio (getInstagramProfile), consultada no máximo 1x/semana por contato e só
+// quando falta o @ ou o nome ainda é automático. Nome editado pela equipe nunca é trocado.
+// Banco sem o SQL novo → segue exatamente o comportamento antigo.
+let igColsMissing = false;
+const igApiKeyCache = new Map<string, string | null>();
+async function lookupIgProfile(orgId: string, accountId: string | null, igId: string): Promise<InstagramProfile | null> {
+  if (!accountId || !/^\d+$/.test(igId)) return null; // a rota pede o IGSID numérico
+  if (!igApiKeyCache.has(orgId)) igApiKeyCache.set(orgId, (await getCredential(orgId, 'zernio_api_key'))?.trim() || null);
+  const apiKey = igApiKeyCache.get(orgId);
+  if (!apiKey) return null;
+  return await getInstagramProfile({ apiKey, accountId, userId: igId });
+}
+
 async function findOrCreateInstagramContact(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  igId: string,
+  name: string | null,
+  pictureUrl?: string | null,
+  ident?: { username: string | null; accountId: string | null },
+): Promise<string | null> {
+  if (!igColsMissing) {
+    const r = await findOrCreateInstagramContactV2(admin, orgId, igId, name, pictureUrl ?? null, ident);
+    if (r !== 'missing_cols') return r;
+    igColsMissing = true;
+  }
+  return await findOrCreateInstagramContactLegacy(admin, orgId, igId, name, pictureUrl);
+}
+
+function isMissingIgCol(err: { message?: string } | null): boolean {
+  return !!err && /instagram_username|instagram_profile_checked_at/.test(err.message ?? '');
+}
+
+async function findOrCreateInstagramContactV2(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  igId: string,
+  name: string | null,
+  pictureUrl: string | null,
+  ident?: { username: string | null; accountId: string | null },
+): Promise<string | null | 'missing_cols'> {
+  const { data: existing, error: selErr } = await admin
+    .from('contacts')
+    .select('id, name, profile_pic_url, profile_pic_updated_at, instagram_username, instagram_profile_checked_at')
+    .eq('org_id', orgId)
+    .eq('instagram_id', igId)
+    .maybeSingle();
+  if (isMissingIgCol(selErr)) return 'missing_cols';
+  const payloadUsername = ident?.username ?? null;
+  const nowIso = new Date().toISOString();
+
+  if (existing) {
+    const e = existing as {
+      id: string; name: string | null; profile_pic_url: string | null; profile_pic_updated_at: string | null;
+      instagram_username: string | null; instagram_profile_checked_at: string | null;
+    };
+    const current = { name: e.name, username: e.instagram_username };
+    const patch: Record<string, unknown> = {};
+    let profile: InstagramProfile | null = null;
+    if (needsProfileLookup(current, igId, e.instagram_profile_checked_at)) {
+      profile = await lookupIgProfile(orgId, ident?.accountId ?? null, igId);
+      if (ident?.accountId) patch.instagram_profile_checked_at = nowIso;
+    }
+    Object.assign(patch, decideIgIdentity({ current, igId, payloadName: name, payloadUsername, profile }));
+    const refreshPicture = !!pictureUrl && pictureUrl !== e.profile_pic_url
+      && !pictureIsFresh(e.profile_pic_url, e.profile_pic_updated_at);
+    if (refreshPicture) {
+      patch.profile_pic_url = pictureUrl;
+      patch.profile_pic_updated_at = nowIso;
+    }
+    if (Object.keys(patch).length > 0) {
+      await admin.from('contacts').update(patch).eq('id', e.id);
+    }
+    if (refreshPicture && pictureUrl) archiveContactPicture(admin, orgId, e.id, pictureUrl);
+    return e.id;
+  }
+
+  const profile = await lookupIgProfile(orgId, ident?.accountId ?? null, igId);
+  const decided = decideIgIdentity({ current: { name: null, username: null }, igId, payloadName: name, payloadUsername, profile });
+  const { data: created, error } = await admin
+    .from('contacts')
+    .insert({
+      org_id: orgId,
+      instagram_id: igId,
+      name: decided.name ?? null,
+      instagram_username: decided.instagram_username ?? null,
+      instagram_profile_checked_at: ident?.accountId ? nowIso : null,
+      source: 'instagram',
+      profile_pic_url: pictureUrl ?? null,
+      profile_pic_updated_at: pictureUrl ? nowIso : null,
+    })
+    .select('id')
+    .single();
+  if (isMissingIgCol(error)) return 'missing_cols';
+  if (error) {
+    // Corrida (dois eventos do mesmo contato ao mesmo tempo): o outro criou — usa o dele.
+    if ((error as { code?: string }).code === '23505') {
+      const { data: again } = await admin.from('contacts').select('id').eq('org_id', orgId).eq('instagram_id', igId).maybeSingle();
+      return (again as { id: string } | null)?.id ?? null;
+    }
+    return null;
+  }
+  const createdId = (created as { id: string }).id;
+  if (pictureUrl) archiveContactPicture(admin, orgId, createdId, pictureUrl);
+  return createdId;
+}
+
+// Comportamento anterior (banco sem as colunas novas).
+async function findOrCreateInstagramContactLegacy(
   admin: ReturnType<typeof getAdminClient>,
   orgId: string,
   igId: string,
@@ -397,6 +509,26 @@ const STORY_REPLY_LABEL = '↩️ Respondeu ao story do AMAI';
 const UNAVAILABLE_LABEL =
   '[Conteúdo do Instagram que a Meta não libera pela API (story/post compartilhado). Abra a conversa no app do Instagram para ver.]';
 
+// Link do post/story NO INSTAGRAM (instagram.com), quando o Zernio mandar — vira o botão
+// "Abrir no Instagram" na conversa. Link de CDN (mídia) não conta: esse já é a própria mídia.
+function instagramLink(message: Record<string, unknown>): string | null {
+  const meta = asObject(message.metadata);
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const pools: Record<string, unknown>[] = [message, meta, asObject(message.storyReply ?? meta.storyReply), asObject(message.share ?? meta.share)];
+  for (const a of attachments) { const o = asObject(a); pools.push(o, asObject(o.payload)); }
+  for (const o of pools) {
+    for (const k of ['permalink', 'postUrl', 'shareUrl', 'link', 'href', 'url', 'storyUrl']) {
+      const v = o[k];
+      if (typeof v !== 'string') continue;
+      try {
+        const u = new URL(v.trim());
+        if (u.protocol === 'https:' && /(^|\.)instagram\.com$/i.test(u.hostname)) return u.toString();
+      } catch { /* não é URL */ }
+    }
+  }
+  return null;
+}
+
 function decodeInbound(message: Record<string, unknown>): {
   contentType: 'text' | 'image' | 'audio' | 'video' | 'document';
   content: string | null;
@@ -505,7 +637,15 @@ async function handleMessageReceived(
       errors.push('message.received (instagram) sem identidade');
       return;
     }
-    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName, contactPicture);
+    const igAccount = asObject(data.account);
+    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName, contactPicture, {
+      // O @ quando o Zernio mandar em campo próprio; senão a regra deduz/consulta o perfil.
+      username: cleanUsername(
+        str(sender, ['username', 'userName', 'handle']) ??
+        str(conversation, ['participantUsername', 'participantHandle']),
+      ),
+      accountId: str(igAccount, ['accountId', 'id', '_id']) ?? str(message, ['accountId', 'account_id']),
+    });
     if (!contactId) {
       errors.push(`contato instagram falhou: ${igId}`);
       return;
@@ -577,7 +717,9 @@ async function handleMessageReceived(
   }
 
   const { contentType, content, mediaUrl } = decodeInbound(message);
+  const externalUrl = platform === 'instagram' ? instagramLink(message) : null;
   const { error: insErr } = await insertMessageRow(admin, {
+    ...(externalUrl ? { external_url: externalUrl } : {}),
     org_id: orgId,
     conversation_id: conversationId,
     direction: 'inbound',
@@ -649,7 +791,11 @@ async function insertOutboundFromCompanionDevice(
   if (channel === 'instagram') {
     const igId = str(conversation, ['participantId']);
     if (!igId) return;
-    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName, contactPicture);
+    const igAccount = asObject(data.account);
+    contactId = await findOrCreateInstagramContact(admin, orgId, igId, contactName, contactPicture, {
+      username: cleanUsername(str(conversation, ['participantUsername', 'participantHandle'])),
+      accountId: str(igAccount, ['accountId', 'id', '_id']) ?? str(message, ['accountId', 'account_id']),
+    });
   } else {
     const recipient = asObject(message.recipient);
     const phone =
@@ -741,12 +887,16 @@ async function insertMessageRow(
   admin: ReturnType<typeof getAdminClient>,
   row: Record<string, unknown>,
 ): Promise<{ error: { message: string; code?: string } | null }> {
-  const first = await admin.from('messages').insert(row);
-  if (first.error && /platform_message_id/.test(first.error.message) && 'platform_message_id' in row) {
-    const { platform_message_id: _drop, ...rest } = row;
-    return await admin.from('messages').insert(rest);
+  // Também tolera o banco sem external_url (SQL 20261016100000 não rodado).
+  let cur = row;
+  for (let i = 0; i < 3; i++) {
+    const res = await admin.from('messages').insert(cur);
+    const col = res.error ? ['platform_message_id', 'external_url'].find((c) => c in cur && res.error!.message.includes(c)) : undefined;
+    if (!col) return res;
+    const { [col]: _drop, ...rest } = cur;
+    cur = rest;
   }
-  return first;
+  return await admin.from('messages').insert(cur);
 }
 
 async function handleStatus(
@@ -973,11 +1123,22 @@ Deno.serve(async (req) => {
 
   const event = normalizeEvent(payload);
 
+  // Payload bruto só das mensagens do Instagram (webhook_events.payload, sem policy = só o servidor
+  // lê) — para conferir no banco o formato real que o Zernio manda.
+  const rawPlatform = (
+    str(asObject(event.data.message), ['platform']) ?? str(asObject(event.data.account), ['platform']) ?? ''
+  ).toLowerCase();
+  const keepPayload = rawPlatform === 'instagram' && event.type.startsWith('message.');
+
   // Idempotencia: registra o event id. Se ja existe (23505), ja foi processado.
   if (event.id) {
-    const { error: dupErr } = await admin
+    const base = { org_id: orgId, zernio_event_id: event.id, event_type: event.type };
+    let { error: dupErr } = await admin
       .from('webhook_events')
-      .insert({ org_id: orgId, zernio_event_id: event.id, event_type: event.type });
+      .insert(keepPayload ? { ...base, payload } : base);
+    if (dupErr && keepPayload && /payload/.test(dupErr.message)) {
+      ({ error: dupErr } = await admin.from('webhook_events').insert(base));
+    }
     if (dupErr) {
       if ((dupErr as { code?: string }).code === '23505') {
         return jsonResponse({ ok: true, deduped: true });

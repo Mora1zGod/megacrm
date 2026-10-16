@@ -1,3 +1,4 @@
+import { instagramHandle } from '@/lib/instagram';
 import { useEffect, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
@@ -458,6 +459,9 @@ export function ContactPanel({
           <Avatar src={contact?.profile_pic_url} name={displayName} size="lg" />
           <div className="min-w-0">
             <div className="truncate text-lg font-bold text-[var(--color-text-primary)]">{displayName}</div>
+            {instagramHandle(contact) && (
+              <div className="truncate text-sm text-[var(--color-text-muted)]">{instagramHandle(contact)}</div>
+            )}
             {contact?.phone && (
               <div className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)]">
                 <span className="truncate">{formatPhoneDisplay(contact.phone)}</span>
@@ -474,6 +478,12 @@ export function ContactPanel({
         <dl className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-x-2 gap-y-2.5 text-sm">
           <dt className="inbox-field-label">Nome</dt>
           <dd className="truncate text-[var(--color-text-primary)]">{contact?.name?.trim() || '—'}</dd>
+          {contact?.instagram_username && (
+            <>
+              <dt className="inbox-field-label">Instagram</dt>
+              <dd className="truncate text-[var(--color-text-secondary)]">@{contact.instagram_username.replace(/^@/, '')}</dd>
+            </>
+          )}
           <dt className="inbox-field-label">Telefone</dt>
           <dd className="flex min-w-0 items-center gap-1.5 text-[var(--color-text-primary)]">
             <span className="truncate">{contact?.phone ? formatPhoneDisplay(contact.phone) : '—'}</span>

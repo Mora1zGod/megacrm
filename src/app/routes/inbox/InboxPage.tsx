@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
 import { useWhatsappProvider } from '@/hooks/useWhatsappProvider';
 import { useConversations } from '@/hooks/useConversations';
+import { useInboxRemoteList, type RemoteMode } from '@/hooks/useInboxRemoteList';
+import { instagramHandle } from '@/lib/instagram';
 import type { ConversationWithContact, Message } from '@/types/inbox';
 import { useMessages } from '@/hooks/useMessages';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
@@ -77,6 +79,12 @@ export default function InboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showStartChat, setShowStartChat] = useState(false);
   const [busca, setBusca] = useState('');
+  // Busca no servidor (todas as conversas, qualquer status) com debounce de 300 ms.
+  const [buscaServidor, setBuscaServidor] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaServidor(busca.trim()), 300);
+    return () => clearTimeout(t);
+  }, [busca]);
   const [quickChip, setQuickChip] = useState<QuickChip>('todas');
   const [filters, setFiltersState] = useState<InboxFilterState>(() =>
     readFiltersFromParams(searchParams),
@@ -205,20 +213,42 @@ export default function InboxPage() {
     return conversations.filter((c) => matchesFilters(c, filters, now));
   }, [conversations, filters]);
 
+  // Listas do servidor (20261016100000_inbox_search_instagram.sql): com texto na busca, procura em
+  // TODAS as conversas da organização (inclusive concluídas); a aba Concluídas lista as closed,
+  // paginada. Sem o SQL novo a busca continua a antiga (na lista carregada). A aba "Tudo" e as
+  // outras abas seguem iguais.
+  const remoteMode: RemoteMode | null = buscaServidor.length >= 2 ? 'search' : quickChip === 'concluidas' ? 'closed' : null;
+  const remote = useInboxRemoteList(remoteMode, buscaServidor);
+  const usingRemote = remoteMode !== null && !(remoteMode === 'search' && remote.unavailable);
+  const conversationsById = useMemo(() => new Map(conversations.map((c) => [c.id, c])), [conversations]);
+  // Mesma conversa já carregada na lista principal → usa a versão dela (mais nova: status, não lidas).
+  const remoteConversations = useMemo(
+    () => remote.items.map((r) => {
+      const m = conversationsById.get(r.id);
+      return m ? { ...m, searchMatch: r.searchMatch } : r;
+    }),
+    [remote.items, conversationsById],
+  );
+
   const visibleConversations = useMemo(() => {
+    if (usingRemote) {
+      return quickChip === 'concluidas' ? remoteConversations.filter((c) => c.status === 'closed') : remoteConversations;
+    }
     const filtered = baseConversations.filter(
       (c) => matchesQuickChip(c, quickChip, sla.late) && matchesBusca(c, busca),
     );
     return sortConversations(filtered, sort);
     // `now` entra para a aba "Atrasadas" acompanhar o relógio.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseConversations, quickChip, busca, sort, sla.late, now]);
+  }, [usingRemote, remoteConversations, baseConversations, quickChip, busca, sort, sla.late, now]);
 
   const { messages, loading: loadingMsgs, sendText, retry, dismissFailed } = useMessages(selectedId);
 
   const selected = useMemo(
-    () => conversations.find((c) => c.id === selectedId) ?? null,
-    [conversations, selectedId],
+    () => conversations.find((c) => c.id === selectedId)
+      ?? remoteConversations.find((c) => c.id === selectedId)
+      ?? null,
+    [conversations, remoteConversations, selectedId],
   );
   const selectedIsGroup = selected ? isGroupConversation(selected) : false;
 
@@ -288,6 +318,7 @@ export default function InboxPage() {
     try {
       await setStatus(selected.id, closing ? 'closed' : 'human_active');
       toast.success(closing ? 'Conversa concluída.' : 'Conversa reaberta.');
+      if (usingRemote) remote.refresh();
     } catch (err) {
       toast.error(closing ? 'Falha ao concluir' : 'Falha ao reabrir', { description: err instanceof Error ? err.message : String(err) });
     }
@@ -356,6 +387,7 @@ export default function InboxPage() {
               filters={filters}
               slaLateMinutes={sla.late}
               now={now}
+              closedCount={remoteMode === 'closed' ? remote.total : null}
               trailing={
                 <InboxFilters
                   compact
@@ -374,9 +406,19 @@ export default function InboxPage() {
             )}
           </div>
           <div className="flex-1 overflow-y-auto">
+            {usingRemote && remoteMode === 'search' && (
+              <div className="px-4 pb-1 text-xs text-[var(--color-text-muted)]">
+                Buscando em todas as conversas, inclusive as concluídas.
+              </div>
+            )}
+            {usingRemote && remote.error && (
+              <div className="px-4 pb-1 text-xs text-[var(--color-error)]">Falha na busca: {remote.error}</div>
+            )}
             <ConversationList
               conversations={visibleConversations}
-              loading={loadingConvs}
+              loading={usingRemote ? remote.loading : loadingConvs}
+              emptyTitle={usingRemote ? (remoteMode === 'search' ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa concluída') : undefined}
+              emptyText={usingRemote ? (remoteMode === 'search' ? `Nada com “${buscaServidor}” no nome, @, telefone ou mensagens.` : 'As conversas concluídas aparecem aqui.') : undefined}
               selectedId={selectedId}
               onSelect={setSelectedId}
               aiEnabledForChannel={aiEnabledForChannel}
@@ -386,6 +428,18 @@ export default function InboxPage() {
               sla={sla}
               now={now}
             />
+            {usingRemote && remote.hasMore && !remote.loading && (
+              <div className="px-2 pb-3">
+                <button
+                  type="button"
+                  onClick={() => void remote.loadMore()}
+                  disabled={remote.loadingMore}
+                  className="w-full rounded-lg border border-[var(--color-border-card)] py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-60"
+                >
+                  {remote.loadingMore ? 'Carregando…' : 'Carregar mais'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -411,7 +465,9 @@ export default function InboxPage() {
                     {selected.contact?.name?.trim() || formatPhone(selected.contact?.phone) || '—'}
                   </div>
                   <div className="mt-0.5 flex items-center gap-1.5 text-[15px] text-[var(--color-text-secondary)]">
-                    <span className="truncate">{selectedIsGroup ? 'Grupo do WhatsApp' : formatPhoneDisplay(selected.contact?.phone)}</span>
+                    <span className="truncate">{selectedIsGroup ? 'Grupo do WhatsApp' : (instagramHandle(selected.contact)
+                      ? [selected.contact?.phone ? formatPhoneDisplay(selected.contact.phone) : null, instagramHandle(selected.contact)].filter(Boolean).join(' · ')
+                      : formatPhoneDisplay(selected.contact?.phone))}</span>
                     {!selectedIsGroup && selected.contact?.phone && (
                       <button
                         type="button"

@@ -1,5 +1,6 @@
-import { Bot, Inbox, Instagram, Lock, MessageCircle, PauseCircle, Timer, User, Users } from 'lucide-react';
+import { Bot, CheckCircle2, Instagram, Lock, MessageCircle, PauseCircle, Timer, User, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { instagramHandle } from '@/lib/instagram';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { WhatsappProvider } from '@/hooks/useWhatsappProvider';
@@ -47,11 +48,15 @@ interface ConversationListProps {
   // SLA de resposta (minutos) + relógio — mostra "esperando há X min".
   sla?: SlaConfig;
   now?: number;
+  // Texto quando a lista está vazia (ex.: busca sem resultado, aba Concluídas vazia).
+  emptyTitle?: string;
+  emptyText?: string;
 }
 
 function statusChip(c: ConversationWithContact, aiEnabled: boolean, assignedName: string | null) {
+  // Selo "Concluída" (aparece também nos resultados da busca em todas as conversas).
   if (c.status === 'closed') {
-    return { Icon: Inbox, label: 'Fechada', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
+    return { Icon: CheckCircle2, label: 'Concluída', className: 'bg-[rgba(34,197,94,0.14)] text-[var(--inbox-done-text,#15803D)]' };
   }
   if (assignedName) {
     return { Icon: User, label: assignedName, className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
@@ -83,6 +88,8 @@ export function ConversationList({
   providerOf,
   sla = DEFAULT_SLA,
   now = Date.now(),
+  emptyTitle,
+  emptyText,
 }: ConversationListProps) {
   if (loading) {
     return (
@@ -103,9 +110,9 @@ export function ConversationList({
   if (conversations.length === 0) {
     return (
       <div className="p-6 text-center">
-        <div className="text-sm font-medium text-[var(--color-text-primary)] mb-1">Nenhuma conversa ainda</div>
+        <div className="text-sm font-medium text-[var(--color-text-primary)] mb-1">{emptyTitle ?? 'Nenhuma conversa ainda'}</div>
         <p className="text-xs text-[var(--color-text-secondary)] max-w-[240px] mx-auto">
-          Conversas aparecem aqui assim que um contato enviar a primeira mensagem.
+          {emptyText ?? 'Conversas aparecem aqui assim que um contato enviar a primeira mensagem.'}
         </p>
       </div>
     );
@@ -129,6 +136,9 @@ export function ConversationList({
         const isActive = c.id === selectedId;
         const contact = c.contact;
         const displayName = contact?.name?.trim() || (isGroup ? 'Grupo' : contact?.phone) || '—';
+        const handle = instagramHandle(contact);
+        // Busca no servidor que casou no texto de uma mensagem: mostra o trecho que casou.
+        const preview = c.searchMatch?.field === 'message' && c.searchMatch.snippet ? c.searchMatch.snippet : c.lastMessagePreview;
 
         const unread = c.unread_count > 0;
         const isInstagram = c.channel === 'instagram';
@@ -162,9 +172,12 @@ export function ConversationList({
                     {formatTimestamp(c.last_message_at)}
                   </span>
                 </div>
+                {handle && (
+                  <div className="truncate text-xs text-[var(--color-text-muted)]">{handle}</div>
+                )}
                 <div className="mt-0.5 flex items-center gap-2">
                   <p className={cn('flex-1 truncate text-[13.5px]', unread ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]')}>
-                    {locked ? <span className="italic opacity-70">Conversa em atendimento</span> : (c.lastMessagePreview ?? '—')}
+                    {locked ? <span className="italic opacity-70">Conversa em atendimento</span> : (preview ?? '—')}
                   </p>
                   {unread && (
                     <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] px-1.5 text-[11px] font-bold text-white">

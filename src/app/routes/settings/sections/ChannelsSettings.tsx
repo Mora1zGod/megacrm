@@ -22,6 +22,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { getSupabase } from '@/lib/supabase';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { ImportHistoryModal } from './ImportHistoryModal';
+import { InstagramNamesBackfill } from './InstagramNamesBackfill';
 import { formatPhone } from '@/lib/format';
 
 // Configurações → Canais. Multi-número: cada linha de whatsapp_hub.channels é
@@ -1222,6 +1223,8 @@ export function ChannelsSettings() {
           )}
         </div>
       </section>
+
+      {instagram && <InstagramNamesBackfill />}
 
       {/* ── UAZAPI (card único) ── */}
       <section>

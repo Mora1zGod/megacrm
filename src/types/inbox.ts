@@ -66,6 +66,8 @@ export interface Message {
   forwarded?: boolean;
   // Texto corrigido pela equipe depois do envio (edit-operator-message).
   edited_at?: string | null;
+  // Link do post/story no Instagram, quando o Zernio manda (botão "Abrir no Instagram").
+  external_url?: string | null;
 }
 
 export interface ConversationWithContact extends Conversation {
@@ -80,7 +82,11 @@ export interface ConversationWithContact extends Conversation {
     custom_fields: Record<string, unknown>;
     // 'whatsapp' | 'instagram' — de onde o contato entrou em contato a 1ª vez.
     source: string | null;
+    // @ do Instagram (o name é o nome de exibição). Ausente com o banco sem o SQL 20261016100000.
+    instagram_username?: string | null;
   } | null;
+  // Resultado da busca no servidor (inbox_search): onde casou e o trecho da mensagem.
+  searchMatch?: { field: 'name' | 'username' | 'phone' | 'message'; snippet: string | null } | null;
   lastMessagePreview: string | null;
   // Direção da última mensagem não-privada. 'inbound' ⇒ quem falou por último
   // foi o contato, ou seja, a conversa está aguardando resposta.

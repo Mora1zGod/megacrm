@@ -1,3 +1,4 @@
+import { instagramHandle } from '@/lib/instagram';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -128,6 +129,9 @@ export default function ContactDetailPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-display">{contact.name ?? 'Sem nome'}</h1>
+            {instagramHandle(contact) && (
+              <div className="text-sm text-[var(--color-text-muted)]">{instagramHandle(contact)}</div>
+            )}
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-secondary)]">
               {contact.source && (
                 <span className="rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5">

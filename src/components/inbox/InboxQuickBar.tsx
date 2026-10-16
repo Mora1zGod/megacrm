@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import type { ConversationWithContact } from '@/types/inbox';
 import type { InboxFilterState } from './inbox-filters';
 
-export type QuickChip = 'todas' | 'nao_lidas' | 'aguardando' | 'atrasadas' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas' | 'grupos';
+export type QuickChip = 'todas' | 'nao_lidas' | 'concluidas' | 'aguardando' | 'atrasadas' | 'aguardando_cliente' | 'ia_pausada' | 'favoritas' | 'grupos';
 
 // Grupo do WhatsApp (UAZAPI): o contato do grupo tem como "telefone" o JID
 // do grupo (…@g.us). Grupos ficam só na aba Grupos — não misturam com os
@@ -55,6 +55,9 @@ export function matchesQuickChip(c: ConversationWithContact, chip: QuickChip, sl
       return Boolean(c.ai_paused);
     case 'favoritas':
       return Boolean(c.is_favorite);
+    // A aba Concluídas vem do servidor (useInboxRemoteList); aqui só por segurança.
+    case 'concluidas':
+      return c.status === 'closed';
     default:
       return true;
   }
@@ -76,7 +79,7 @@ export function matchesBusca(c: ConversationWithContact, busca: string): boolean
   return ultima.includes(q);
 }
 
-export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, trailing, slaLateMinutes = 15, now }: Props & { trailing?: ReactNode; slaLateMinutes?: number; now?: number }) {
+export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, trailing, slaLateMinutes = 15, now, closedCount }: Props & { trailing?: ReactNode; slaLateMinutes?: number; now?: number; closedCount?: number | null }) {
   const contagem = useMemo(() => {
     let naoLidas = 0;
     let aguardando = 0;
@@ -102,6 +105,8 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, 
   const chips: Array<{ id: QuickChip; label: string; count: number; title?: string }> = [
     { id: 'todas', label: 'Tudo', count: contagem.todas },
     { id: 'nao_lidas', label: 'Não lidas', count: contagem.naoLidas },
+    // Conversas concluídas (status closed) — lista paginada do servidor; sempre visível.
+    { id: 'concluidas', label: 'Concluídas', count: closedCount ?? 0, title: 'Conversas concluídas, mais recentes primeiro' },
     { id: 'aguardando', label: 'Aguardando', count: contagem.aguardando, title: 'Aguardando resposta da equipe' },
     { id: 'atrasadas', label: 'Atrasadas', count: contagem.atrasadas, title: `Esperando resposta há ${slaLateMinutes} min ou mais (SLA)` },
     { id: 'aguardando_cliente', label: 'Aguardando cliente', count: contagem.aguardandoCliente },
@@ -111,7 +116,7 @@ export function InboxQuickBar({ busca, onBuscaChange, chip, onChipChange, base, 
   ];
 
   // Aba sem nada para mostrar (fora Tudo/Grupos) fica oculta.
-  const shown = chips.filter((c) => c.id === 'todas' || c.id === 'grupos' || c.count > 0 || chip === c.id);
+  const shown = chips.filter((c) => c.id === 'todas' || c.id === 'grupos' || c.id === 'concluidas' || c.count > 0 || chip === c.id);
 
   return (
     <div className="space-y-2.5">

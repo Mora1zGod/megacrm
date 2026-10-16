@@ -17,6 +17,7 @@
   --inbox-bubble-in: #FFFFFF;
   --inbox-wa: #25D366;                /* ícone WhatsApp */
   --inbox-warn-text: #B45309;
+  --inbox-done-text: #15803D;         /* selo Concluída */
 }
 :root[data-theme='dark'] .inbox-workspace,
 :root:not([data-theme='light']) .inbox-workspace {
@@ -31,6 +32,7 @@
   --inbox-wallpaper-dot: rgba(233, 237, 239, 0.035);
   --inbox-bubble-in: var(--color-surface-raised);
   --inbox-warn-text: #FBBF24;
+  --inbox-done-text: #4ADE80;
 }
 :root[data-theme='light'] .inbox-workspace {
   --accent-primary: #15803D;
@@ -44,6 +46,7 @@
   --inbox-wallpaper-dot: rgba(17, 27, 33, 0.045);
   --inbox-bubble-in: #FFFFFF;
   --inbox-warn-text: #B45309;
+  --inbox-done-text: #15803D;         /* selo Concluída */
 }
 
 /* ---- Estrutura -------------------------------------------------------------- */

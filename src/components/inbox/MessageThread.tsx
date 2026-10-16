@@ -585,6 +585,18 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
               ) : (
                 <MediaContent message={m} />
               )}
+              {/* Link do post/story no Instagram, quando o Zernio mandou (o aviso de conteúdo que a
+                  Meta não libera continua igual; sem link, nada muda). */}
+              {m.external_url && /^https:\/\/([a-z0-9-]+\.)*instagram\.com\//i.test(m.external_url) && (
+                <a
+                  href={m.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-[var(--color-border-soft)] px-2 py-1 text-xs font-medium text-[var(--accent-primary)] hover:bg-[var(--color-surface-hover)]"
+                >
+                  <ExternalLink className="h-3 w-3" /> Abrir no Instagram
+                </a>
+              )}
               {!isInbound && m.meta_status === 'failed' && m.error_reason && (
                 <div className="mt-1.5 rounded-md bg-[rgba(239,68,68,0.12)] px-2 py-1.5 text-[11px] leading-snug text-[var(--color-error)]">
                   <span className="font-semibold">Motivo: </span>
