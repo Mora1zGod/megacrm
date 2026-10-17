@@ -919,3 +919,10 @@ Regras:
   novos / desvincular), status Vinculado/Pendente/Lançado, menu ⋮ (portal); painel do item selecionado com busca no estoque, sugestões por
   semelhança (`similarity`: GTIN, palavras/abreviações, NCM), fator, lote/validade e "Cadastrar novo item"; rodapé vinculado × pendente em
   valor. Local de entrada do topo vale para as linhas sem local (gravado ao salvar). Salvar = `pur_invoice_post` só estoque.
+- (17/10/2026) Conciliação de itens: "Novo local" cadastra `inv_locations` na própria tela (empresa da nota; exige `inventory.setup`) e já
+  aplica. Sugestões de itens só aparecem para linha PENDENTE; linha vinculada mostra só "Trocar o item do estoque".
+  Memória por fornecedor (`20261017100000_invoice_item_memory.sql`): trigger BEFORE INSERT `_pur_invoice_item_memory` em
+  `pur_invoice_items` liga a linha ao item usado da última vez pelo MESMO fornecedor (código de barras → código do produto → descrição) e
+  copia o fator. Notas já importadas: a tela faz o mesmo ao abrir (selo "como na última compra").
+- (17/10/2026) Sugestões rápidas do `EntryFormDialog` = contas do plano (nome exato da conta, título "código — nome"): as mais usadas nos
+  últimos 300 lançamentos do tipo + contas-chave (`SUGGESTION_CODES`) que existirem; clicar escolhe a conta e só preenche a descrição se vazia.

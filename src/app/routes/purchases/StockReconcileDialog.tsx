@@ -95,6 +95,10 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
   const [busy, setBusy] = useState<string | null>(null);
   const [loc, setLoc] = useState('');
   const [catalog, setCatalog] = useState(lookups.items);
+  const [locations, setLocations] = useState(lookups.locations);
+  const [newLoc, setNewLoc] = useState<string | null>(null);
+  const [fromHistory, setFromHistory] = useState<Set<string>>(new Set());
+  const canEdit = can;
   const [rowMenu, setRowMenu] = useState<{ id: string; rect: DOMRect } | null>(null);
   const [bulkMenu, setBulkMenu] = useState<DOMRect | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -105,12 +109,40 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
       sb.from('pur_invoice_items').select('*').eq('invoice_id', inv.id).order('line'),
       sb.from('pur_invoice_links').select('id').eq('invoice_id', inv.id),
     ]);
-    const list = (i.data ?? []) as InvoiceItem[];
+    let list = (i.data ?? []) as InvoiceItem[];
+    // Memória do fornecedor: linha sem item que este fornecedor já vendeu antes (mesmo código de barras,
+    // código do produto ou descrição numa nota anterior ligada ao estoque) entra vinculada como da última vez.
+    // O banco já faz isso na chegada da nota (20261017100000_invoice_item_memory.sql); aqui cobre as notas antigas.
+    const open = list.filter((x) => !x.item_id && !x.stock_posted);
+    if (canEdit && inv.party_id && open.length) {
+      const { data: prev } = await sb.from('pur_invoices').select('id').eq('party_id', inv.party_id).neq('id', inv.id).order('created_at', { ascending: false }).limit(100);
+      const ids = ((prev ?? []) as Array<{ id: string }>).map((x) => x.id);
+      if (ids.length) {
+        const { data: hist } = await sb.from('pur_invoice_items').select('gtin, product_code, description, item_id, conversion_factor').in('invoice_id', ids).not('item_id', 'is', null);
+        const rows = (hist ?? []) as Array<{ gtin: string | null; product_code: string | null; description: string; item_id: string; conversion_factor: number }>;
+        const activeIds = new Set(lookups.items.filter((x) => x.is_active).map((x) => x.id));
+        const key = (d: string) => d.trim().toLowerCase();
+        const hits: string[] = [];
+        for (const it of open) {
+          const h = rows.find((r) => activeIds.has(r.item_id) && it.gtin && r.gtin === it.gtin)
+            ?? rows.find((r) => activeIds.has(r.item_id) && it.product_code && r.product_code === it.product_code)
+            ?? rows.find((r) => activeIds.has(r.item_id) && key(r.description) === key(it.description));
+          if (!h) continue;
+          const patch = { item_id: h.item_id, ...(Number(h.conversion_factor) > 0 ? { conversion_factor: Number(h.conversion_factor) } : {}) };
+          const { error } = await sb.from('pur_invoice_items').update(patch).eq('id', it.id);
+          if (!error) { list = list.map((x) => (x.id === it.id ? { ...x, ...patch } : x)); hits.push(it.id); }
+        }
+        if (hits.length) {
+          setFromHistory((cur) => new Set([...cur, ...hits]));
+          toast.success(`${hits.length} item(ns) vinculado(s) como na última compra deste fornecedor.`);
+        }
+      }
+    }
     setItems(list); setViaReceipt((l.data ?? []).length > 0);
     setMarked((m) => m ?? list.find((x) => !x.item_id)?.id ?? list[0]?.id ?? null);
     const locs = [...new Set(list.map((x) => x.location_id).filter(Boolean))];
     if (locs.length === 1) setLoc((v) => v || String(locs[0]));
-  }, [inv.id]);
+  }, [inv.id, inv.party_id, canEdit, lookups.items]);
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => { setSearch(''); }, [marked]);
 
@@ -145,6 +177,20 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
     for (const it of items.filter((x) => !x.stock_posted && x.location_id !== v)) await save(it, { location_id: v });
   };
 
+  // Cadastra o local aqui mesmo (sem sair da nota) e já usa nas linhas.
+  const createLocation = async () => {
+    const name = (newLoc ?? '').trim();
+    if (name.length < 2) return;
+    setBusy('loc');
+    const { data, error } = await getSupabase().from('inv_locations').insert({ name, company_id: inv.company_id }).select('id, company_id, name, is_active').single();
+    setBusy(null);
+    if (error) { toast.error('Não foi possível cadastrar o local', { description: purError(error) }); return; }
+    const created = data as { id: string; company_id: string | null; name: string; is_active: boolean };
+    setLocations((cur) => [...cur, created]);
+    setNewLoc(null);
+    toast.success(`Local "${created.name}" cadastrado.`);
+    await applyLoc(created.id);
+  };
   const active = useMemo(() => catalog.filter((i) => i.is_active), [catalog]);
   const byId = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
   const stateOf = (it: InvoiceItem): RowState => (it.stock_posted ? 'posted' : it.item_id ? 'linked' : 'pending');
@@ -203,7 +249,7 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
     finally { setBusy(null); }
   };
 
-  const locations = lookups.locations.filter((l) => l.is_active && (!l.company_id || l.company_id === inv.company_id));
+  const locOptions = locations.filter((l) => l.is_active && (!l.company_id || l.company_id === inv.company_id));
   const rowMenuItem = rowMenu ? list.find((x) => x.id === rowMenu.id) : null;
 
   return (
@@ -259,8 +305,22 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
                 <span className="text-[var(--color-text-secondary)]">Local de entrada</span>
                 <select value={loc} disabled={!can} onChange={(e) => void applyLoc(e.target.value)}
                   className={cn('h-9 w-56 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-2 text-sm disabled:opacity-60', can && missingLoc ? 'border-[var(--inbox-warn-text,#B45309)]' : 'border-[var(--color-border-card)]')}>
-                  <option value="">Selecione…</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  <option value="">{locOptions.length ? 'Selecione…' : 'Nenhum local cadastrado'}</option>{locOptions.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
+                {can && newLoc === null && (
+                  <button type="button" onClick={() => setNewLoc('')} className="inline-flex h-9 items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-2.5 text-sm text-[var(--accent-primary)] hover:border-[var(--accent-primary)]">
+                    <Plus className="h-4 w-4" /> Novo local
+                  </button>
+                )}
+                {can && newLoc !== null && (
+                  <span className="flex items-center gap-1.5">
+                    <input autoFocus value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Ex.: Almoxarifado"
+                      onKeyDown={(e) => { if (e.key === 'Enter') void createLocation(); if (e.key === 'Escape') setNewLoc(null); }}
+                      className="h-9 w-44 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm" />
+                    <Button size="sm" disabled={busy === 'loc' || newLoc.trim().length < 2} onClick={() => void createLocation()}>{busy === 'loc' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Salvar</Button>
+                    <button type="button" aria-label="Cancelar novo local" onClick={() => setNewLoc(null)} className="rounded p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"><X className="h-4 w-4" /></button>
+                  </span>
+                )}
                 {can && missingLoc && <span className="text-xs text-[var(--inbox-warn-text,#B45309)]">obrigatório para dar entrada</span>}
               </div>
 
@@ -307,7 +367,7 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
                               <div className="flex w-52 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2.5 py-1.5">
                                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { setMarked(it.id); searchRef.current?.focus(); }} disabled={!edit}>
                                   <div className="truncate text-[13px] font-medium text-[var(--color-text-primary)]">{cat.name}</div>
-                                  <div className="text-[11px] text-[var(--color-text-muted)]">Cód. EST: {cat.code || '—'}</div>
+                                  <div className="text-[11px] text-[var(--color-text-muted)]">Cód. EST: {cat.code || '—'}{fromHistory.has(it.id) && <span className="text-[var(--accent-primary)]"> · como na última compra</span>}</div>
                                 </button>
                                 {edit && <button type="button" aria-label="Desvincular" title="Desvincular" onClick={() => void save(it, { item_id: null })} className="rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-error)]"><X className="h-3.5 w-3.5" /></button>}
                               </div>
@@ -385,7 +445,7 @@ export function StockReconcileDialog({ inv, lookups, statusLabel, statusTone, on
                           </ul>
                         )}
                       </div>
-                      {!t && (
+                      {!t && !selCat && (
                         <div className="space-y-2">
                           <div className="font-semibold text-[var(--color-text-primary)]">Sugestões de itens semelhantes</div>
                           {suggestions.length === 0 ? <p className="text-sm text-[var(--color-text-muted)]">Nenhum item parecido no estoque. Busque acima ou cadastre um novo.</p> : (

@@ -18,22 +18,17 @@ import { formatDoc } from '@/lib/format';
 import { SearchSelect } from '@/components/ui/SearchSelect';
 import { SupplierFormDialog } from '../purchases/SupplierForm';
 
-const SUGGESTIONS: Record<EntryKind, Array<{ label: string; description: string; code: string; icon: LucideIcon }>> = {
-  payable: [
-    { label: 'Energia', description: 'Conta de energia elétrica', code: '3.4.1', icon: Zap },
-    { label: 'Água', description: 'Conta de água', code: '3.4.2', icon: Droplet },
-    { label: 'Internet', description: 'Internet e telefonia', code: '4.2.2', icon: Wifi },
-    { label: 'Químicos', description: 'Produtos químicos da piscina', code: '3.2.2', icon: FlaskConical },
-    { label: 'Manutenção', description: 'Manutenção de brinquedos', code: '5.3', icon: Wrench },
-    { label: 'Tráfego pago', description: 'Anúncios / tráfego pago', code: '6.1', icon: BarChart3 },
-  ],
-  receivable: [
-    { label: 'Evento', description: 'Evento / aniversário', code: '1.3.5', icon: PartyPopper },
-    { label: 'Excursão', description: 'Excursão / escola', code: '1.3.6', icon: Bus },
-    { label: 'Área VIP', description: 'Locação de área VIP / bangalô', code: '1.3.4', icon: Star },
-    { label: 'Patrocínio', description: 'Patrocínio', code: '1.4.3', icon: Handshake },
-  ],
+// Sugestões rápidas = contas do PLANO DE CONTAS (nome exato da conta). Ordem: as mais usadas nos lançamentos
+// recentes desta org; completa com estas contas-chave quando existirem no plano. Ícone só enfeita.
+const SUGGESTION_CODES: Record<EntryKind, string[]> = {
+  payable: ['3.4.1', '3.4.2', '4.2.2', '3.2.2', '5.3', '6.1'],
+  receivable: ['1.3.5', '1.3.6', '1.3.4', '1.4.3'],
 };
+const SUGGESTION_ICON: Record<string, LucideIcon> = {
+  '3.4.1': Zap, '3.4.2': Droplet, '4.2.2': Wifi, '3.2.2': FlaskConical, '5.3': Wrench, '6.1': BarChart3,
+  '1.3.5': PartyPopper, '1.3.6': Bus, '1.3.4': Star, '1.4.3': Handshake,
+};
+const MAX_SUGGESTIONS = 6;
 
 // Lançamento novo ou edição do cabeçalho (valor e parcelas não mudam na edição).
 // Dados vindos de fora (ex.: e-mail com boleto) para já abrir preenchido.
@@ -116,11 +111,33 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
   const schedSum = sched.reduce((a, x) => a + x.cents, 0);
   const editSched = (i: number, patch: Partial<{ due: string; cents: number }>) => { setCustomSched(true); setSched(sched.map((x, j) => (j === i ? { ...x, ...patch } : x))); };
 
-  const applySuggestion = (s: { description: string; code: string }) => {
-    setDescription(s.description);
-    const acc = lookups.chart.find((c) => c.code === s.code && chartAllowed(c, kind));
-    if (acc) setChartId(acc.id);
-    else toast.info('Descrição preenchida. Escolha a conta do plano — a conta sugerida não existe no seu plano.');
+  // Contas mais usadas (últimos lançamentos deste tipo) + contas-chave do plano.
+  const [usedChart, setUsedChart] = useState<string[]>([]);
+  useEffect(() => {
+    if (editing) return;
+    void getSupabase().from('fin_entries').select('chart_account_id').eq('kind', kind).order('created_at', { ascending: false }).limit(300)
+      .then(({ data }) => {
+        const count = new Map<string, number>();
+        for (const r of (data ?? []) as Array<{ chart_account_id: string | null }>) if (r.chart_account_id) count.set(r.chart_account_id, (count.get(r.chart_account_id) ?? 0) + 1);
+        setUsedChart([...count.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id));
+      });
+  }, [editing, kind]);
+  const suggestions = (() => {
+    const allowed = lookups.chart.filter((c) => chartAllowed(c, kind));
+    const byId = new Map(allowed.map((c) => [c.id, c]));
+    const out: typeof allowed = [];
+    for (const id of usedChart) { const c = byId.get(id); if (c && !out.includes(c)) out.push(c); if (out.length >= MAX_SUGGESTIONS) break; }
+    for (const code of SUGGESTION_CODES[kind]) {
+      if (out.length >= MAX_SUGGESTIONS) break;
+      const c = allowed.find((x) => x.code === code);
+      if (c && !out.includes(c)) out.push(c);
+    }
+    return out;
+  })();
+  const applySuggestion = (acc: { id: string; name: string }) => {
+    setChartId(acc.id);
+    // Descrição: só preenche quando está vazia ou ainda é o nome de outra sugestão.
+    if (!description.trim() || suggestions.some((x) => x.name === description.trim())) setDescription(acc.name);
   };
 
 
@@ -216,15 +233,20 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
 
       <div className="max-h-[65vh] space-y-4 overflow-y-auto px-0.5 pb-1">
         {topSlot}
-        {!editing && (
+        {!editing && suggestions.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]"><Zap className="h-4 w-4 text-[var(--accent-primary)]" /> Sugestões rápidas:</span>
-            {SUGGESTIONS[kind].map((s) => (
-              <button key={s.label} type="button" onClick={() => applySuggestion(s)}
-                className="flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]">
-                <s.icon className="h-4 w-4 text-[var(--accent-primary)]" /> {s.label}
-              </button>
-            ))}
+            {suggestions.map((acc) => {
+              const Icon = SUGGESTION_ICON[acc.code] ?? List;
+              const on = chartId === acc.id;
+              return (
+                <button key={acc.id} type="button" onClick={() => applySuggestion(acc)} title={`${acc.code} — ${acc.name}`} aria-pressed={on}
+                  className={cn('flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-sm font-medium hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]',
+                    on ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] bg-[var(--color-surface)] text-[var(--color-text-primary)]')}>
+                  <Icon className="h-4 w-4 text-[var(--accent-primary)]" /> {acc.name}
+                </button>
+              );
+            })}
           </div>
         )}
 
