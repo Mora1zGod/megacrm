@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useMediaUrl } from '@/lib/signedMedia';
 
 // Avatar circular compartilhado: mostra a imagem redonda quando há `src`, senão
 // cai nas iniciais (até 2 letras) no mesmo estilo do ConversationList. Usado
@@ -53,8 +54,10 @@ export function Avatar({ online, ...props }: AvatarProps) {
   );
 }
 
-function AvatarImage({ src, name, size = 'md', className }: Omit<AvatarProps, 'online'>) {
+function AvatarImage({ src: rawSrc, name, size = 'md', className }: Omit<AvatarProps, 'online'>) {
   const sizeClass = SIZE_CLASS[size];
+  // Foto de contato guardada no bucket privado whatsapp-hub-media: link assinado (iniciais enquanto assina).
+  const src = useMediaUrl(rawSrc);
   // Fotos do Instagram vêm da CDN da Meta com link assinado que EXPIRA em
   // poucos dias. Sem este fallback o navegador mostrava imagem quebrada; agora
   // cai nas iniciais quando a foto não carrega.

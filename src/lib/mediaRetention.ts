@@ -1,3 +1,4 @@
+import { signMediaUrl } from '@/lib/signedMedia';
 import { zip } from 'fflate';
 import { getSupabase } from '@/lib/supabase';
 
@@ -64,7 +65,7 @@ export async function downloadConversationMedia(conversationId: string, label: s
   let failed = 0, bytes = 0, done = 0;
   for (const [i, r] of rows.entries()) {
     try {
-      const res = await fetch(r.media_url);
+      const res = await fetch(await signMediaUrl(r.media_url));
       if (!res.ok) throw new Error(String(res.status));
       const buf = new Uint8Array(await res.arrayBuffer());
       entries[fileName(r.media_url, r.created_at, i, res.headers.get('content-type') ?? '')] = buf;

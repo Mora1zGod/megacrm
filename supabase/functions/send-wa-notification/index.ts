@@ -81,7 +81,10 @@ Deno.serve(async (req) => {
       const path = `${caller.orgId}/notificacoes/${crypto.randomUUID()}.png`;
       const { error: upErr } = await admin.storage.from('whatsapp-hub-media').upload(path, bytes, { contentType: 'image/png', upsert: false });
       if (upErr) throw new Error(`Não consegui guardar a imagem: ${upErr.message}`);
-      imageUrls.push(admin.storage.from('whatsapp-hub-media').getPublicUrl(path).data.publicUrl);
+      // Bucket privado: a UAZAPI recebe um link assinado (1 dia — sobra para reenvios/fila da instância).
+      const { data: signed, error: signErr } = await admin.storage.from('whatsapp-hub-media').createSignedUrl(path, 86_400);
+      if (signErr || !signed?.signedUrl) throw new Error(`Não consegui gerar o link da imagem: ${signErr?.message ?? 'sem link'}`);
+      imageUrls.push(signed.signedUrl);
     }
 
     const uctx = await uazapiContextFromChannel(channel);

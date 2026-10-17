@@ -12,6 +12,7 @@
 
 import { requirePermission, AuthError } from '../_shared/auth.ts';
 import { getAdminClient } from '../_shared/supabase-admin.ts';
+import { fetchMediaBytes, signedMediaUrl } from '../_shared/media-storage.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { ZERNIO_PRESIGN_TYPES, ZernioError, uploadMediaDirect, uploadMediaPresigned } from '../_shared/zernio.ts';
 import { loadOrgZernioContext } from '../_shared/channels.ts';
@@ -101,11 +102,14 @@ async function hostOutboundMedia(
   bytes: Uint8Array,
   filename: string,
   mime: string,
-): Promise<string> {
+): Promise<{ sendUrl: string; storeUrl: string }> {
+  // sendUrl = o que o Zernio/UAZAPI baixa; storeUrl = o que fica em messages.media_url.
+  // No nosso bucket (privado) são diferentes: link assinado para o provedor, URL "pública" como identificador.
   const errors: string[] = [];
   if (ZERNIO_PRESIGN_TYPES.has(mime)) {
     try {
-      return await uploadMediaPresigned({ apiKey, bytes, filename, contentType: mime });
+      const u = await uploadMediaPresigned({ apiKey, bytes, filename, contentType: mime });
+      return { sendUrl: u, storeUrl: u };
     } catch (e) {
       errors.push(`presign: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -116,12 +120,15 @@ async function hostOutboundMedia(
     const { error } = await admin.storage.from('whatsapp-hub-media').upload(path, bytes, { contentType: mime, upsert: false });
     if (error) throw new Error(error.message);
     const { data } = admin.storage.from('whatsapp-hub-media').getPublicUrl(path);
-    return data.publicUrl;
+    // 7 dias: cobre fila/reenvio do provedor. Depois disso o arquivo continua aqui (link novo quando precisar).
+    const sendUrl = await signedMediaUrl(admin, data.publicUrl, 7 * 86_400);
+    return { sendUrl, storeUrl: data.publicUrl };
   } catch (e) {
     errors.push(`storage: ${e instanceof Error ? e.message : String(e)}`);
   }
   try {
-    return await uploadMediaDirect({ apiKey, bytes, filename, contentType: mime });
+    const u = await uploadMediaDirect({ apiKey, bytes, filename, contentType: mime });
+    return { sendUrl: u, storeUrl: u };
   } catch (e) {
     errors.push(`upload-direct: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -255,17 +262,17 @@ Deno.serve(async (req) => {
       if (!srcRow || srcRow.is_private_note || !srcRow.media_url || !/^https?:\/\//i.test(srcRow.media_url)) {
         return jsonResponse({ ok: false, error: 'Mídia original não encontrada para encaminhar.' }, { status: 404 });
       }
-      // Mídia recebida pelo Zernio exige a API key; as demais são públicas.
+      // Mídia recebida pelo Zernio exige a API key; a do nosso bucket (privado) sai pelo Storage; o resto por fetch.
       const needsKey = /^https:\/\/zernio\.com\/api\/v1\//i.test(srcRow.media_url);
-      const upstream = await fetch(srcRow.media_url, needsKey ? { headers: { Authorization: `Bearer ${zernio.apiKey}` } } : undefined);
+      const upstream = await fetchMediaBytes(admin, srcRow.media_url, needsKey ? { headers: { Authorization: `Bearer ${zernio.apiKey}` } } : undefined);
       if (!upstream.ok) {
         return jsonResponse({ ok: false, error: `Não consegui baixar a mídia original (${upstream.status}). Ela pode ter expirado.` }, { status: 502 });
       }
-      bytes = new Uint8Array(await upstream.arrayBuffer());
+      bytes = upstream.bytes;
       if (bytes.byteLength > MAX_BYTES) {
         return jsonResponse({ ok: false, error: 'Arquivo excede 25MB.' }, { status: 400 });
       }
-      const headerMime = (upstream.headers.get('content-type')?.split(';')[0] ?? '').trim().toLowerCase();
+      const headerMime = (upstream.contentType.split(';')[0] ?? '').trim().toLowerCase();
       mime = resolveForwardMime(bytes, headerMime, srcRow.media_url);
       contentType = (['image', 'audio', 'video', 'document'] as const).includes(srcRow.content_type as never)
         ? (srcRow.content_type as 'image' | 'audio' | 'video' | 'document')
@@ -279,7 +286,7 @@ Deno.serve(async (req) => {
     // 1. Sobe a mídia ao Zernio (host da URL usada no attachmentUrl, inclusive
     //    para conversas UAZAPI que enviam a URL direto pela instância).
     mime = mime.split(';')[0].trim();
-    const mediaUrl = await hostOutboundMedia(admin, caller.orgId, zernio.apiKey, bytes, filename, mime);
+    const hosted = await hostOutboundMedia(admin, caller.orgId, zernio.apiKey, bytes, filename, mime);
 
     // 2. Resolve a conversa 1:1 no Zernio (por canal) e envia a mídia, curando
     //    o id salvo se o Zernio o rejeitar.
@@ -304,7 +311,7 @@ Deno.serve(async (req) => {
         provider: convRow.provider ?? null,
       },
       {
-        attachmentUrl: mediaUrl,
+        attachmentUrl: hosted.sendUrl,
         voiceNote,
         text: caption || undefined,
         humanAgentTag,
@@ -324,7 +331,7 @@ Deno.serve(async (req) => {
         sender_id: caller.userId,
         content_type: contentType,
         content: caption || null,
-        media_url: mediaUrl,
+        media_url: hosted.storeUrl,
         zernio_message_id: zernioMessageId,
         meta_status: 'sent',
         is_private_note: false,
@@ -348,7 +355,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       ok: true,
       message_id: (inserted as { id: string }).id,
-      media_url: mediaUrl,
+      media_url: hosted.storeUrl,
       sent_to_zernio: true,
     });
   } catch (err) {

@@ -19,6 +19,7 @@
 // ============================================================================
 
 import { getAdminClient } from '../_shared/supabase-admin.ts';
+import { fetchMediaBytes } from '../_shared/media-storage.ts';
 import { loadAppCredentials } from '../_shared/tenant-credentials.ts';
 import { callLLM, type LLMProvider } from '../_shared/llm.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
@@ -88,11 +89,12 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function describeImage(openaiKey: string, imageUrl: string): Promise<string> {
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error(`download imagem ${imgRes.status}`);
-  const mime = imgRes.headers.get('content-type') ?? 'image/jpeg';
-  const bytes = new Uint8Array(await imgRes.arrayBuffer());
+async function describeImage(admin: ReturnType<typeof getAdminClient>, openaiKey: string, imageUrl: string): Promise<string> {
+  // Nosso bucket é privado: fetchMediaBytes baixa pelo Storage (service role); URL de fora segue por fetch.
+  const img = await fetchMediaBytes(admin, imageUrl);
+  if (!img.ok) throw new Error(`download imagem ${img.status}`);
+  const mime = img.contentType || 'image/jpeg';
+  const bytes = img.bytes;
   const dataUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -583,7 +585,7 @@ Deno.serve(async (req) => {
   if (message.content_type !== 'text' && !message.content && message.media_url) {
     if (message.content_type === 'image') {
       try {
-        const desc = await describeImage(creds.openai_api_key, message.media_url);
+        const desc = await describeImage(admin, creds.openai_api_key, message.media_url);
         message.content = desc;
         await admin.from('messages').update({ content: desc }).eq('id', message.id);
       } catch (err) {

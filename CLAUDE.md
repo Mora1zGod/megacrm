@@ -403,7 +403,7 @@ service role key vêm de Vault entries (`whatsapp_hub_supabase_url`,
   populados pelos webhooks do Zernio (`message.received` + status).
 - Mídia do operador: `send-operator-media` publica o arquivo (`hostOutboundMedia`):
   1º Zernio `POST /media/presign` + PUT (documentado; imagem/vídeo/áudio/PDF), 2º Storage
-  público `whatsapp-hub-media/<org>/enviadas/…` (qualquer tipo), 3º `/media/upload-direct`
+  `whatsapp-hub-media/<org>/enviadas/…` (qualquer tipo; provedor recebe link assinado de 7 dias), 3º `/media/upload-direct`
   (legado, multipart). Máx 25MB; envia com `attachmentUrl`. O upload-direct com corpo binário
   cru passou a falhar com "Invalid multipart form data" em 08/10/2026.
 - Notas privadas (`is_private_note = true`) — fundo diferenciado, locais, nunca
@@ -943,3 +943,17 @@ Regras:
   Conversa ⋮: "Baixar mídias da conversa (.zip)" (`src/lib/mediaRetention.ts`, zip no navegador com `fflate` 0.8.2, nível 0) e
   "Guardar mídia deste contato" (liga/desliga a tag). Chat: `media_purged_at` → "📎 Mídia removida pela política de retenção" (legenda
   continua) e sem "Encaminhar". Arquivos: some da lista.
+
+## Mídia privada (17/10/2026) — `20261017140000_private_media.sql` (fase 1) + bucket `public=false` (fase 2)
+- O bucket `whatsapp-hub-media` (fotos/áudios/documentos do Atendimento, fotos de contato, imagens de aviso) deixa de ser público (LGPD).
+  O banco CONTINUA guardando a URL "pública" (`messages.media_url`, `contacts.profile_pic_url`) só como identificador do arquivo
+  (retenção, `_media_path`, busca). Nunca usar essa URL direto para mostrar/baixar.
+- Front: `src/lib/signedMedia.ts` — `useMediaUrl(url)` (img/video/audio; assina em lote com `createSignedUrls`, 1 h, cache 50 min),
+  `signMediaUrl(url)` (fetch, zip), `openMedia(url)` (abrir em outra aba, assina no clique). URL de fora do bucket volta igual; se
+  assinar falhar, volta a URL original. Já ligado em: `MessageThread` (mídia), `Avatar` (toda foto de contato), Arquivos, zip da conversa.
+- Policy `whatsapp_hub_media_read_member` (storage.objects, SELECT, authenticated): pasta da org do token + org/usuário ativos +
+  (`avatars/` OU existe mensagem que o usuário enxerga com esse arquivo — passa pelo RLS de responsável).
+- Servidor: `_shared/media-storage.ts` — `fetchMediaBytes` (nosso bucket pelo Storage com service role, resto por fetch) e
+  `signedMediaUrl`. `send-operator-media` manda link assinado (7 dias) ao Zernio/UAZAPI e grava a URL "pública";
+  `send-wa-notification` assina 1 dia; `transcribe-audio`/`process-ai-message` baixam pelo Storage. Código novo que precise de um
+  arquivo do bucket TEM de usar esses helpers.

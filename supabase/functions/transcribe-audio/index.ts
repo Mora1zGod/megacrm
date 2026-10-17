@@ -17,6 +17,7 @@
 // ============================================================================
 
 import { getAdminClient } from '../_shared/supabase-admin.ts';
+import { fetchMediaBytes, mediaPathFromUrl } from '../_shared/media-storage.ts';
 import { loadAppCredentials } from '../_shared/tenant-credentials.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { requireOrgCaller, requireServiceRole } from '../_shared/auth.ts';
@@ -30,7 +31,14 @@ interface MessageRow {
   content: string | null;
 }
 
-async function downloadAudio(url: string, zernioApiKey: string | null): Promise<{ blob: Blob; mime: string }> {
+async function downloadAudio(admin: ReturnType<typeof getAdminClient>, url: string, zernioApiKey: string | null): Promise<{ blob: Blob; mime: string }> {
+  // Áudio já guardado no nosso bucket (privado): baixa pelo Storage com a service role.
+  if (mediaPathFromUrl(url)) {
+    const r = await fetchMediaBytes(admin, url);
+    if (!r.ok) throw new Error(`Download do audio ${r.status}`);
+    const mime = r.contentType || 'audio/ogg';
+    return { blob: new Blob([r.bytes], { type: mime }), mime };
+  }
   // As URLs de midia do WhatsApp via Zernio apontam para a API deles
   // (https://zernio.com/api/v1/whatsapp/media/<id>?accountId=...) e NAO sao
   // publicas: sem o Bearer da conta o endpoint responde 401 e a transcricao
@@ -168,7 +176,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { blob, mime } = await downloadAudio(message.media_url, creds.zernio_api_key);
+    const { blob, mime } = await downloadAudio(admin, message.media_url, creds.zernio_api_key);
     const transcript = await transcribeWithWhisper(creds.openai_api_key, blob, mime);
 
     await admin

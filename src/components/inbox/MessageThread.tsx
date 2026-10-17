@@ -1,3 +1,4 @@
+import { mediaPath, openMedia, useMediaUrl } from '@/lib/signedMedia';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AlertCircle, Bot, Check, CheckCheck, CheckSquare, Clock, CornerUpRight, ExternalLink, FileText, Loader2, Play, Pencil, Reply, Smartphone, StickyNote, User } from 'lucide-react';
 import { toast } from 'sonner';
@@ -158,8 +159,11 @@ const MEDIA_RECEIVED: Record<string, string> = {
 function MediaContent({ message }: { message: Message }) {
   const { session } = useAuth();
   const rawUrl = message.media_url ?? '';
-  const url = resolveMediaUrl(rawUrl, session?.access_token ?? null);
   const isHttp = /^https?:\/\//i.test(rawUrl);
+  // Arquivo do nosso bucket (privado): troca pelo link assinado antes de mostrar.
+  const signed = useMediaUrl(isHttp ? rawUrl : null);
+  const signing = isHttp && !!mediaPath(rawUrl) && !signed;
+  const url = resolveMediaUrl(signed ?? rawUrl, session?.access_token ?? null);
   const label = MEDIA_LABEL[message.content_type] ?? 'Mídia';
   const caption = message.content?.trim();
 
@@ -168,6 +172,9 @@ function MediaContent({ message }: { message: Message }) {
     // o player ficava em 0:00. Mostra um cartão que abre no Instagram.
     const ig = instagramShare(rawUrl);
     if (ig) return <ShareCard url={rawUrl} title={ig} caption={caption} />;
+    if (signing) {
+      return <div className="flex h-16 min-w-[10rem] items-center justify-center rounded-lg bg-black/10 text-xs opacity-70">Carregando {label.toLowerCase()}…</div>;
+    }
     if (message.content_type === 'image') {
       return <ImageContent url={url} alt={caption || label} caption={caption} />;
     }
@@ -188,6 +195,8 @@ function MediaContent({ message }: { message: Message }) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
+        // Link assinado vence em 1 h: no clique pede um novo (a conversa pode ficar aberta por horas).
+        onClick={mediaPath(rawUrl) ? (e) => { e.preventDefault(); openMedia(rawUrl); } : undefined}
         className="flex items-center gap-2 rounded-lg border border-current/20 bg-black/10 px-2.5 py-2 transition hover:bg-black/20"
       >
         <FileText className="h-4 w-4 shrink-0 opacity-80" />

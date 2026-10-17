@@ -1,3 +1,4 @@
+import { openMedia } from '@/lib/signedMedia';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Film, Image as ImageIcon, Music, Paperclip, Search } from 'lucide-react';
@@ -214,6 +215,7 @@ export default function FilesPage() {
                 href={r.media_url}
                 target="_blank"
                 rel="noreferrer"
+                onClick={(e) => { e.preventDefault(); openMedia(r.media_url); }}
                 className="glass-card flex items-center gap-3 p-3 transition hover:border-[var(--accent-primary)]"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent-subtle)]">
