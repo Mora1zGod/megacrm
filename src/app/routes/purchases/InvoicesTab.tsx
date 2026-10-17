@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useMyDefaultCompany } from '@/hooks/useMyDefaultCompany';
-import { Ban, Boxes, CheckCircle2, CloudDownload, DollarSign, KeyRound, Download, Eye, FileSpreadsheet, FileText, FileUp, Link2, Loader2, PackagePlus, Pencil, Plus, Printer, RotateCcw, Save, Search, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
+import { Ban, Boxes, CheckCircle2, CloudDownload, DollarSign, KeyRound, Download, Eye, FileSpreadsheet, FileText, FileUp, Link2, Loader2, PackagePlus, Pencil, Plus, Printer, RotateCcw, Trash2, Unlink, Wallet, XCircle } from 'lucide-react';
 import { DataGrid, GridReset, gridExportRows, useGrid, type GridColumn } from '@/components/ui/GridTable';
 import { exportExcel, openReport, reportNow } from '@/lib/table-export';
 import { searchMatch } from '@/lib/search';
@@ -16,7 +16,9 @@ import { formatBRL } from '@/lib/money';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { AuditList } from '../finance/AuditList';
 import { formatDoc } from '../finance/SetupTab';
-import { STATUS_LABEL, type InstallmentRow } from '../finance/data';
+import { STATUS_LABEL, useFinanceLookups, type InstallmentRow } from '../finance/data';
+import { EntryFormDialog, type EntryPrefill } from '../finance/EntryFormDialog';
+import { EntryDetailDialog } from '../finance/EntryDetailDialog';
 import { StatusBadge } from '../finance/ui';
 import {
   addDays, DOC_TYPE, fmtDate, fmtDateTime, INVOICE_STATUS, monthStart, purError, qtyFmt, rpc, sefazApi, SOURCE, todaySP,
@@ -25,6 +27,7 @@ import {
 } from './data';
 import { Badge, Card, Field, inputCls, KV, MoneyInput, QtyInput, ReasonDialog, Spinner, StatusPill, SubTabs, TableWrap, tdCls, thCls, Trace, useDebounced, useOpenDoc } from './ui';
 import { ChartPicker } from '../finance/ui';
+import { StockReconcileDialog } from './StockReconcileDialog';
 
 
 type YesNo = '' | 'yes' | 'no';
@@ -350,8 +353,8 @@ export function InvoicesTab({ lookups, openId, onOpen, onCloseDoc }: TabProps) {
 
       {manual && <ManualDialog lookups={lookups} onClose={() => setManual(false)} onSaved={(id) => { setManual(false); void load(); onOpen('invoice', id); }} />}
       {openId && current && <InvoiceDetail inv={current} lookups={lookups} onClose={onCloseDoc} onOpen={onOpen} onChanged={load} />}
-      {finFor && <FinanceReconcileDialog inv={rows?.find((r) => r.id === finFor.id) ?? finFor} lookups={lookups} onClose={() => setFinFor(null)} onOpenNote={() => { const id = finFor.id; setFinFor(null); onOpen('invoice', id); }} onChanged={load} />}
-      {stockFor && <StockReconcileDialog inv={rows?.find((r) => r.id === stockFor.id) ?? stockFor} lookups={lookups} onClose={() => setStockFor(null)} onOpenNote={() => { const id = stockFor.id; setStockFor(null); onOpen('invoice', id); }} onChanged={load} />}
+      {finFor && <InvoiceFinanceEntry inv={rows?.find((r) => r.id === finFor.id) ?? finFor} lookups={lookups} onClose={() => setFinFor(null)} onOpenNote={() => { const id = finFor.id; setFinFor(null); onOpen('invoice', id); }} onChanged={load} />}
+      {stockFor && <StockReconcileDialog inv={rows?.find((r) => r.id === stockFor.id) ?? stockFor} lookups={lookups} statusLabel={displayStatus(rows?.find((r) => r.id === stockFor.id) ?? stockFor)[0]} statusTone={displayStatus(rows?.find((r) => r.id === stockFor.id) ?? stockFor)[1]} onClose={() => setStockFor(null)} onOpenNote={() => { const id = stockFor.id; setStockFor(null); onOpen('invoice', id); }} onChanged={load} />}
       {delFor && (
         <Dialog open onClose={() => setDelFor(null)} opaque title="Excluir nota" description={`Nota ${delFor.number} de ${delFor.party_name ?? delFor.supplier_name ?? ''} (${formatBRL(delFor.total_cents)}). Se ela vier de novo da SEFAZ, entra outra vez.`}>
           <div className="flex justify-end gap-2 pt-2">
@@ -797,6 +800,120 @@ function NoteHead({ inv, extra }: { inv: Invoice; extra?: ReactNode }) {
   );
 }
 
+// Botão $ da nota: abre a MESMA tela de "Nova conta a pagar" do Financeiro, já preenchida com a nota
+// (empresa travada, fornecedor, descrição, valor, emissão, competência e as parcelas das duplicatas).
+// Ao lançar, a conta é ligada à nota (pur_invoice_fin_link) e a conciliação financeira é salva
+// (pur_invoice_post só Financeiro). Nota já conciliada → abre a conta a pagar no Financeiro.
+// Sem permissão de lançar/ver o Financeiro → cai na tela antiga de conciliação.
+function InvoiceFinanceEntry(props: { inv: Invoice; lookups: PurLookups; onClose: () => void; onOpenNote: () => void; onChanged: () => Promise<void> }) {
+  const perms = usePermission();
+  const { inv } = props;
+  if (inv.fin_entry_id) {
+    if (!perms.can('financial.ledger_view')) return <FinanceReconcileDialog {...props} />;
+    return <LinkedEntry {...props} entryId={inv.fin_entry_id} />;
+  }
+  if (!perms.can('financial.ledger_create') || !perms.can('purchases.invoice')) return <FinanceReconcileDialog {...props} />;
+  return <NewPayableFromInvoice {...props} />;
+}
+
+function LinkedEntry({ entryId, onClose, onChanged }: { entryId: string; onClose: () => void; onChanged: () => Promise<void> }) {
+  const fin = useFinanceLookups();
+  if (fin.loading) return <Dialog open onClose={onClose} opaque title="Conta a pagar da nota"><Spinner /></Dialog>;
+  return <EntryDetailDialog entryId={entryId} lookups={fin} onClose={onClose} onChanged={() => void onChanged()} />;
+}
+
+function NewPayableFromInvoice({ inv, lookups, onClose, onOpenNote, onChanged }: { inv: Invoice; lookups: PurLookups; onClose: () => void; onOpenNote: () => void; onChanged: () => Promise<void> }) {
+  const fin = useFinanceLookups();
+  const [dues, setDues] = useState<Due[] | null>(null);
+  const [cands, setCands] = useState<Candidate[] | null>(null);
+  const [accept, setAccept] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void getSupabase().from('pur_invoice_dues').select('*').eq('invoice_id', inv.id).order('due_date').then(({ data }) => setDues((data ?? []) as Due[]));
+    rpc<Candidate[]>('pur_invoice_fin_candidates', { p_id: inv.id }).then(setCands).catch(() => setCands([]));
+  }, [inv.id]);
+
+  // Liga a conta à nota e salva a conciliação financeira.
+  const linkAndPost = async (entryId: string, acceptDiff: boolean) => {
+    setBusy(true);
+    try {
+      await rpc('pur_invoice_fin_link', { p_id: inv.id, p_entry: entryId, p_accept_diff: acceptDiff });
+      await rpc('pur_invoice_post', { p_id: inv.id, p_finance: true, p_stock: false });
+      toast.success('Conciliação financeira salva', { description: `Nota ${inv.number} ligada à conta a pagar.` });
+      await onChanged();
+      onClose();
+    } catch (e) {
+      // Não deixa a tela aberta: um novo "Lançar" criaria outra conta. A conta já existe no Financeiro;
+      // ao abrir o $ de novo ela aparece em "vincular a uma que já existe".
+      toast.error('Não foi possível ligar à nota', { description: `${e instanceof Error ? e.message : String(e)} Abra o $ de novo e use "vincular a uma que já existe".` });
+      await onChanged();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (fin.loading || !dues) return <Dialog open onClose={onClose} opaque title="Nova conta a pagar"><Spinner /></Dialog>;
+
+  const supplier = lookups.suppliers.find((x) => x.id === inv.party_id);
+  const dueSum = dues.reduce((a, d) => a + d.amount_cents, 0);
+  const schedule = dues.length > 0 && dueSum === inv.total_cents ? dues.map((d) => ({ due: d.due_date, cents: d.amount_cents })) : undefined;
+  const label = `${DOC_TYPE[inv.doc_type] ?? inv.doc_type} ${inv.number}${inv.series ? `/${inv.series}` : ''}`;
+  const prefill: EntryPrefill = {
+    companyId: inv.company_id,
+    partyId: inv.party_id ?? undefined,
+    description: `${label}${inv.party_name || inv.supplier_name ? ` — ${inv.party_name ?? inv.supplier_name}` : ''}`,
+    totalCents: inv.total_cents,
+    issueDate: inv.issue_date ?? undefined,
+    competenceDate: inv.issue_date ?? inv.entry_date ?? undefined,
+    dueDate: inv.entry_date ?? inv.issue_date ?? undefined,
+    schedule,
+    chartAccountId: supplier?.default_chart_account_id ?? undefined,
+    notes: inv.access_key ? `Chave ${inv.access_key}` : undefined,
+  };
+
+  const top = (
+    <div className="space-y-2 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-hover)] p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[var(--color-text-primary)]">
+          Nota <b>{inv.number}{inv.series ? `/${inv.series}` : ''}</b> · {inv.party_name ?? inv.supplier_name ?? '—'} · <b className="tabular-nums">{formatBRL(inv.total_cents)}</b>
+          {schedule ? ` · ${schedule.length} vencimento(s) da nota` : ''}
+        </span>
+        <button type="button" onClick={onOpenNote} className="text-xs font-semibold text-[var(--accent-primary)] hover:underline">Ver a nota</button>
+      </div>
+      {cands && cands.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-xs font-medium text-[var(--color-text-secondary)]">Essa conta já foi lançada no Financeiro? Vincular a uma que já existe ({cands.length})</summary>
+          <ul className="mt-2 space-y-1.5">
+            {cands.map((c) => {
+              const differs = c.total_cents !== inv.total_cents;
+              return (
+                <li key={c.entry_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-3 py-2">
+                  <span><b>{c.description}</b> · {c.party_name ?? 'sem fornecedor'} · {formatBRL(c.total_cents)} · venc. {fmtDate(c.first_due)}</span>
+                  <span className="flex items-center gap-2">
+                    {differs && <label className="flex items-center gap-1 text-xs text-[var(--inbox-warn-text,#B45309)]"><input type="checkbox" checked={!!accept[c.entry_id]} onChange={(e) => setAccept((a) => ({ ...a, [c.entry_id]: e.target.checked }))} /> aceito a diferença de {formatBRL(Math.abs(c.total_cents - inv.total_cents))}</label>}
+                    <Button size="sm" variant="outline" disabled={busy || (differs && !accept[c.entry_id])} onClick={() => void linkAndPost(c.entry_id, !!accept[c.entry_id])}><Link2 className="h-3.5 w-3.5" /> Vincular</Button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+
+  return (
+    <EntryFormDialog kind="payable" lookups={fin} prefill={prefill} lockCompany lockedCompanyHint="Mesma empresa da nota."
+      topSlot={top} onClose={onClose}
+      onSaved={(id) => { void (async () => {
+        const { data } = await getSupabase().from('fin_entries').select('total_cents').eq('id', id).maybeSingle();
+        const total = (data as { total_cents: number } | null)?.total_cents ?? inv.total_cents;
+        await linkAndPost(id, total !== inv.total_cents);
+      })(); }} />
+  );
+}
+
 function FinanceReconcileDialog({ inv, lookups, onClose, onOpenNote, onChanged }: { inv: Invoice; lookups: PurLookups; onClose: () => void; onOpenNote: () => void; onChanged: () => Promise<void> }) {
   const perms = usePermission();
   const can = perms.can('purchases.invoice') && !NO_RECON.has(inv.status);
@@ -933,193 +1050,3 @@ function FinanceReconcileDialog({ inv, lookups, onClose, onOpenNote, onChanged }
   );
 }
 
-function StockReconcileDialog({ inv, lookups, onClose, onOpenNote, onChanged }: { inv: Invoice; lookups: PurLookups; onClose: () => void; onOpenNote: () => void; onChanged: () => Promise<void> }) {
-  const perms = usePermission();
-  const can = perms.can('purchases.invoice') && !NO_RECON.has(inv.status) && !inv.stock_reconciled;
-  const [items, setItems] = useState<InvoiceItem[] | null>(null);
-  const [viaReceipt, setViaReceipt] = useState(false);
-  const [marked, setMarked] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [loc, setLoc] = useState('');
-  const [catalog, setCatalog] = useState(lookups.items);
-
-  const reload = useCallback(async () => {
-    const sb = getSupabase();
-    const [i, l] = await Promise.all([
-      sb.from('pur_invoice_items').select('*').eq('invoice_id', inv.id).order('line'),
-      sb.from('pur_invoice_links').select('id').eq('invoice_id', inv.id),
-    ]);
-    const list = (i.data ?? []) as InvoiceItem[];
-    setItems(list); setViaReceipt((l.data ?? []).length > 0);
-    setMarked((m) => m ?? list.find((x) => !x.item_id)?.id ?? list[0]?.id ?? null);
-    const locs = [...new Set(list.map((x) => x.location_id).filter(Boolean))];
-    if (locs.length === 1) setLoc((v) => v || String(locs[0]));
-  }, [inv.id]);
-  useEffect(() => { void reload(); }, [reload]);
-
-  const save = async (it: InvoiceItem, patch: Partial<InvoiceItem>) => {
-    setBusy(it.id);
-    const { error } = await getSupabase().from('pur_invoice_items').update(patch).eq('id', it.id);
-    setBusy(null);
-    if (error) { toast.error(purError(error)); return false; }
-    setItems((cur) => cur?.map((x) => (x.id === it.id ? { ...x, ...patch } : x)) ?? cur);
-    return true;
-  };
-  const linkTo = async (itemId: string) => {
-    const it = items?.find((x) => x.id === marked);
-    if (!it) { toast.info('Clique numa linha da nota primeiro.'); return; }
-    if (await save(it, { item_id: itemId })) {
-      const next = items?.find((x) => x.id !== it.id && !x.item_id);
-      if (next) setMarked(next.id);
-    }
-  };
-  const createFromMarked = async () => {
-    const it = items?.find((x) => x.id === marked);
-    if (!it) { toast.info('Clique numa linha da nota primeiro.'); return; }
-    setBusy(it.id);
-    const { data, error } = await getSupabase().from('inv_items').insert({ name: it.description.slice(0, 200), unit: (it.unit ?? 'UN').toUpperCase().slice(0, 6), ncm: it.ncm, gtin: it.gtin, code: null, last_cost_cents: it.unit_cents })
-      .select('id, code, name, unit, requires_lot, ncm, gtin, chart_account_id, last_cost_cents, is_active').single();
-    setBusy(null);
-    if (error) { toast.error(purError(error)); return; }
-    setCatalog((c) => [...c, data as typeof c[number]]);
-    await linkTo(String(data.id));
-    toast.success('Item cadastrado no estoque e ligado à linha.');
-  };
-  const applyLoc = async (v: string) => {
-    setLoc(v);
-    if (!v || !items) return;
-    for (const it of items.filter((x) => !x.stock_posted && x.location_id !== v)) await save(it, { location_id: v });
-  };
-
-  const list = items ?? [];
-  const done = list.filter((x) => x.item_id).length;
-  const pct = list.length ? Math.round((done / list.length) * 100) : 0;
-  const active = catalog.filter((i) => i.is_active);
-  const t = search.trim().toLowerCase();
-  const found = (t ? active.filter((i) => `${i.code ?? ''} ${i.name} ${i.gtin ?? ''}`.toLowerCase().includes(t)) : active).slice(0, 60);
-  const ready = viaReceipt || (list.length > 0 && list.every((x) => x.stock_posted || (x.item_id && x.location_id && (!catalog.find((c) => c.id === x.item_id)?.requires_lot || x.lot))));
-  const [statusLabel, statusTone] = displayStatus(inv);
-
-  const sel = 'h-9 w-full min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm disabled:opacity-60';
-  return (
-    <Dialog open onClose={onClose} widthClass="max-w-7xl" opaque title="Conciliação de itens da nota" description="Vincule cada item da nota ao item do seu estoque e dê entrada no almoxarifado.">
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 rounded-[var(--radius-card)] border border-[var(--color-border-card)] p-4 sm:grid-cols-3 lg:grid-cols-6">
-          <KV label="Número da nota"><b>{inv.number}{inv.series ? `/${inv.series}` : ''}</b></KV>
-          <KV label="Fornecedor"><b className="line-clamp-2">{inv.party_name ?? inv.supplier_name ?? '—'}</b><div className="text-xs text-[var(--color-text-muted)]">{formatDoc(inv.supplier_doc)}</div></KV>
-          <KV label="Valor total"><b className="tabular-nums">{formatBRL(inv.total_cents)}</b></KV>
-          <KV label="Status da nota"><Badge tone={statusTone}>{statusLabel}</Badge><div className="text-xs text-[var(--color-text-muted)]">Emissão {fmtDate(inv.issue_date)}</div></KV>
-          <KV label="Itens na nota"><b>{list.length}</b></KV>
-          <KV label="Progresso da conciliação">
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-hover)]"><div className="h-full bg-[var(--accent-fill)] transition-all" style={{ width: `${viaReceipt ? 100 : pct}%` }} /></div>
-            <div className="mt-1 text-xs text-[var(--color-text-muted)]">{viaReceipt ? 'Entrada pelo recebimento' : `${done} de ${list.length} itens vinculados · ${pct}%`}</div>
-          </KV>
-        </div>
-
-        {!items ? <Spinner /> : list.length === 0 ? (
-          <p className="rounded-lg bg-[var(--color-surface-hover)] p-3 text-sm">{inv.status === 'summary' ? 'Os itens aparecem depois de baixar o XML completo (abra a nota e dê ciência).' : 'Documento sem itens (entrada manual): não há estoque a conciliar.'}</p>
-        ) : viaReceipt ? (
-          <p className="rounded-lg bg-[var(--color-surface-hover)] p-3 text-sm">Esta nota está ligada a pedido/recebimento: o estoque entra pela conferência do recebimento. Ao salvar, o sistema só marca o estoque como conciliado — <b>não lança em dobro</b>.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
-            <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <div>
-                  <div className="font-semibold text-[var(--color-text-primary)]">Itens da nota ({list.length})</div>
-                  <p className="text-xs text-[var(--color-text-secondary)]">Clique numa linha e escolha o item do estoque ao lado — ou direto na lista da linha.</p>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">Local de entrada
-                  <select value={loc} disabled={!can} onChange={(e) => void applyLoc(e.target.value)} className={cn(sel, 'w-48')}>
-                    <option value="">Selecione…</option>{lookups.locations.filter((l) => l.is_active && (!l.company_id || l.company_id === inv.company_id)).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                  </select>
-                </label>
-              </div>
-              <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)]">
-                <table className="w-full min-w-[920px] text-sm">
-                  <thead className="bg-[var(--color-surface-hover)] text-left text-[11px] text-[var(--color-text-muted)]">
-                    <tr><th className="px-2 py-2">#</th><th className="px-2 py-2">Item da nota</th><th className="px-2 py-2">Un.</th><th className="px-2 py-2 text-right">Qtde</th><th className="px-2 py-2 text-right">Valor total</th>
-                      <th className="px-2 py-2">Fator</th><th className="px-2 py-2">Item do estoque</th><th className="px-2 py-2 text-right">Custo</th><th className="px-2 py-2">Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {list.map((it) => {
-                      const cat = catalog.find((c) => c.id === it.item_id);
-                      const edit = can && !it.stock_posted;
-                      const ok = it.stock_posted || (it.item_id && it.location_id && (!cat?.requires_lot || it.lot));
-                      return (
-                        <tr key={it.id} onClick={() => setMarked(it.id)} className={cn('cursor-pointer border-t border-[var(--color-border-soft)] align-middle', marked === it.id ? 'bg-[var(--color-accent-subtle)]' : 'hover:bg-[var(--color-surface-hover)]')}>
-                          <td className="px-2 py-1.5 text-[var(--color-text-muted)]">{it.line}</td>
-                          <td className="max-w-[260px] px-2 py-1.5"><div className="truncate font-medium" title={it.description}>{it.description}</div>
-                            {cat?.requires_lot && edit && (
-                              <div className="mt-1 flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                <input placeholder="Lote (obrigatório)" defaultValue={it.lot ?? ''} onBlur={(e) => (e.target.value.trim() || null) !== it.lot && void save(it, { lot: e.target.value.trim() || null })} className="h-7 w-32 rounded border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-xs" />
-                                <input type="date" defaultValue={it.expiry ?? ''} onBlur={(e) => (e.target.value || null) !== it.expiry && void save(it, { expiry: e.target.value || null })} className="h-7 rounded border border-[var(--color-border-card)] bg-[var(--color-surface)] px-1 text-xs" aria-label="Validade" />
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-2 py-1.5">{it.unit ?? '—'}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{qtyFmt(it.qty)}</td>
-                          <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{formatBRL(it.total_cents)}</td>
-                          <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>{edit ? <div className="w-16 [&_input]:h-9 [&_input]:w-16 [&_input]:px-2 [&_input]:text-right"><QtyInput value={Number(it.conversion_factor)} onChange={(n) => n > 0 && void save(it, { conversion_factor: n })} /></div> : qtyFmt(it.conversion_factor)}</td>
-                          <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
-                            {edit ? (
-                              <select value={it.item_id ?? ''} disabled={busy === it.id} onChange={(e) => void save(it, { item_id: e.target.value || null })} className={cn(sel, 'w-48')}>
-                                <option value="">Selecione um item</option>
-                                {active.map((x) => <option key={x.id} value={x.id}>{x.code ? `${x.code} · ` : ''}{x.name} ({x.unit})</option>)}
-                              </select>
-                            ) : cat ? `${cat.name} (${cat.unit})` : '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{formatBRL(Number(it.conversion_factor) > 0 ? Math.round(it.unit_cents / Number(it.conversion_factor)) : it.unit_cents)}</td>
-                          <td className="px-2 py-1.5">{it.stock_posted ? <Badge tone="success">Lançado</Badge> : ok ? <Badge tone="accent">Pronto</Badge> : <Badge tone="warn">Pendente</Badge>}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {can && (
-              <div className="h-fit space-y-2 rounded-[var(--radius-card)] border border-[var(--color-border-card)] p-4">
-                <div className="font-semibold text-[var(--color-text-primary)]">Itens do estoque</div>
-                <p className="text-xs text-[var(--color-text-secondary)]">Busque e toque no + para vincular à linha marcada{marked ? ` (linha ${list.find((x) => x.id === marked)?.line ?? ''})` : ''}.</p>
-                <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Digite para pesquisar…" className={cn(inputCls, 'pl-9')} /></label>
-                <ul className="max-h-[360px] overflow-y-auto">
-                  {found.length === 0 && <li className="py-3 text-sm text-[var(--color-text-muted)]">Nenhum item encontrado.</li>}
-                  {found.map((x) => (
-                    <li key={x.id} className="flex items-center gap-2 border-b border-[var(--color-border-soft)] py-2 text-sm last:border-0">
-                      <span className="min-w-0 flex-1">{x.name}{x.code && <span className="ml-1 text-xs text-[var(--color-text-muted)]">{x.code}</span>}</span>
-                      <span className="text-xs text-[var(--color-text-muted)]">{x.unit}</span>
-                      <button type="button" aria-label={`Vincular ${x.name}`} disabled={!marked || !!busy} onClick={() => void linkTo(x.id)} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-border-card)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
-                    </li>
-                  ))}
-                </ul>
-                <button type="button" disabled={!marked || !!busy} onClick={() => void createFromMarked()} className="flex w-full items-center justify-center gap-1.5 rounded-md py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-40">
-                  <PackagePlus className="h-4 w-4" /> Cadastrar a linha marcada como item novo
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border-soft)] pt-4">
-          <Button variant="outline" onClick={onOpenNote}><Pencil className="h-4 w-4" /> Abrir a nota</Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>{can ? 'Cancelar' : 'Fechar'}</Button>
-            {can && list.length > 0 && (
-              <Button disabled={!!busy || !ready} title={ready ? undefined : 'Ligue todas as linhas a um item, escolha o local (e o lote quando o item exigir).'}
-                onClick={async () => {
-                  setBusy('post');
-                  try { await rpc('pur_invoice_post', { p_id: inv.id, p_finance: false, p_stock: true }); toast.success('Conciliação de estoque salva: entrada feita no almoxarifado.'); await onChanged(); onClose(); }
-                  catch (e) { toast.error('Não foi possível dar entrada', { description: e instanceof Error ? e.message : String(e) }); }
-                  finally { setBusy(null); }
-                }}>
-                {busy === 'post' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar conciliação
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    </Dialog>
-  );
-}

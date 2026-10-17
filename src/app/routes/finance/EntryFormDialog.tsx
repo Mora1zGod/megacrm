@@ -37,10 +37,20 @@ const SUGGESTIONS: Record<EntryKind, Array<{ label: string; description: string;
 
 // Lançamento novo ou edição do cabeçalho (valor e parcelas não mudam na edição).
 // Dados vindos de fora (ex.: e-mail com boleto) para já abrir preenchido.
-export interface EntryPrefill { description?: string; partyId?: string; totalCents?: number; dueDate?: string; issueDate?: string; notes?: string; files?: File[] }
+export interface EntryPrefill {
+  description?: string; partyId?: string; totalCents?: number; dueDate?: string; issueDate?: string; notes?: string; files?: File[];
+  // Nota de entrada (Compras → $): empresa, conta, competência e as parcelas das duplicatas da nota.
+  companyId?: string; chartAccountId?: string; costCenterId?: string; competenceDate?: string;
+  schedule?: Array<{ due: string; cents: number }>;
+}
 
-export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, onClose, onSaved }: {
+export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, onClose, onSaved, lockCompany, topSlot, lockedCompanyHint }: {
   kind: EntryKind;
+  // Empresa travada (ex.: conta da nota de entrada precisa ser da mesma empresa da nota).
+  lockCompany?: boolean;
+  lockedCompanyHint?: string;
+  // Bloco extra no topo do formulário (ex.: dados da nota e "vincular conta que já existe").
+  topSlot?: ReactNode;
   lookups: Lookups;
   entry?: Entry | null;
   hasSettlement?: boolean;
@@ -52,21 +62,21 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
   const editing = Boolean(entry);
   const today = todaySP();
   const defaultCompany = lookups.companies.find((c) => c.is_default && c.is_active) ?? lookups.companies.find((c) => c.is_active);
-  const [companyId, setCompanyId] = useState(entry?.company_id ?? defaultCompany?.id ?? '');
+  const [companyId, setCompanyId] = useState(entry?.company_id ?? prefill?.companyId ?? defaultCompany?.id ?? '');
   const myCompany = useMyDefaultCompany();
   const touchedCompany = useRef(false);
   useEffect(() => {
-    if (!entry && myCompany && !touchedCompany.current && lookups.companies.some((c) => c.id === myCompany && c.is_active)) setCompanyId(myCompany);
-  }, [entry, myCompany, lookups.companies]);
+    if (!entry && !prefill?.companyId && myCompany && !touchedCompany.current && lookups.companies.some((c) => c.id === myCompany && c.is_active)) setCompanyId(myCompany);
+  }, [entry, prefill?.companyId, myCompany, lookups.companies]);
   const [description, setDescription] = useState(entry?.description ?? prefill?.description ?? '');
   const [partyId, setPartyId] = useState(entry?.party_id ?? prefill?.partyId ?? '');
-  const [chartId, setChartId] = useState(entry?.chart_account_id ?? '');
-  const [ccId, setCcId] = useState(entry?.cost_center_id ?? '');
+  const [chartId, setChartId] = useState(entry?.chart_account_id ?? prefill?.chartAccountId ?? '');
+  const [ccId, setCcId] = useState(entry?.cost_center_id ?? prefill?.costCenterId ?? '');
   const [total, setTotal] = useState(entry?.total_cents ?? prefill?.totalCents ?? 0);
   const [issue, setIssue] = useState(entry?.issue_date ?? prefill?.issueDate ?? today);
-  const [competence, setCompetence] = useState(entry?.competence_date ?? today);
-  const [due, setDue] = useState(prefill?.dueDate ?? today);
-  const [installments, setInstallments] = useState(entry?.installments_count ?? 1);
+  const [competence, setCompetence] = useState(entry?.competence_date ?? prefill?.competenceDate ?? today);
+  const [due, setDue] = useState(prefill?.schedule?.[0]?.due ?? prefill?.dueDate ?? today);
+  const [installments, setInstallments] = useState(entry?.installments_count ?? (prefill?.schedule?.length || 1));
   const [notes, setNotes] = useState(entry?.notes ?? prefill?.notes ?? '');
   const [files, setFiles] = useState<File[]>(prefill?.files ?? []);
   const [saving, setSaving] = useState(false);
@@ -99,8 +109,9 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
   const parties = lookups.parties.filter((p) => p.is_active && (p.kind === 'both' || p.kind === (kind === 'payable' ? 'supplier' : 'customer') || p.id === partyId));
   // Parcelas sempre à vista. O usuário pode mudar a data/valor de cada uma (ex.: antecipar a 1ª).
   const auto = () => splitInstallments(total, installments).map((v, i) => ({ due: addMonths(due, i), cents: v }));
-  const [sched, setSched] = useState<Array<{ due: string; cents: number }>>([]);
-  const [customSched, setCustomSched] = useState(false);
+  const [sched, setSched] = useState<Array<{ due: string; cents: number }>>(prefill?.schedule ?? []);
+  // Parcelas da nota (datas/valores das duplicatas) entram como já ajustadas.
+  const [customSched, setCustomSched] = useState(Boolean(prefill?.schedule && prefill.schedule.length > 0));
   useEffect(() => { if (!customSched) setSched(auto()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [total, installments, due, customSched]);
   const schedSum = sched.reduce((a, x) => a + x.cents, 0);
   const editSched = (i: number, patch: Partial<{ due: string; cents: number }>) => { setCustomSched(true); setSched(sched.map((x, j) => (j === i ? { ...x, ...patch } : x))); };
@@ -204,6 +215,7 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
       </div>
 
       <div className="max-h-[65vh] space-y-4 overflow-y-auto px-0.5 pb-1">
+        {topSlot}
         {!editing && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]"><Zap className="h-4 w-4 text-[var(--accent-primary)]" /> Sugestões rápidas:</span>
@@ -217,9 +229,9 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
         )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <F icon={Building2} label="Empresa" required htmlFor="ef-company" hint={editing && hasSettlement ? 'Já houve baixa: a empresa não muda.' : undefined}>
+          <F icon={Building2} label="Empresa" required htmlFor="ef-company" hint={editing && hasSettlement ? 'Já houve baixa: a empresa não muda.' : lockCompany ? lockedCompanyHint : undefined}>
             <WithIcon icon={Building2}>
-              <select id="ef-company" value={companyId} onChange={(e) => { touchedCompany.current = true; setCompanyId(e.target.value); }} className={cn(inputCls, 'h-11 pl-10')}>
+              <select id="ef-company" value={companyId} disabled={lockCompany} onChange={(e) => { touchedCompany.current = true; setCompanyId(e.target.value); }} className={cn(inputCls, 'h-11 pl-10')}>
                 {lookups.companies.filter((c) => editing || c.is_active).map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (padrão)' : ''}{c.is_active ? '' : ' — inativa'}</option>
                 ))}

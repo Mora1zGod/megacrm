@@ -907,3 +907,15 @@ Regras:
   Tela: Configurações → Canais → "Nomes dos contatos do Instagram" (Ver o que muda → Aplicar).
 - `webhook_events.payload`: payload bruto só de `message.*` do Instagram (tabela sem policy). `messages.external_url`: link instagram.com
   do post/story quando vier no payload → botão "Abrir no Instagram" no balão (o aviso de conteúdo que a Meta não libera continua igual).
+
+## Notas de entrada: botões $ e estoque (17/10/2026)
+- $ (`InvoiceFinanceEntry` em `purchases/InvoicesTab.tsx`): nota sem conta → abre o MESMO `EntryFormDialog` do Financeiro ("Nova conta a
+  pagar") preenchido pela nota (`EntryPrefill`: companyId travado com `lockCompany`, fornecedor, "NF-e nº/série — fornecedor", total, emissão,
+  competência, parcelas = duplicatas quando somam o total, conta padrão do fornecedor, chave nas observações) + `topSlot` com a nota e
+  "vincular a uma que já existe" (`pur_invoice_fin_candidates`). Ao lançar: `pur_invoice_fin_link` (aceite de diferença se o valor mudou) +
+  `pur_invoice_post` só Financeiro. Nota já com conta → `EntryDetailDialog` da conta. Sem `financial.ledger_create`/`ledger_view` → tela antiga
+  (`FinanceReconcileDialog`).
+- Estoque (`purchases/StockReconcileDialog.tsx`): tabela com seleção, busca, ações em lote (sugestão mais parecida / cadastrar como itens
+  novos / desvincular), status Vinculado/Pendente/Lançado, menu ⋮ (portal); painel do item selecionado com busca no estoque, sugestões por
+  semelhança (`similarity`: GTIN, palavras/abreviações, NCM), fator, lote/validade e "Cadastrar novo item"; rodapé vinculado × pendente em
+  valor. Local de entrada do topo vale para as linhas sem local (gravado ao salvar). Salvar = `pur_invoice_post` só estoque.
