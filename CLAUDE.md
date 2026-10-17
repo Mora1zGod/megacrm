@@ -926,3 +926,20 @@ Regras:
   copia o fator. Notas já importadas: a tela faz o mesmo ao abrir (selo "como na última compra").
 - (17/10/2026) Sugestões rápidas do `EntryFormDialog` = contas do plano (nome exato da conta, título "código — nome"): as mais usadas nos
   últimos 300 lançamentos do tipo + contas-chave (`SUGGESTION_CODES`) que existirem; clicar escolhe a conta e só preenche a descrição se vazia.
+
+## Retenção de mídia (17/10/2026) — `20261017120000_media_retention.sql` + edge `media-retention-purge`
+- Por org em `app_settings`: `media_retention_enabled` (padrão false), `purge_on_close_after_hours` (24), `purge_inactive_after_days` (30).
+  Regras (`media_retention_candidates(org, limite)`, só LEITURA, service_role): conversa `closed` há mais de X horas (`closed_at`) OU mídia
+  com mais de Y dias (por ARQUIVO, mesmo em conversa ativa); nunca contato com a tag `guardar-midia` (criada em toda org + trigger
+  `zz_org_seed_media_tag`); nunca `avatars/` nem arquivo usado em `contacts.profile_pic_url`; arquivo usado por várias mensagens só sai se
+  TODAS estiverem no prazo. Reabrir (tela ou `_reopen_closed_conversation`) tira o `closed` → a regra das horas deixa de valer.
+- Órfãos: `media_retention_orphans(org)` — arquivo da org sem mensagem ativa nem foto de contato, com mais de 1 dia (upload de "enviadas"
+  acontece antes da mensagem existir).
+- Edge: cron de hora em hora (`media-retention-purge-hourly`, minuto 17) só nas orgs ligadas; tela (`settings.edit`) só a própria org,
+  `dry_run` padrão true; apagar exige `confirm:true` e retenção ligada. Apaga SEMPRE com `storage.from(...).remove()` em lotes de 100
+  (nunca DELETE em storage.objects), marca `messages.media_purged_at`, registra `audit_log` (`media.retention_purge`). Lógica em
+  `media-retention-purge/logic.ts` (testada com cliente falso).
+- Tela: Configurações → Automação e IA → Atendimento/SLA → "Retenção de mídia" (prazos, ligar/desligar, Simular, Apagar agora).
+  Conversa ⋮: "Baixar mídias da conversa (.zip)" (`src/lib/mediaRetention.ts`, zip no navegador com `fflate` 0.8.2, nível 0) e
+  "Guardar mídia deste contato" (liga/desliga a tag). Chat: `media_purged_at` → "📎 Mídia removida pela política de retenção" (legenda
+  continua) e sem "Encaminhar". Arquivos: some da lista.

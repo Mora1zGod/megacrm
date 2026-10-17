@@ -6,6 +6,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ContentType } from '@/types/inbox';
 import { formatPhone } from '@/lib/format';
 
+// Banco sem o SQL da retenção de mídia: consulta sem o filtro.
+let purgedColMissing = false;
+
 interface FileRow {
   id: string;
   conversation_id: string;
@@ -62,14 +65,23 @@ export default function FilesPage() {
 
   const loadPage = useCallback(async (offset: number, type: ContentType | 'all') => {
     const supabase = getSupabase();
-    let query = supabase
-      .from('messages')
-      .select('id, conversation_id, content_type, content, media_url, created_at')
-      .not('media_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (type !== 'all') query = query.eq('content_type', type);
-    const { data, error } = await query;
+    const build = (withPurgeFilter: boolean) => {
+      let query = supabase
+        .from('messages')
+        .select('id, conversation_id, content_type, content, media_url, created_at')
+        .not('media_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+      if (type !== 'all') query = query.eq('content_type', type);
+      // Retenção de mídia: arquivo já apagado do Storage não aparece aqui (o histórico da conversa mostra o aviso).
+      if (withPurgeFilter) query = query.is('media_purged_at', null);
+      return query;
+    };
+    let { data, error } = await build(!purgedColMissing);
+    if (error && /media_purged_at/.test(error.message)) {
+      purgedColMissing = true;
+      ({ data, error } = await build(false));
+    }
     if (error) return { items: [] as FileRow[], error };
     return { items: (data ?? []) as FileRow[], error: null };
   }, []);

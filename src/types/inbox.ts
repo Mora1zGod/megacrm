@@ -68,6 +68,8 @@ export interface Message {
   edited_at?: string | null;
   // Link do post/story no Instagram, quando o Zernio manda (botão "Abrir no Instagram").
   external_url?: string | null;
+  // Retenção de mídia: arquivo apagado do Storage (a mensagem fica no histórico).
+  media_purged_at?: string | null;
 }
 
 export interface ConversationWithContact extends Conversation {

@@ -5,7 +5,7 @@ import './inbox.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRightLeft, CheckCircle2, Copy, CornerUpRight, Info, Instagram, MessageCircle, MoreVertical, PanelRightClose, PanelRightOpen, Pin, Plus, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, CheckCircle2, Copy, FileArchive, ShieldCheck, CornerUpRight, Info, Instagram, MessageCircle, MoreVertical, PanelRightClose, PanelRightOpen, Pin, Plus, RotateCcw, Share2, Star, UserCheck, X } from 'lucide-react';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { cn } from '@/lib/utils';
 import { useAiChannels } from '@/hooks/useAiChannels';
@@ -13,6 +13,7 @@ import { useWhatsappProvider } from '@/hooks/useWhatsappProvider';
 import { useConversations } from '@/hooks/useConversations';
 import { useInboxRemoteList, type RemoteMode } from '@/hooks/useInboxRemoteList';
 import { instagramHandle } from '@/lib/instagram';
+import { contactKeepsMedia, downloadConversationMedia, setContactKeepsMedia } from '@/lib/mediaRetention';
 import type { ConversationWithContact, Message } from '@/types/inbox';
 import { useMessages } from '@/hooks/useMessages';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
@@ -251,6 +252,44 @@ export default function InboxPage() {
     [conversations, remoteConversations, selectedId],
   );
   const selectedIsGroup = selected ? isGroupConversation(selected) : false;
+
+  // Retenção de mídia: contato com a tag "guardar-midia" nunca perde a mídia; zip das mídias da conversa.
+  const [keepMedia, setKeepMedia] = useState<boolean | null>(null);
+  const [zipping, setZipping] = useState(false);
+  const selectedContactId = selected?.contact?.id ?? null;
+  useEffect(() => {
+    setKeepMedia(null);
+    if (!selectedContactId) return;
+    let alive = true;
+    void contactKeepsMedia(selectedContactId).then((v) => { if (alive) setKeepMedia(v); }).catch(() => { if (alive) setKeepMedia(false); });
+    return () => { alive = false; };
+  }, [selectedContactId]);
+  const toggleKeepMedia = async () => {
+    if (!selectedContactId || keepMedia === null) return;
+    const next = !keepMedia;
+    try {
+      await setContactKeepsMedia(selectedContactId, next);
+      setKeepMedia(next);
+      toast.success(next ? 'A mídia deste contato não será apagada pela retenção.' : 'A mídia deste contato volta a seguir a retenção.');
+    } catch (err) {
+      toast.error('Não foi possível alterar', { description: err instanceof Error ? err.message : String(err) });
+    }
+  };
+  const zipMedia = async () => {
+    if (!selected || zipping) return;
+    setZipping(true);
+    const id = toast.loading('Preparando o .zip das mídias…');
+    try {
+      const r = await downloadConversationMedia(selected.id, selected.contact?.name || selected.contact?.phone || 'conversa',
+        (done, total) => toast.loading(`Baixando mídias… ${done}/${total}`, { id }));
+      if (!r.files) toast.info(r.failed ? `Nenhuma mídia pôde ser baixada (${r.failed} falharam).` : 'Esta conversa não tem mídias para baixar.', { id });
+      else toast.success(`${r.files} arquivo(s) no .zip (${(r.bytes / 1048576).toFixed(1).replace('.', ',')} MB)${r.failed ? ` · ${r.failed} não baixaram` : ''}.`, { id });
+    } catch (err) {
+      toast.error('Falha ao montar o .zip', { id, description: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setZipping(false);
+    }
+  };
 
   // Se a conversa aberta for (re)atribuída a outro operador (deep-link ou
   // realtime), fecha imediatamente para quem não pode vê-la.
@@ -562,6 +601,14 @@ export default function InboxPage() {
                         <MenuItem icon={<Share2 className="h-4 w-4" />} onClick={() => { setMoreOpen(false); setShowForward(true); }}>
                           Compartilhar com a equipe
                         </MenuItem>
+                        <MenuItem icon={<FileArchive className="h-4 w-4" />} onClick={() => { setMoreOpen(false); void zipMedia(); }}>
+                          {zipping ? 'Preparando o .zip…' : 'Baixar mídias da conversa (.zip)'}
+                        </MenuItem>
+                        {selectedContactId && keepMedia !== null && (
+                          <MenuItem icon={<ShieldCheck className={cn('h-4 w-4', keepMedia && 'text-[var(--accent-primary)]')} />} onClick={() => { setMoreOpen(false); void toggleKeepMedia(); }}>
+                            {keepMedia ? 'Parar de guardar a mídia' : 'Guardar mídia deste contato'}
+                          </MenuItem>
+                        )}
                         <div className="min-[1440px]:hidden">
                           <MenuItem icon={<Info className="h-4 w-4" />} onClick={() => { setMoreOpen(false); setShowPanelMobile(true); }}>
                             Detalhes do contato

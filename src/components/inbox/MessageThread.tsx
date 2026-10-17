@@ -490,7 +490,7 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
                 <Reply className="h-4 w-4" />
               </button>
             )}
-            {onForward && (
+            {onForward && !m.media_purged_at && (
               <button type="button" onClick={() => onForward({ ...m, id: realId! })} aria-label="Encaminhar" title="Encaminhar"
                 className="rounded-full p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
                 <CornerUpRight className="h-4 w-4" />
@@ -581,6 +581,12 @@ export function MessageThread({ messages, loading, onRetry, onDismiss, onReply, 
                     Template
                   </div>
                   <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                </div>
+              ) : m.media_purged_at ? (
+                // Retenção de mídia: o arquivo saiu do Storage, a mensagem continua no histórico.
+                <div className="space-y-1">
+                  <div className="italic opacity-75">📎 Mídia removida pela política de retenção</div>
+                  {m.content?.trim() && <div className="whitespace-pre-wrap break-words">{m.content}</div>}
                 </div>
               ) : (
                 <MediaContent message={m} />

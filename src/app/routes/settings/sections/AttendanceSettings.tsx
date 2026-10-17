@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useSlaConfig } from '@/hooks/useSlaConfig';
+import { MediaRetentionSettings } from './MediaRetentionSettings';
 
 const inputCls =
   'h-10 w-24 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
@@ -62,6 +63,8 @@ export function AttendanceSettings() {
           <Button onClick={() => void submit()} disabled={saving || loading}>{saving ? 'Salvando…' : 'Salvar'}</Button>
         </div>
       </Card>
+
+      <MediaRetentionSettings />
 
       <Card className="p-5">
         <div className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">Outros recursos do atendimento</div>
