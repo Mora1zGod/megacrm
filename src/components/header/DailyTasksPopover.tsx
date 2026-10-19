@@ -26,6 +26,7 @@ function startOfToday() { const d = new Date(); d.setHours(0, 0, 0, 0); return d
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 
 type View = 'hoje' | 'proximas' | 'atrasadas';
+const SCOPE_KEY = 'megacrm_daily_tasks_scope';
 
 // Título do grupo nas próximas: "Amanhã", "sex., 24/10", ...
 function dayLabel(iso: string): string {
@@ -46,6 +47,9 @@ export function DailyTasksPopover() {
   const [open, setOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [view, setView] = useState<View>('hoje');
+  // Minhas (eu + sem responsável) ou da equipe toda (o que o RLS deixa ver). Guardado no navegador.
+  const [scope, setScopeState] = useState<'mine' | 'all'>(() => { try { return localStorage.getItem(SCOPE_KEY) === 'all' ? 'all' : 'mine'; } catch { return 'mine'; } });
+  const setScope = (v: 'mine' | 'all') => { setScopeState(v); try { localStorage.setItem(SCOPE_KEY, v); } catch { /* sem storage */ } };
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -55,7 +59,6 @@ export function DailyTasksPopover() {
       .select('*')
       .gte('due_at', addDays(today, -BEHIND_DAYS).toISOString())
       .lt('due_at', addDays(today, AHEAD_DAYS + 1).toISOString())
-      .or(`assigned_to.eq.${userId},assigned_to.is.null`)
       .order('due_at', { ascending: true });
     setTasks((data ?? []) as DayTask[]);
   }, [userId]);
@@ -74,11 +77,18 @@ export function DailyTasksPopover() {
   const t0 = startOfToday().getTime();
   const t1 = addDays(startOfToday(), 1).getTime();
   const at = (t: DayTask) => (t.due_at ? new Date(t.due_at).getTime() : 0);
-  const todayTasks = tasks.filter((t) => at(t) >= t0 && at(t) < t1);
-  const lateTasks = tasks.filter((t) => t.status === 'pending' && at(t) < t0);
-  const nextTasks = tasks.filter((t) => t.status === 'pending' && at(t) >= t1);
+  const mine = (t: DayTask) => !t.assigned_to || t.assigned_to === userId;
+  const scoped = scope === 'all' ? tasks : tasks.filter(mine);
+  // Bolinha do botão: sempre só as MINHAS (hoje pendentes + atrasadas).
+  const myLate = tasks.filter((t) => mine(t) && t.status === 'pending' && at(t) < t0).length;
+  const myTodayOpen = tasks.filter((t) => mine(t) && t.status === 'pending' && at(t) >= t0 && at(t) < t1).length;
+  const todayTasks = scoped.filter((t) => at(t) >= t0 && at(t) < t1);
+  const lateTasks = scoped.filter((t) => t.status === 'pending' && at(t) < t0);
+  const nextTasks = scoped.filter((t) => t.status === 'pending' && at(t) >= t1);
   const done = todayTasks.filter((t) => t.status === 'done').length;
-  const pending = todayTasks.length - done + lateTasks.length;
+  const pending = myTodayOpen + myLate;
+  const inView = (t: DayTask) => view === 'hoje' ? at(t) >= t0 && at(t) < t1 : t.status === 'pending' && (view === 'proximas' ? at(t) >= t1 : at(t) < t0);
+  const othersInView = tasks.filter((t) => !mine(t) && inView(t)).length;
   const shown = (view === 'hoje' ? todayTasks : view === 'proximas' ? nextTasks : lateTasks).slice().sort((a, b) => at(a) - at(b));
 
   const toggle = async (t: DayTask) => {
@@ -123,6 +133,16 @@ export function DailyTasksPopover() {
               </div>
             </div>
 
+            <div className="mb-2 flex items-center gap-1 px-1 text-xs">
+              <span className="text-[var(--color-text-muted)]">Mostrar:</span>
+              {([['mine', 'Minhas'], ['all', 'Toda a equipe']] as const).map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={scope === k} onClick={() => setScope(k)}
+                  className={`rounded-full border px-2.5 py-0.5 font-medium ${scope === k ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-soft)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div role="tablist" aria-label="Período" className="mb-2 flex gap-1 rounded-lg bg-[var(--color-fill-subtle)] p-1">
               {([['hoje', 'Hoje', todayTasks.length - done], ['proximas', 'Próximas', nextTasks.length], ['atrasadas', 'Atrasadas', lateTasks.length]] as const).map(([k, label, n]) => (
                 <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)}
@@ -136,6 +156,11 @@ export function DailyTasksPopover() {
             {shown.length === 0 ? (
               <div className="px-2 py-4 text-center text-sm text-[var(--color-text-muted)]">
                 {view === 'hoje' ? 'Nenhuma tarefa para hoje. 🎉' : view === 'proximas' ? `Nada nos próximos ${AHEAD_DAYS} dias.` : 'Nenhuma tarefa atrasada. 👏'}
+                {scope === 'mine' && othersInView > 0 && (
+                  <button type="button" onClick={() => setScope('all')} className="mt-2 block w-full text-xs font-medium text-[var(--accent-primary)] hover:underline">
+                    {othersInView} de outras pessoas da equipe — ver
+                  </button>
+                )}
               </div>
             ) : (
               <ul className="max-h-96 space-y-0.5 overflow-y-auto">

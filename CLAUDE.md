@@ -958,4 +958,5 @@ Regras:
   `send-wa-notification` assina 1 dia; `transcribe-audio`/`process-ai-message` baixam pelo Storage. Código novo que precise de um
   arquivo do bucket TEM de usar esses helpers.
 - Tarefas Diárias no topo (19/10/2026, `components/header/DailyTasksPopover.tsx`): abas Hoje (feitas/total) · Próximas (pendentes até 30 dias,
-  agrupadas por dia — marcar = adiantar) · Atrasadas (pendentes vencidas, até 90 dias). Bolinha = pendentes de hoje + atrasadas.
+  agrupadas por dia — marcar = adiantar) · Atrasadas (pendentes vencidas, até 90 dias). "Minhas" (eu + sem responsável) ou "Toda a equipe"
+  (`megacrm_daily_tasks_scope`). Bolinha = SÓ as minhas pendentes de hoje + atrasadas.
