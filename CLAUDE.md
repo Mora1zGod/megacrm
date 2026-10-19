@@ -758,8 +758,10 @@ Regras:
   `p_finance` ou só `p_stock`).
 
 ## Tarefas e quadros (08/10/2026) — rota `/quadros` (`/tasks` redireciona para `?modo=caixa`)
-- Uma área só, estilo Trello: abas no TOPO (19/10/2026; antes barra flutuante embaixo) Tarefas (TasksPage, tabela `tasks`) · Quadros · Planejador; a última aba usada fica no navegador (`megacrm_boards_mode`). Planejador (semana com prazos de
-  `board_cards.due_date` + `tasks.due_at`) · Quadro · Mudar de quadros. Menu: item "Tarefas e quadros" (`anyPerm` boards.view/tasks.view).
+- Uma área só, estilo Trello: abas no TOPO (19/10/2026; antes barra flutuante embaixo) Tarefas (TasksPage, tabela `tasks`) · Quadros · Agenda (link);
+  a última aba usada fica no navegador (`megacrm_boards_mode`). O antigo Planejador virou a camada "Cartões dos quadros" da Agenda
+  (`VisitsPage`, prazos de `board_cards.due_date`, mesmos quadros visíveis da tela de Quadros); `?modo=planejador` redireciona para `/agenda`
+  e a Agenda abre cartão com `/quadros?quadro=<board>&cartao=<card>`. Menu: item "Tarefas e quadros" (`anyPerm` boards.view/tasks.view).
 - Quadro: fundo por `boards.color` (chaves de `BOARD_BG`), listas/cartões com tokens `.board-canvas` (globals.css), arrastar cartão entre e
   dentro das listas (posição antes do cartão alvo), menu do quadro (renomear, fundo, itens arquivados com restaurar, arquivar).
 - "Mudar de quadros": abrir, criar, restaurar arquivados e **Juntar quadros em um só** (cada quadro vira uma lista do quadro novo; move
@@ -960,3 +962,14 @@ Regras:
 - Tarefas Diárias no topo (19/10/2026, `components/header/DailyTasksPopover.tsx`): abas Hoje (feitas/total) · Próximas (pendentes até 30 dias,
   agrupadas por dia — marcar = adiantar) · Atrasadas (pendentes vencidas, até 90 dias). "Minhas" (eu + sem responsável) ou "Toda a equipe"
   (`megacrm_daily_tasks_scope`). Bolinha = SÓ as minhas pendentes de hoje + atrasadas.
+
+## Tarefas de todas as empresas (19/10/2026) — `20261019120000_tasks_all_orgs.sql`, `src/lib/tasksAllOrgs.ts`
+- Quem tem 2+ organizações (my_orgs + a org em uso) vê em Tarefas (select "Empresa") e no Tarefas Diárias (chip "Todas as empresas") as
+  tarefas de todas juntas, com etiqueta da empresa. Escolha guardada em `megacrm_tasks_company_scope`. NADA é duplicado (cada tarefa no seu org_id).
+- Banco (SECURITY DEFINER, policies de tasks intactas): `tasks_all_orgs(from?, to?)`, `task_xorg_set_done(task, done, next_due)` (a próxima
+  repetição é calculada no front com `nextFutureOccurrence` e criada na MESMA org), `task_xorg_save(id|null, org, p)` (edição só mexe nos campos
+  enviados), `task_xorg_members(org)`. Regras por org: `_xorg_can(org, perm)` = membro ativo + `effective_permissions`; ver = `tasks.view` e
+  (minha/criada por mim/sem responsável ou escopo "Todas"/admin daquela org; "Equipe" conta como só minhas); responsável tem de ser membro ativo
+  da org. Apagar tarefa de OUTRA empresa não é oferecido. Super admin em suporte: só as orgs onde é membro + a em uso.
+- `TaskFormDialog` aceita `companies` + `orgId`: com 2+ empresas mostra "Empresa" ao criar; tarefa de outra org salva por `task_xorg_save`.
+- Typecheck do front: `npx tsc --noEmit -p tsconfig.app.json` (o `-p .` não checa nada — tsconfig raiz só tem references).

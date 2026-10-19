@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Bell, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, List, MessageSquare, Pencil, Plus, Trash2, User, Users, X } from 'lucide-react';
+import { Bell, Briefcase, CalendarDays, CheckSquare, KanbanSquare, ChevronDown, ChevronLeft, ChevronRight, List, MessageSquare, Pencil, Plus, Trash2, User, Users, X } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { DataGrid, useGrid } from '@/components/ui/GridTable';
@@ -17,6 +17,7 @@ import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
 import { formatNextDue, isRecurring, RECURRENCE_LABELS, setTaskDone } from '@/lib/tasks';
 import { REMINDER_COLORS, toLocalInput, useReminders, type Reminder, type ReminderColor } from '@/hooks/useReminders';
 import { formatPhone } from '@/lib/format';
+import { useAllBoardMembers, useBoards } from '@/hooks/useBoards';
 
 interface AgendaTask {
   id: string;
@@ -29,7 +30,8 @@ interface AgendaTask {
   recurrence?: string | null;
 }
 
-type Layer = 'visitas' | 'tarefas' | 'lembretes';
+type Layer = 'visitas' | 'tarefas' | 'lembretes' | 'cartoes';
+interface AgendaCard { id: string; title: string; due_date: string; done: boolean; board_id: string; board_name: string; list_name: string }
 
 const minutesOf = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + (m || 0); };
 const minutesOfIso = (iso: string) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
@@ -92,7 +94,7 @@ export default function VisitsPage() {
   const { userId } = useAppUser();
   const perms = usePermission();
   const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
-  const [layers, setLayers] = useState<Record<Layer, boolean>>({ visitas: true, tarefas: true, lembretes: true });
+  const [layers, setLayers] = useState<Record<Layer, boolean>>({ visitas: true, tarefas: true, lembretes: true, cartoes: true });
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
   const [detailTask, setDetailTask] = useState<AgendaTask | null>(null);
   const [editTask, setEditTask] = useState<AgendaTask | null>(null);
@@ -117,6 +119,42 @@ export default function VisitsPage() {
   }, [weekStart]);
   const { reminders, create: createReminder, update: updateReminder, setDone: setReminderDone, remove: removeReminder } = useReminders(weekRange);
   const [editReminder, setEditReminder] = useState<Reminder | null>(null);
+
+  // Cartões dos quadros com prazo na semana (19/10/2026: antes ficavam no "Planejador" de Tarefas e quadros).
+  // Mesmos quadros que a pessoa vê lá: quadro sem membros = todos; com membros = só eles (admin vê todos).
+  const canBoards = perms.can('boards.view');
+  const { boards } = useBoards();
+  const { byBoard } = useAllBoardMembers();
+  const { userId: meId, role: myRole } = useAppUser();
+  const visibleBoardIds = useMemo(() => boards.filter((b) => {
+    const m = byBoard.get(b.id);
+    return !m || m.length === 0 || myRole === 'admin' || (meId ? m.includes(meId) : false);
+  }).map((b) => b.id), [boards, byBoard, myRole, meId]);
+  const [cards, setCards] = useState<AgendaCard[]>([]);
+  useEffect(() => {
+    if (!canBoards || visibleBoardIds.length === 0) { setCards([]); return; }
+    let alive = true;
+    void (async () => {
+      const sb = getSupabase();
+      const { data: ls } = await sb.from('board_lists').select('id, name, board_id').in('board_id', visibleBoardIds).eq('archived', false);
+      const lists = (ls ?? []) as Array<{ id: string; name: string; board_id: string }>;
+      if (!lists.length) { if (alive) setCards([]); return; }
+      const { data: cs } = await sb.from('board_cards').select('id, title, due_date, done, list_id').in('list_id', lists.map((l) => l.id))
+        .eq('archived', false).gte('due_date', weekRange.fromISO).lt('due_date', weekRange.toISO);
+      if (!alive) return;
+      setCards(((cs ?? []) as Array<{ id: string; title: string; due_date: string; done: boolean; list_id: string }>).map((c) => {
+        const l = lists.find((x) => x.id === c.list_id)!;
+        return { id: c.id, title: c.title, due_date: c.due_date, done: c.done, board_id: l.board_id, board_name: boards.find((b) => b.id === l.board_id)?.name ?? '', list_name: l.name };
+      }));
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleBoardIds.join(), weekRange.fromISO, canBoards]);
+  const cardsByDay = useMemo(() => {
+    const map = new Map<string, AgendaCard[]>();
+    for (const c of cards) { const k = toISODate(new Date(c.due_date)); map.set(k, [...(map.get(k) ?? []), c]); }
+    return map;
+  }, [cards]);
 
   const loadTasks = async () => {
     const { data } = await getSupabase()
@@ -250,7 +288,7 @@ export default function VisitsPage() {
           <div>
             <div className="text-label">Seção</div>
             <h1 className="text-2xl font-bold text-display">Agenda</h1>
-            <p className="text-sm text-[var(--color-text-secondary)]">Visitas, tarefas e lembretes num só calendário</p>
+            <p className="text-sm text-[var(--color-text-secondary)]">Visitas, tarefas, lembretes e cartões dos quadros num só calendário</p>
           </div>
         </div>
 
@@ -336,6 +374,7 @@ export default function VisitsPage() {
             ['visitas', 'Visitas', 'var(--accent-primary)'],
             ['tarefas', 'Tarefas', '#7C3AED'],
             ['lembretes', 'Lembretes', '#EA580C'],
+            ...(canBoards ? [['cartoes', 'Cartões dos quadros', '#0891B2']] : []),
           ] as [Layer, string, string][]).map(([id, label, color]) => (
             <button
               key={id}
@@ -385,6 +424,7 @@ export default function VisitsPage() {
             const dayVisits = layers.visitas ? (visitsByDay.get(key) ?? []) : [];
             const dayTasks = layers.tarefas ? (tasksByDay.get(key) ?? []) : [];
             const dayReminders = layers.lembretes ? (remindersByDay.get(key) ?? []) : [];
+            const dayCards = layers.cartoes ? (cardsByDay.get(key) ?? []) : [];
             const isToday = key === toISODate(new Date());
             return (
               <div key={key} className="min-h-[220px] rounded-xl border border-[var(--color-border-soft)] p-2">
@@ -439,6 +479,19 @@ export default function VisitsPage() {
                       </button>
                     );
                   })}
+                  {dayCards.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => navigate(`/quadros?quadro=${c.board_id}&cartao=${c.id}`)}
+                      title={`${c.board_name} · ${c.list_name}`}
+                      style={{ order: minutesOfIso(c.due_date) }}
+                      className={cn('w-full text-left rounded-lg border-l-[3px] border-[#0891B2] bg-[rgba(8,145,178,0.1)] px-2 py-1.5 text-xs text-[var(--color-text-primary)]', c.done && 'opacity-50 line-through')}
+                    >
+                      <div className="flex items-start gap-1 font-semibold"><KanbanSquare className="mt-0.5 h-3 w-3 shrink-0 text-[#0891B2]" /> <span className="line-clamp-2">{c.title}</span></div>
+                      <div className="truncate opacity-75">{c.board_name}</div>
+                    </button>
+                  ))}
                   {dayReminders.map((r) => (
                     <button
                       key={r.id}
@@ -456,7 +509,7 @@ export default function VisitsPage() {
           })}
         </div>
 
-        {!loading && visits.length === 0 && tasks.length === 0 && reminders.length === 0 && (
+        {!loading && visits.length === 0 && tasks.length === 0 && reminders.length === 0 && cards.length === 0 && (
           <div className="mt-3 rounded-xl border border-dashed border-[var(--color-border-soft)] p-6 text-center">
             <p className="text-sm text-[var(--color-text-secondary)] mb-2">Nada na agenda nesta semana.</p>
             <Button size="sm" onClick={() => setCreateOpen(true)}>

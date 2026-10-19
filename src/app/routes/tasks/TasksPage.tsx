@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import { useAppUser } from '@/app/providers/AppUserProvider';
 import { operatorLabel, useOperators, type Operator } from '@/hooks/useOperators';
 import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
 import { formatNextDue, isRecurring, RECURRENCE_LABELS, type TaskRecurrence } from '@/lib/tasks';
+import { fetchAllOrgTasks, readCompanyScope, saveCompanyScope, setTaskDoneAnyOrg, useTaskCompanies, type CompanyScope, type XTask } from '@/lib/tasksAllOrgs';
 
 type Tab = 'pending' | 'today' | 'late' | 'done' | 'all';
 
@@ -42,14 +43,35 @@ function dueText(iso: string, now: Date) {
 }
 
 export default function TasksPage() {
-  const { userId } = useAppUser();
+  const { userId, orgId } = useAppUser();
   const perms = usePermission();
   const { operators, allOperators } = useOperators();
-  const { tasks, loading, error, reload, toggleTask, deleteTask } = useTasks();
+  const { tasks: ownTasks, loading: ownLoading, error: ownError, reload: reloadOwn, toggleTask, deleteTask } = useTasks();
+
+  // "Todas as empresas": tarefas de todas as organizações do usuário numa lista só (cada uma com a etiqueta da empresa).
+  const { companies, multi } = useTaskCompanies();
+  const [companyScope, setCompanyScopeState] = useState<CompanyScope>(readCompanyScope);
+  const allMode = multi && companyScope === 'all';
+  const setCompanyScope = (v: CompanyScope) => { setCompanyScopeState(v); saveCompanyScope(v); };
+  const [xtasks, setXtasks] = useState<XTask[] | null>(null);
+  const [xError, setXError] = useState<string | null>(null);
+  const [xMissing, setXMissing] = useState(false);
+  const loadAll = useCallback(async () => {
+    try {
+      const r = await fetchAllOrgTasks();
+      if (r === null) { setXMissing(true); setXtasks(null); } else { setXtasks(r); setXError(null); }
+    } catch (e) { setXError(e instanceof Error ? e.message : String(e)); }
+  }, []);
+  useEffect(() => { if (allMode) void loadAll(); }, [allMode, loadAll, ownTasks]);
+  const useX = allMode && !xMissing && xtasks !== null;
+  const tasks: Task[] = useX ? xtasks! : ownTasks;
+  const loading = allMode && !xMissing ? xtasks === null && !xError : ownLoading;
+  const error = allMode && !xMissing ? xError : ownError;
+  const reload = useCallback(async () => { await reloadOwn(); if (allMode) await loadAll(); }, [reloadOwn, allMode, loadAll]);
   const [tab, setTab] = useState<Tab>('pending');
   const [who, setWho] = useState<string>('all'); // all | me | none | <user_id>
   const [q, setQ] = useState('');
-  const [form, setForm] = useState<{ task?: Task } | null>(null);
+  const [form, setForm] = useState<{ task?: Task; orgId?: string } | null>(null);
   const now = new Date();
 
   const scoped = useMemo(() => {
@@ -95,7 +117,7 @@ export default function TasksPage() {
 
   const onToggle = async (t: Task) => {
     try {
-      const res = await toggleTask(t);
+      const res = useX ? await setTaskDoneAnyOrg(t, t.status !== 'done').finally(() => void reload()) : await toggleTask(t);
       if (t.status === 'pending') {
         toast.success('Tarefa concluída.', res?.nextDue ? { description: `Próxima repetição: ${formatNextDue(res.nextDue)}` } : undefined);
       }
@@ -117,12 +139,23 @@ export default function TasksPage() {
     ['all', 'Todas', counts.all],
   ];
 
-  const renderRow = (t: Task) => (
-    <TaskRow key={t.id} task={t} now={now} operator={allOperators.find((o) => o.user_id === t.assigned_to)}
-      onToggle={perms.can('tasks.complete') ? () => void onToggle(t) : undefined}
-      onEdit={perms.can('tasks.edit') ? () => setForm({ task: t }) : undefined}
-      onDelete={perms.can('tasks.delete') ? () => void onDelete(t) : undefined} />
-  );
+  const renderRow = (t: Task) => {
+    const x = useX ? (t as XTask) : null;
+    const other = Boolean(x && orgId && x.org_id !== orgId);
+    // Empresa em uso: permissões daqui (como antes). Outra empresa: o que o banco disse que pode lá; apagar só na empresa em uso.
+    const canComplete = x ? x.can_complete : perms.can('tasks.complete');
+    const canEdit = x ? x.can_edit : perms.can('tasks.edit');
+    const canDelete = !other && perms.can('tasks.delete');
+    return (
+      <TaskRow key={t.id} task={t} now={now}
+        operator={other ? undefined : allOperators.find((o) => o.user_id === t.assigned_to)}
+        assigneeName={x?.assigned_name ?? null}
+        company={x ? x.org_name : null}
+        onToggle={canComplete ? () => void onToggle(t) : undefined}
+        onEdit={canEdit ? () => setForm({ task: t, orgId: x?.org_id }) : undefined}
+        onDelete={canDelete ? () => void onDelete(t) : undefined} />
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -161,6 +194,14 @@ export default function TasksPage() {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar tarefa" aria-label="Buscar tarefa"
               className="h-9 w-52 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] pl-8 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]" />
           </label>
+          {multi && (
+            <select value={companyScope} onChange={(e) => setCompanyScope(e.target.value as CompanyScope)} aria-label="Empresa"
+              title="Ver as tarefas só desta empresa ou de todas as suas empresas juntas"
+              className="h-9 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2.5 text-sm text-[var(--color-text-primary)]">
+              <option value="current">{companies.find((c) => c.id === orgId)?.name ?? 'Esta empresa'}</option>
+              <option value="all">Todas as empresas</option>
+            </select>
+          )}
           <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Responsável"
             className="h-9 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2.5 text-sm text-[var(--color-text-primary)]">
             <option value="all">Toda a equipe</option>
@@ -172,6 +213,11 @@ export default function TasksPage() {
       </div>
 
       {error && <p className="mb-3 text-sm text-[var(--color-error)]">{error}</p>}
+      {allMode && xMissing && (
+        <p className="mb-3 rounded-[var(--radius-control)] bg-[var(--color-fill-subtle)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+          Para ver todas as empresas juntas falta rodar no Supabase o SQL "tarefas de todas as empresas". Mostrando só a empresa em uso.
+        </p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-4">
         {loading ? (
@@ -200,6 +246,8 @@ export default function TasksPage() {
       {form && (
         <TaskFormDialog
           initial={form.task}
+          companies={multi ? companies : undefined}
+          orgId={form.orgId}
           onClose={() => setForm(null)}
           onSaved={() => { setForm(null); void reload(); }}
         />
@@ -224,8 +272,9 @@ function Kpi({ icon: Icon, label, value, tone, onClick }: {
   );
 }
 
-function TaskRow({ task, now, operator, onToggle, onEdit, onDelete }: {
-  task: Task; now: Date; operator?: Operator; onToggle?: () => void; onEdit?: () => void; onDelete?: () => void;
+function TaskRow({ task, now, operator, assigneeName, company, onToggle, onEdit, onDelete }: {
+  task: Task; now: Date; operator?: Operator; assigneeName?: string | null; company?: string | null;
+  onToggle?: () => void; onEdit?: () => void; onDelete?: () => void;
 }) {
   const navigate = useNavigate();
   const done = task.status === 'done';
@@ -243,6 +292,11 @@ function TaskRow({ task, now, operator, onToggle, onEdit, onDelete }: {
         {task.description && <div className="truncate text-xs text-[var(--color-text-secondary)]">{task.description}</div>}
       </button>
       <div className="flex shrink-0 items-center gap-2">
+        {company && (
+          <span className="hidden max-w-[10rem] truncate rounded-full border border-[var(--color-border-card)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] sm:inline" title={`Empresa: ${company}`}>
+            {company}
+          </span>
+        )}
         {rec && (
           <span className="hidden items-center gap-1 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent-primary)] sm:inline-flex">
             <Repeat className="h-3 w-3" /> {RECURRENCE_LABELS[rec]}
@@ -261,7 +315,9 @@ function TaskRow({ task, now, operator, onToggle, onEdit, onDelete }: {
         )}
         {operator
           ? <span title={operatorLabel(operator)}><Avatar src={operator.avatar_url} name={operatorLabel(operator)} size="sm" className="!h-7 !w-7" /></span>
-          : <span className="h-7 w-7" aria-hidden />}
+          : assigneeName && task.assigned_to
+            ? <span title={assigneeName}><Avatar name={assigneeName} size="sm" className="!h-7 !w-7" /></span>
+            : <span className="h-7 w-7" aria-hidden />}
         {onEdit && <button type="button" onClick={onEdit} aria-label="Editar tarefa"
           className="rounded p-1 text-[var(--color-text-muted)] opacity-0 transition hover:text-[var(--accent-primary)] focus:opacity-100 group-hover:opacity-100">
           <Pencil className="h-4 w-4" />

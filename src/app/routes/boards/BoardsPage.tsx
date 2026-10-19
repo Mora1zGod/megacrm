@@ -1,6 +1,6 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { lazyRetry } from '@/lib/lazyRetry';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useOperators } from '@/hooks/useOperators';
-import { useTasks } from '@/hooks/useTasks';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,6 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ListColumn } from '@/components/boards/ListColumn';
 import { CardModal } from '@/components/boards/CardModal';
 import { ShareBoardDialog } from '@/components/boards/ShareBoardDialog';
-import { dueState, DUE_CLS } from '@/components/boards/CardMini';
 import { AllBoardsView } from './AllBoardsView';
 import { BOARD_BG, boardBg } from './boardBg';
 export { BOARD_BG, boardBg };
@@ -30,7 +28,7 @@ const TasksPage = lazyRetry(() => import('../tasks/TasksPage'));
 
 // Quadro aberto: ALL = tela inicial com todos os quadros lado a lado (como o quadro principal do Trello).
 const ALL = 'todos';
-type Mode = 'quadro' | 'caixa' | 'planejador';
+type Mode = 'quadro' | 'caixa';
 const MODE_KEY = 'megacrm_boards_mode';
 
 // Tarefas e Quadros juntos: o quadro (Trello), a caixa de entrada (tarefas), o planejador (semana) e a troca de quadros.
@@ -44,7 +42,6 @@ export default function BoardsPage() {
     let m = params.get('modo');
     if (!m) { try { m = localStorage.getItem(MODE_KEY); } catch { /* sem storage */ } }
     if (m === 'caixa' && canTasks) return 'caixa';
-    if (m === 'planejador') return 'planejador';
     return canBoards ? 'quadro' : 'caixa';
   })();
   const setMode = (m: Mode) => {
@@ -68,6 +65,19 @@ export default function BoardsPage() {
   const board = visibleBoards.find((b) => b.id === boardId) ?? null;
   const [openCardFromPlanner, setOpenCardFromPlanner] = useState<string | null>(null);
 
+  // 19/10/2026: o Planejador virou a camada "Cartões" da Agenda. Link antigo (?modo=planejador) vai para a Agenda.
+  // A Agenda abre um cartão com ?quadro=<board>&cartao=<card>.
+  const navigate = useNavigate();
+  useEffect(() => { if (params.get('modo') === 'planejador') navigate('/agenda', { replace: true }); }, [params, navigate]);
+  const deepBoard = params.get('quadro');
+  const deepCard = params.get('cartao');
+  useEffect(() => {
+    if (!deepBoard || loadingBoards || !visibleBoards.some((b) => b.id === deepBoard)) return;
+    setBoardId(deepBoard);
+    if (deepCard) setOpenCardFromPlanner(deepCard);
+    setParams((p) => { p.delete('quadro'); p.delete('cartao'); p.set('modo', 'quadro'); return p; }, { replace: true });
+  }, [deepBoard, deepCard, loadingBoards, visibleBoards, setParams]);
+
   return (
     <div className="relative -m-3 flex h-[calc(100%+1.5rem)] min-h-0 flex-col sm:-m-5 sm:h-[calc(100%+2.5rem)]">
       {(errBoards) && <div className="p-3"><LoadErrorBanner message={errBoards} onRetry={() => void reloadBoards()} /></div>}
@@ -76,7 +86,7 @@ export default function BoardsPage() {
       <nav aria-label="Tarefas e quadros" className="flex shrink-0 flex-wrap items-center gap-1 border-b border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 py-2 sm:px-5">
         {canTasks && <ModeBtn on={mode === 'caixa'} icon={ListChecks} label="Tarefas" onClick={() => setMode('caixa')} />}
         {canBoards && <ModeBtn on={mode === 'quadro'} icon={KanbanSquare} label="Quadros" onClick={() => setMode('quadro')} />}
-        <ModeBtn on={mode === 'planejador'} icon={CalendarDays} label="Planejador" onClick={() => setMode('planejador')} />
+        <ModeBtn on={false} icon={CalendarDays} label="Agenda" onClick={() => navigate('/agenda')} />
         {canBoards && mode === 'quadro' && (
           <button type="button" onClick={() => setSwitcher(true)}
             className="ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]">
@@ -97,11 +107,6 @@ export default function BoardsPage() {
           <div className="h-full overflow-y-auto p-4 md:p-6">
             <Suspense fallback={<Skeleton className="h-96" />}><TasksPage /></Suspense>
           </div>
-        )}
-        {mode === 'planejador' && (
-          <Planner boards={visibleBoards} canTasks={canTasks} canBoards={canBoards}
-            onOpenCard={(bid, cid) => { setBoardId(bid); setOpenCardFromPlanner(cid); setMode('quadro'); }}
-            onOpenTasks={() => setMode('caixa')} />
         )}
       </div>
 
@@ -532,93 +537,5 @@ function BoardSwitcher({ boards, archived, currentId, onPick, onClose, onChanged
         </div>
       </div>
     </Dialog>
-  );
-}
-
-// ============================================================================ PLANEJADOR
-interface PlanCard { id: string; title: string; due_date: string; done: boolean; board_id: string; board_name: string; list_name: string }
-function Planner({ boards, canTasks, canBoards, onOpenCard, onOpenTasks }: {
-  boards: Board[]; canTasks: boolean; canBoards: boolean; onOpenCard: (boardId: string, cardId: string) => void; onOpenTasks: () => void;
-}) {
-  const { tasks } = useTasks();
-  const [start, setStart] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; });
-  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
-  const end = new Date(start); end.setDate(end.getDate() + 7);
-  const [cards, setCards] = useState<PlanCard[]>([]);
-  const boardsKey = boards.map((b) => b.id).join();
-  const reqId = useRef(0);
-  useEffect(() => {
-    if (!canBoards || boards.length === 0) { setCards([]); return; }
-    const my = ++reqId.current;
-    void (async () => {
-      const sb = getSupabase();
-      const { data: ls } = await sb.from('board_lists').select('id, name, board_id').in('board_id', boards.map((b) => b.id)).eq('archived', false);
-      const lists = (ls ?? []) as Array<{ id: string; name: string; board_id: string }>;
-      if (!lists.length) { setCards([]); return; }
-      const { data: cs } = await sb.from('board_cards').select('id, title, due_date, done, list_id').in('list_id', lists.map((l) => l.id)).eq('archived', false)
-        .gte('due_date', start.toISOString()).lt('due_date', end.toISOString());
-      if (my !== reqId.current) return;
-      setCards(((cs ?? []) as Array<{ id: string; title: string; due_date: string; done: boolean; list_id: string }>).map((c) => {
-        const l = lists.find((x) => x.id === c.list_id)!;
-        return { id: c.id, title: c.title, due_date: c.due_date, done: c.done, board_id: l.board_id, board_name: boards.find((b) => b.id === l.board_id)?.name ?? '', list_name: l.name };
-      }));
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardsKey, start.getTime(), canBoards]);
-  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  const today = new Date();
-  const weekTasks = canTasks ? tasks.filter((t) => t.due_at && new Date(t.due_at) >= start && new Date(t.due_at) < end) : [];
-  const shift = (n: number) => setStart((s) => { const d = new Date(s); d.setDate(d.getDate() + n); return d; });
-  const label = `${days[0].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} – ${days[6].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`.replace(/\./g, '');
-
-  return (
-    <div className="flex h-full flex-col overflow-hidden p-4 md:p-6">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Planejador</h2>
-        <span className="text-sm text-[var(--color-text-secondary)]">Prazos dos cartões e das tarefas da semana.</span>
-        <div className="ml-auto flex items-center gap-1">
-          <Button variant="outline" size="sm" onClick={() => shift(-7)} aria-label="Semana anterior"><ChevronLeft className="h-4 w-4" /></Button>
-          <Button variant="outline" size="sm" onClick={() => setStart(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; })}>Hoje</Button>
-          <Button variant="outline" size="sm" onClick={() => shift(7)} aria-label="Próxima semana"><ChevronRight className="h-4 w-4" /></Button>
-          <span className="ml-2 text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
-        </div>
-      </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-7">
-        {days.map((d) => {
-          const dc = cards.filter((c) => sameDay(new Date(c.due_date), d));
-          const dt = weekTasks.filter((t) => sameDay(new Date(t.due_at!), d));
-          const isToday = sameDay(d, today);
-          return (
-            <div key={d.toISOString()} className={cn('flex min-h-[160px] flex-col rounded-[var(--radius-card)] border bg-[var(--color-surface)] p-2', isToday ? 'border-[var(--accent-primary)]' : 'border-[var(--color-border-card)]')}>
-              <div className="mb-2 flex items-baseline justify-between px-1">
-                <span className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">{d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
-                <span className={cn('flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold', isToday ? 'bg-[var(--accent-fill)] text-white' : 'text-[var(--color-text-primary)]')}>{d.getDate()}</span>
-              </div>
-              <div className="space-y-1.5">
-                {dc.map((c) => {
-                  const st = dueState(c);
-                  return (
-                    <button key={c.id} type="button" onClick={() => onOpenCard(c.board_id, c.id)} className="block w-full rounded-md border border-[var(--color-border-soft)] bg-[var(--color-surface-hover)] px-2 py-1.5 text-left hover:border-[var(--accent-primary)]">
-                      <span className={cn('block text-sm leading-snug text-[var(--color-text-primary)]', c.done && 'line-through opacity-60')}>{c.title}</span>
-                      <span className="mt-1 flex items-center gap-1 text-[11px] text-[var(--color-text-muted)]">
-                        {st && st !== 'ok' && <span className={cn('rounded px-1', DUE_CLS[st])}>{new Date(c.due_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
-                        <span className="truncate">{c.board_name} · {c.list_name}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-                {dt.map((t) => (
-                  <button key={t.id} type="button" onClick={onOpenTasks} className="flex w-full items-start gap-1.5 rounded-md border border-dashed border-[var(--color-border-card)] px-2 py-1.5 text-left text-sm hover:border-[var(--accent-primary)]">
-                    <Inbox className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent-primary)]" />
-                    <span className={cn('leading-snug text-[var(--color-text-primary)]', t.status === 'done' && 'line-through opacity-60')}>{t.title}</span>
-                  </button>
-                ))}
-                {dc.length + dt.length === 0 && <p className="px-1 text-xs text-[var(--color-text-muted)]">—</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }

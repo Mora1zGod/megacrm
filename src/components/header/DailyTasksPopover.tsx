@@ -9,6 +9,7 @@ import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { Avatar } from '@/components/ui/Avatar';
 import { TaskFormDialog } from '@/components/tasks/TaskFormDialog';
 import { formatNextDue, isRecurring, setTaskDone } from '@/lib/tasks';
+import { fetchAllOrgTasks, readCompanyScope, saveCompanyScope, setTaskDoneAnyOrg, useTaskCompanies, type CompanyScope } from '@/lib/tasksAllOrgs';
 
 interface DayTask {
   id: string;
@@ -17,6 +18,10 @@ interface DayTask {
   status: 'pending' | 'done';
   assigned_to: string | null;
   recurrence?: string | null;
+  org_id?: string;
+  org_name?: string;
+  assigned_name?: string | null;
+  can_complete?: boolean;
 }
 
 const AHEAD_DAYS = 30;  // "Próximas": até 30 dias à frente
@@ -40,7 +45,13 @@ function dayLabel(iso: string): string {
 // Próximas (pendentes dos próximos 30 dias, por dia) e Atrasadas (pendentes vencidas). Marcar como feita adianta
 // a tarefa (recorrente: a próxima continua contando da data marcada). Bolinha = pendentes de hoje + atrasadas.
 export function DailyTasksPopover() {
-  const { userId } = useAppUser();
+  const { userId, orgId } = useAppUser();
+  // Todas as empresas (mesma escolha da tela de Tarefas).
+  const { companies, multi } = useTaskCompanies();
+  const [companyScope, setCompanyScopeState] = useState<CompanyScope>(readCompanyScope);
+  const allMode = multi && companyScope === 'all';
+  const setCompanyScope = (v: CompanyScope) => { setCompanyScopeState(v); saveCompanyScope(v); };
+  const [xUsed, setXUsed] = useState(false);
   const perms = usePermission();
   const { allOperators: operators } = useOperators(); // nomes: inclui desativados (histórico)
   const [tasks, setTasks] = useState<DayTask[]>([]);
@@ -54,6 +65,13 @@ export function DailyTasksPopover() {
   const load = useCallback(async () => {
     if (!userId) return;
     const today = startOfToday();
+    if (allMode) {
+      try {
+        const rows = await fetchAllOrgTasks(addDays(today, -BEHIND_DAYS).toISOString(), addDays(today, AHEAD_DAYS + 1).toISOString());
+        if (rows) { setTasks(rows as unknown as DayTask[]); setXUsed(true); return; }
+      } catch { /* cai na empresa em uso */ }
+    }
+    setXUsed(false);
     const { data } = await getSupabase()
       .from('tasks')
       .select('*')
@@ -61,7 +79,7 @@ export function DailyTasksPopover() {
       .lt('due_at', addDays(today, AHEAD_DAYS + 1).toISOString())
       .order('due_at', { ascending: true });
     setTasks((data ?? []) as DayTask[]);
-  }, [userId]);
+  }, [userId, allMode]);
 
   useEffect(() => {
     void load();
@@ -95,7 +113,7 @@ export function DailyTasksPopover() {
     const next = t.status === 'done' ? 'pending' : 'done';
     setTasks((cur) => cur.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
     try {
-      const res = await setTaskDone(t.id, next === 'done');
+      const res = xUsed ? await setTaskDoneAnyOrg(t, next === 'done') : await setTaskDone(t.id, next === 'done');
       if (res.nextDue) toast.success('Tarefa concluída.', { description: `Próxima repetição: ${formatNextDue(res.nextDue)}` });
     } catch (e) {
       toast.error('Falha ao atualizar a tarefa', { description: e instanceof Error ? e.message : String(e) });
@@ -135,12 +153,19 @@ export function DailyTasksPopover() {
 
             <div className="mb-2 flex items-center gap-1 px-1 text-xs">
               <span className="text-[var(--color-text-muted)]">Mostrar:</span>
-              {([['mine', 'Minhas'], ['all', 'Toda a equipe']] as const).map(([k, label]) => (
+              {([['mine', 'Minhas'], ['all', 'Equipe']] as const).map(([k, label]) => (
                 <button key={k} type="button" aria-pressed={scope === k} onClick={() => setScope(k)}
                   className={`rounded-full border px-2.5 py-0.5 font-medium ${scope === k ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-soft)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>
                   {label}
                 </button>
               ))}
+              {multi && (
+                <button type="button" aria-pressed={allMode} onClick={() => setCompanyScope(allMode ? 'current' : 'all')}
+                  title={allMode ? 'Mostrando tarefas de todas as suas empresas' : 'Juntar as tarefas de todas as suas empresas'}
+                  className={`ml-auto rounded-full border px-2.5 py-0.5 font-medium ${allMode ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-soft)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}>
+                  {allMode ? `Todas as empresas (${companies.length})` : 'Todas as empresas'}
+                </button>
+              )}
             </div>
 
             <div role="tablist" aria-label="Período" className="mb-2 flex gap-1 rounded-lg bg-[var(--color-fill-subtle)] p-1">
@@ -177,15 +202,18 @@ export function DailyTasksPopover() {
                         <div className={`px-2 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wide ${view === 'atrasadas' ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'}`}>{group}</div>
                       )}
                       <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-[var(--color-surface-hover)]">
-                        <input type="checkbox" checked={isDone} disabled={!perms.can('tasks.complete')} onChange={() => void toggle(t)} aria-label={`Concluir: ${t.title}`} title={view === 'proximas' ? 'Concluir agora (adiantar)' : 'Concluir'} className="h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
+                        <input type="checkbox" checked={isDone} disabled={xUsed ? t.can_complete === false : !perms.can('tasks.complete')} onChange={() => void toggle(t)} aria-label={`Concluir: ${t.title}`} title={view === 'proximas' ? 'Concluir agora (adiantar)' : 'Concluir'} className="h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
                         <div className="min-w-0 flex-1">
                           <div className={`truncate text-sm ${isDone ? 'text-[var(--color-text-muted)] line-through' : 'text-[var(--color-text-primary)]'}`}>{t.title}</div>
                           <div className={`flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] ${isDone ? 'line-through' : ''}`}>
                             {t.due_at && <span>{new Date(t.due_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
                             {isRecurring(t.recurrence) && <Repeat className="h-3 w-3" aria-label="Recorrente" />}
+                            {xUsed && t.org_name && <span className="truncate rounded border border-[var(--color-border-soft)] px-1 text-[10px] font-semibold uppercase">{t.org_name}</span>}
                           </div>
                         </div>
-                        {op && <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" className="!h-7 !w-7" />}
+                        {op && (!xUsed || t.org_id === orgId)
+                          ? <Avatar src={op.avatar_url} name={operatorLabel(op)} size="sm" className="!h-7 !w-7" />
+                          : xUsed && t.assigned_to && t.assigned_name ? <span title={t.assigned_name}><Avatar name={t.assigned_name} size="sm" className="!h-7 !w-7" /></span> : null}
                       </div>
                     </li>
                   );
@@ -200,7 +228,7 @@ export function DailyTasksPopover() {
         </>
       )}
       {formOpen && (
-        <TaskFormDialog onClose={() => setFormOpen(false)} onSaved={() => { setFormOpen(false); void load(); }} />
+        <TaskFormDialog companies={multi ? companies : undefined} onClose={() => setFormOpen(false)} onSaved={() => { setFormOpen(false); void load(); }} />
       )}
     </div>
   );

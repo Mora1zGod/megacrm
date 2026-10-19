@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { toast } from 'sonner';
 import { Repeat } from 'lucide-react';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { RECURRENCE_LABELS, type TaskRecurrence } from '@/lib/tasks';
+import { loadOrgMembers, saveTaskAnyOrg } from '@/lib/tasksAllOrgs';
 
 export interface TaskFormValues {
   id?: string;
@@ -34,16 +35,33 @@ const RECURRENCES: TaskRecurrence[] = ['none', 'daily', 'weekdays', 'weekly', 'm
 
 // Formulário único de tarefa (criar e editar): título, descrição, responsável,
 // data/hora e recorrência. Usado em Tarefas, Agenda e no topo.
-export function TaskFormDialog({ initial, defaultDate, onClose, onSaved }: {
+// Várias empresas (20261019120000_tasks_all_orgs.sql): `companies` com 2+ mostra "Empresa" ao criar; `orgId` = empresa da
+// tarefa (edição) ou a sugerida. Tarefa de OUTRA empresa (não a em uso) é salva por task_xorg_save, que confere as
+// permissões daquela empresa; o "Responsável" lista os membros dela.
+export function TaskFormDialog({ initial, defaultDate, onClose, onSaved, companies, orgId: initialOrg }: {
   initial?: TaskFormValues;
   defaultDate?: string; // yyyy-mm-dd
   onClose: () => void;
   onSaved: () => void;
+  companies?: { id: string; name: string }[];
+  orgId?: string;
 }) {
-  const { userId } = useAppUser();
+  const { userId, orgId: currentOrg } = useAppUser();
   const perms = usePermission();
-  const canAssign = perms.can('tasks.assign');
   const { operators } = useOperators();
+  const [org, setOrg] = useState<string>(initialOrg ?? currentOrg ?? '');
+  const otherOrg = Boolean(org && currentOrg && org !== currentOrg);
+  const canAssign = otherOrg || perms.can('tasks.assign'); // outra empresa: o banco confere tasks.assign de lá
+  const [orgMembers, setOrgMembers] = useState<{ user_id: string; name: string }[] | null>(null);
+  useEffect(() => {
+    if (!otherOrg) { setOrgMembers(null); return; }
+    let alive = true;
+    void loadOrgMembers(org).then((m) => { if (alive) setOrgMembers(m); });
+    return () => { alive = false; };
+  }, [org, otherOrg]);
+  const people = otherOrg
+    ? (orgMembers ?? []).map((m) => ({ id: m.user_id, label: m.name }))
+    : operators.map((o) => ({ id: o.user_id, label: operatorLabel(o) }));
   const editing = Boolean(initial?.id);
   const due = initial?.due_at ? new Date(initial.due_at) : null;
 
@@ -74,6 +92,21 @@ export function TaskFormDialog({ initial, defaultDate, onClose, onSaved }: {
     if (recurrence !== 'none' || (initial?.recurrence && initial.recurrence !== 'none')) payload.recurrence = recurrence;
 
     setSaving(true);
+    if (otherOrg) {
+      try {
+        await saveTaskAnyOrg(editing ? initial!.id! : null, org, {
+          title: title.trim(), description: description.trim() || null, due_at: dueAt, assigned_to: assignee || null, recurrence,
+        });
+      } catch (e) {
+        setSaving(false);
+        toast.error(editing ? 'Não foi possível salvar a tarefa' : 'Não foi possível criar a tarefa', { description: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      setSaving(false);
+      toast.success(editing ? 'Tarefa atualizada.' : `Tarefa criada em ${companies?.find((c) => c.id === org)?.name ?? 'outra empresa'}.`);
+      onSaved();
+      return;
+    }
     const supabase = getSupabase();
     const { error } = editing
       ? await supabase.from('tasks').update(payload).eq('id', initial!.id!)
@@ -104,6 +137,19 @@ export function TaskFormDialog({ initial, defaultDate, onClose, onSaved }: {
       description={editing ? undefined : 'Crie uma tarefa para você ou para alguém da equipe.'}
     >
       <div className="space-y-3.5">
+        {!editing && companies && companies.length > 1 && (
+          <div>
+            <Label htmlFor="tf-org">Empresa</Label>
+            <select id="tf-org" value={org} onChange={(e) => { setOrg(e.target.value); setAssignee(userId ?? ''); }} className={cn(inputCls, 'h-10 py-0')}>
+              {companies.map((c) => <option key={c.id} value={c.id}>{c.name}{c.id === currentOrg ? ' (em uso)' : ''}</option>)}
+            </select>
+          </div>
+        )}
+        {editing && otherOrg && companies && (
+          <p className="rounded-[var(--radius-control)] bg-[var(--color-fill-subtle)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+            Tarefa da empresa <b>{companies.find((c) => c.id === org)?.name ?? '—'}</b>.
+          </p>
+        )}
         <div>
           <Label htmlFor="tf-title">Título</Label>
           <input id="tf-title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)}
@@ -120,9 +166,11 @@ export function TaskFormDialog({ initial, defaultDate, onClose, onSaved }: {
           <select id="tf-who" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!canAssign}
             title={canAssign ? undefined : 'Seu perfil não permite atribuir tarefas para outra pessoa'} className={cn(inputCls, 'h-10 py-0')}>
             <option value="">Sem responsável</option>
-            {operators.map((o) => (
-              <option key={o.user_id} value={o.user_id}>{operatorLabel(o)}{o.user_id === userId ? ' (eu)' : ''}</option>
+            {people.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}{o.id === userId ? ' (eu)' : ''}</option>
             ))}
+            {/* responsável atual que não está na lista (ex.: lista ainda carregando) */}
+            {assignee && !people.some((o) => o.id === assignee) && <option value={assignee}>{otherOrg && !orgMembers ? 'Carregando…' : 'Responsável atual'}</option>}
           </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
