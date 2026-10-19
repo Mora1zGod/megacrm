@@ -957,3 +957,5 @@ Regras:
   `signedMediaUrl`. `send-operator-media` manda link assinado (7 dias) ao Zernio/UAZAPI e grava a URL "pública";
   `send-wa-notification` assina 1 dia; `transcribe-audio`/`process-ai-message` baixam pelo Storage. Código novo que precise de um
   arquivo do bucket TEM de usar esses helpers.
+- Tarefas Diárias no topo (19/10/2026, `components/header/DailyTasksPopover.tsx`): abas Hoje (feitas/total) · Próximas (pendentes até 30 dias,
+  agrupadas por dia — marcar = adiantar) · Atrasadas (pendentes vencidas, até 90 dias). Bolinha = pendentes de hoje + atrasadas.
