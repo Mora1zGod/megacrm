@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
-  Archive, ArchiveRestore, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Inbox, KanbanSquare, Layers, Lock, MoreHorizontal,
+  Archive, ArchiveRestore, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Inbox, KanbanSquare, Layers, ListChecks, Lock, MoreHorizontal,
   Palette, Pencil, Plus, Search, Users, X,
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
@@ -31,6 +31,7 @@ const TasksPage = lazyRetry(() => import('../tasks/TasksPage'));
 // Quadro aberto: ALL = tela inicial com todos os quadros lado a lado (como o quadro principal do Trello).
 const ALL = 'todos';
 type Mode = 'quadro' | 'caixa' | 'planejador';
+const MODE_KEY = 'megacrm_boards_mode';
 
 // Tarefas e Quadros juntos: o quadro (Trello), a caixa de entrada (tarefas), o planejador (semana) e a troca de quadros.
 export default function BoardsPage() {
@@ -38,13 +39,18 @@ export default function BoardsPage() {
   const canBoards = perms.can('boards.view');
   const canTasks = perms.can('tasks.view');
   const [params, setParams] = useSearchParams();
+  // Sem ?modo= na URL: volta para a última aba usada (Tarefas ou Quadros), guardada no navegador.
   const mode: Mode = ((): Mode => {
-    const m = params.get('modo');
+    let m = params.get('modo');
+    if (!m) { try { m = localStorage.getItem(MODE_KEY); } catch { /* sem storage */ } }
     if (m === 'caixa' && canTasks) return 'caixa';
     if (m === 'planejador') return 'planejador';
     return canBoards ? 'quadro' : 'caixa';
   })();
-  const setMode = (m: Mode) => setParams((p) => { p.set('modo', m); return p; }, { replace: true });
+  const setMode = (m: Mode) => {
+    try { localStorage.setItem(MODE_KEY, m); } catch { /* sem storage */ }
+    setParams((p) => { p.set('modo', m); return p; }, { replace: true });
+  };
   const [switcher, setSwitcher] = useState(false);
 
   const { boards, archivedBoards, loading: loadingBoards, error: errBoards, reload: reloadBoards } = useBoards();
@@ -66,6 +72,19 @@ export default function BoardsPage() {
     <div className="relative -m-3 flex h-[calc(100%+1.5rem)] min-h-0 flex-col sm:-m-5 sm:h-[calc(100%+2.5rem)]">
       {(errBoards) && <div className="p-3"><LoadErrorBanner message={errBoards} onRetry={() => void reloadBoards()} /></div>}
 
+      {/* Abas no topo: Tarefas · Planejador · Quadros (antes ficavam numa barra flutuante embaixo, que sumia em tela baixa). */}
+      <nav aria-label="Tarefas e quadros" className="flex shrink-0 flex-wrap items-center gap-1 border-b border-[var(--color-border-card)] bg-[var(--color-surface)] px-3 py-2 sm:px-5">
+        {canTasks && <ModeBtn on={mode === 'caixa'} icon={ListChecks} label="Tarefas" onClick={() => setMode('caixa')} />}
+        {canBoards && <ModeBtn on={mode === 'quadro'} icon={KanbanSquare} label="Quadros" onClick={() => setMode('quadro')} />}
+        <ModeBtn on={mode === 'planejador'} icon={CalendarDays} label="Planejador" onClick={() => setMode('planejador')} />
+        {canBoards && mode === 'quadro' && (
+          <button type="button" onClick={() => setSwitcher(true)}
+            className="ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]">
+            <Layers className="h-4 w-4" /><span>Mudar de quadros</span>
+          </button>
+        )}
+      </nav>
+
       <div className="min-h-0 flex-1">
         {mode === 'quadro' && (
           loadingBoards ? <div className="p-6"><Skeleton className="h-96" /></div>
@@ -75,7 +94,7 @@ export default function BoardsPage() {
                 onMembersChanged={reloadBoardMembers} onSwitch={() => setSwitcher(true)} onAll={() => setBoardId(ALL)} openCardId={openCardFromPlanner} onCardOpened={() => setOpenCardFromPlanner(null)} />
         )}
         {mode === 'caixa' && (
-          <div className="h-full overflow-y-auto p-4 pb-24 md:p-6 md:pb-24">
+          <div className="h-full overflow-y-auto p-4 md:p-6">
             <Suspense fallback={<Skeleton className="h-96" />}><TasksPage /></Suspense>
           </div>
         )}
@@ -86,18 +105,6 @@ export default function BoardsPage() {
         )}
       </div>
 
-      {/* Barra de baixo, como no Trello */}
-      <nav aria-label="Modos" className="pointer-events-none absolute inset-x-0 bottom-4 z-30 flex justify-center">
-        <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface-raised,var(--color-surface))] p-1.5 shadow-[var(--shadow-lg)]">
-          {canTasks && <ModeBtn on={mode === 'caixa'} icon={Inbox} label="Caixa de entrada" onClick={() => setMode('caixa')} />}
-          <ModeBtn on={mode === 'planejador'} icon={CalendarDays} label="Planejador" onClick={() => setMode('planejador')} />
-          {canBoards && <ModeBtn on={mode === 'quadro'} icon={KanbanSquare} label="Quadro" onClick={() => setMode('quadro')} />}
-          {canBoards && <>
-            <span className="mx-1 h-6 w-px bg-[var(--color-border-card)]" />
-            <ModeBtn on={false} icon={Layers} label="Mudar de quadros" onClick={() => setSwitcher(true)} />
-          </>}
-        </div>
-      </nav>
 
       {switcher && (
         <BoardSwitcher boards={visibleBoards} archived={archivedBoards} currentId={boardId}
@@ -113,8 +120,7 @@ function ModeBtn({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof
     <button type="button" onClick={onClick} aria-pressed={on}
       className={cn('relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
         on ? 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]')}>
-      <Icon className="h-4 w-4" /><span className="hidden sm:inline">{label}</span>
-      {on && <span className="absolute inset-x-3 -bottom-1 h-0.5 rounded-full bg-[var(--accent-primary)]" />}
+      <Icon className="h-4 w-4" /><span>{label}</span>
     </button>
   );
 }
@@ -253,7 +259,7 @@ function BoardView({ board, members, onBoardsChanged, onMembersChanged, onSwitch
 
       {/* Listas */}
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full items-start gap-3 p-3 pb-24">
+        <div className="flex h-full items-start gap-3 p-3 pb-6">
           {sortedLists.map((l) => (
             <ListColumn key={l.id} list={l} cards={byList.get(l.id) ?? []} labels={labels} operators={allOperators} currentUserId={userId} loading={loading}
               isDropTarget={!!dragCard && overList === l.id} isListDropTarget={!!dragList && overListHeader === l.id} draggingCardId={dragCard}
@@ -566,7 +572,7 @@ function Planner({ boards, canTasks, canBoards, onOpenCard, onOpenTasks }: {
   const label = `${days[0].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} – ${days[6].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`.replace(/\./g, '');
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-4 pb-24 md:p-6 md:pb-24">
+    <div className="flex h-full flex-col overflow-hidden p-4 md:p-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Planejador</h2>
         <span className="text-sm text-[var(--color-text-secondary)]">Prazos dos cartões e das tarefas da semana.</span>

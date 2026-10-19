@@ -170,7 +170,7 @@ export function AllBoardsView({ boards, onBoardsChanged, onOpenBoard, onSwitch }
       {error && <div className="p-3"><LoadErrorBanner message={error} onRetry={() => void reload()} /></div>}
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full items-start gap-3 p-3 pb-24">
+        <div className="flex h-full items-start gap-3 p-3 pb-6">
           {sortedBoards.map((b) => (
             <BoardColumn key={b.id} board={b} cards={byBoard.get(b.id) ?? []} lists={listsByBoard.get(b.id) ?? []} listById={listById}
               labels={labels.filter((l) => l.board_id === b.id)} operators={allOperators} currentUserId={userId} loading={loading}

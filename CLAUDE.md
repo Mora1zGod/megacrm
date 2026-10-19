@@ -758,7 +758,7 @@ Regras:
   `p_finance` ou só `p_stock`).
 
 ## Tarefas e quadros (08/10/2026) — rota `/quadros` (`/tasks` redireciona para `?modo=caixa`)
-- Uma área só, estilo Trello: barra de baixo Caixa de entrada (TasksPage, tabela `tasks`) · Planejador (semana com prazos de
+- Uma área só, estilo Trello: abas no TOPO (19/10/2026; antes barra flutuante embaixo) Tarefas (TasksPage, tabela `tasks`) · Quadros · Planejador; a última aba usada fica no navegador (`megacrm_boards_mode`). Planejador (semana com prazos de
   `board_cards.due_date` + `tasks.due_at`) · Quadro · Mudar de quadros. Menu: item "Tarefas e quadros" (`anyPerm` boards.view/tasks.view).
 - Quadro: fundo por `boards.color` (chaves de `BOARD_BG`), listas/cartões com tokens `.board-canvas` (globals.css), arrastar cartão entre e
   dentro das listas (posição antes do cartão alvo), menu do quadro (renomear, fundo, itens arquivados com restaurar, arquivar).
