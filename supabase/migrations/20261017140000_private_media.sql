@@ -46,6 +46,17 @@ CREATE POLICY whatsapp_hub_media_read_member ON storage.objects
     )
   );
 
+-- Policy antiga criada no painel (fora das migrations): SELECT para o papel public no bucket inteiro — qualquer
+-- pessoa com a chave anon (que vai no site) conseguia LISTAR e baixar todos os arquivos, mesmo com o bucket fechado.
+-- Só é apagada se continuar sendo de leitura; a de escrita do service_role (wh_media_service_write) fica.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+              AND policyname = 'wh_media_public_read' AND cmd = 'SELECT') THEN
+    DROP POLICY wh_media_public_read ON storage.objects;
+  END IF;
+END $$;
+
 -- Para conferir: policies que hoje existem em storage.objects (mande o resultado se aparecer alguma
 -- outra citando whatsapp-hub-media para anon/public — ela seria um furo depois de fechar o bucket).
 SELECT policyname, cmd, roles::text, coalesce(qual, '') AS usando, coalesce(with_check, '') AS checando
