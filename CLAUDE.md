@@ -321,8 +321,12 @@ public._bootstrap_state           <- checkpoints idempotentes do wizard /setup
 
 | Job                     | Cadência     | Função                  |
 |-------------------------|--------------|-------------------------|
-| `dispatch-campaigns`    | 30 segundos  | `dispatch-campaign`     |
+| `wh-dispatch-campaigns` | 30 segundos (só chama com campanha sending/agendada vencida — 20261020090000) | `dispatch-campaign` |
 | `check-follow-ups`      | a cada 15min | `check-follow-ups`      |
+
+> 20/10/2026 (`20261020090000_cron_only_when_needed.sql`): `wh-dispatch-campaigns` e `wh-sync-broadcast-status` têm o `WHERE EXISTS` no
+> próprio comando do cron — sem campanha, a Edge Function não é chamada (eram ~3.600 chamadas/dia vazias e estouravam o Log Ingestion do
+> plano Free). Agendamento novo que chama Edge Function deve nascer assim. `cron-history-cleanup-daily` apaga `cron.job_run_details` > 3 dias.
 
 > O antigo `check-template-status` (polling 5min) foi removido — o status do
 > template chega pelo webhook `whatsapp.template.status_updated`.
