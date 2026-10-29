@@ -62,13 +62,26 @@ export const STATUS_LABEL: Record<InstStatus, string> = {
 export function todaySP(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
+// Data "aaaa-mm-dd" válida? Enquanto a pessoa digita num campo de data o navegador entrega '' (ou ano incompleto);
+// antes isso virava "Invalid time value" no toISOString() e a tela inteira travava (29/10/2026, 1º vencimento).
+function ymd(iso: string | null | undefined): [number, number, number] | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (y < 1900 || y > 2999 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return [y, mo, d];
+}
 export function addDays(iso: string, days: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
+  const p = ymd(iso);
+  if (!p) return '';
+  const [y, m, d] = p;
   const dt = new Date(Date.UTC(y, m - 1, d + days));
   return dt.toISOString().slice(0, 10);
 }
 export function addMonths(iso: string, months: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
+  const p = ymd(iso);
+  if (!p) return '';
+  const [y, m, d] = p;
   const target = new Date(Date.UTC(y, m - 1 + months, 1));
   const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
   target.setUTCDate(Math.min(d, last));
