@@ -116,7 +116,16 @@ export const CONTACT_SOURCE_LABEL: Record<string, string> = {
   instagram: 'Instagram',
   import: 'Importação (Excel)',
   manual: 'Cadastro manual',
+  wifi: 'Wi-Fi',
 };
+
+// Rótulo do canal: conhecido → nome bonito; qualquer outro que chegue de integração (ex.: "wifi" do portal de
+// Wi-Fi, "site") → primeira letra maiúscula, em vez de aparecer cru.
+export function contactSourceLabel(src: string | null | undefined): string {
+  if (!src) return '';
+  const k = src.trim();
+  return CONTACT_SOURCE_LABEL[k.toLowerCase()] ?? k.charAt(0).toLocaleUpperCase('pt-BR') + k.slice(1);
+}
 
 // ---- Origem do lead (rastreio UTM do deal) ----
 // traffic_type e origin_channel são derivados server-side pela trigger

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,15 +24,34 @@ import { TagManagerDialog } from '@/components/contacts/TagManagerDialog';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { ImportContactsDialog } from '@/components/contacts/ImportContactsDialog';
 import type { ContactWithTags } from '@/types/db';
-import { CONTACT_SOURCE_LABEL } from '@/types/crm';
+import { contactSourceLabel } from '@/types/crm';
 import { TRAFFIC_LABEL } from '@/lib/dashboard';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { formatPhone } from '@/lib/format';
 import { DataGrid, useGrid } from '@/components/ui/GridTable';
+import { getSupabase } from '@/lib/supabase';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 1000] as const;
 
-const SOURCE_OPTIONS = ['whatsapp', 'instagram', 'import', 'manual'];
+const BASE_SOURCES = ['whatsapp', 'instagram', 'import', 'manual'];
+
+// Canais do filtro = os fixos + qualquer outro que exista nos contatos (ex.: "wifi" do portal de Wi-Fi).
+// Antes a lista era fixa e um canal novo aparecia na tabela mas não dava para filtrar por ele.
+function useSourceOptions(): string[] {
+  const [extra, setExtra] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void getSupabase().from('contacts').select('source').not('source', 'is', null).neq('source', 'whatsapp_group').limit(20000)
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        const set = new Set<string>();
+        for (const r of data as Array<{ source: string | null }>) if (r.source && !BASE_SOURCES.includes(r.source)) set.add(r.source);
+        setExtra([...set].sort((a, b) => a.localeCompare(b)));
+      });
+    return () => { alive = false; };
+  }, []);
+  return [...BASE_SOURCES, ...extra];
+}
 
 const fmtDate = (s: string | null | undefined) =>
   s ? new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
@@ -50,7 +69,7 @@ function buildContactsCsv(rows: ContactExportRow[]): string {
       r.name ?? '',
       r.phone ?? '',
       r.email ?? '',
-      r.source ? CONTACT_SOURCE_LABEL[r.source] ?? r.source : '',
+      r.source ? contactSourceLabel(r.source) : '',
       r.traffic_type ? TRAFFIC_LABEL[r.traffic_type] ?? r.traffic_type : '',
       r.tags.join(', '),
       day(r.first_seen),
@@ -73,6 +92,7 @@ function downloadCsv(csv: string, filename: string) {
 
 export default function ContactsPage() {
   const perms = usePermission();
+  const sourceOptions = useSourceOptions();
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
@@ -171,7 +191,7 @@ export default function ContactsPage() {
   const grid = useGrid<ContactWithTags>('megacrm_grid_contacts', [
     { id: 'name', label: 'Nome', width: 240, minWidth: 120, sortValue: (c) => c.name ?? '', render: (c) => <Link to={`/contacts/${c.id}`} className="block truncate font-medium text-[var(--color-text-primary)] hover:text-[var(--accent-primary)]">{c.name || <span className="opacity-40">— ver ficha</span>}</Link> },
     { id: 'phone', label: 'Telefone', width: 160, sortValue: (c) => c.phone ?? '', exportValue: (c) => formatPhone(c.phone), render: (c) => <span className="font-mono text-xs text-[var(--color-text-secondary)]">{formatPhone(c.phone) || <span className="opacity-40">—</span>}</span> },
-    { id: 'source', label: 'Canal', width: 120, sortValue: (c) => (c.source ? CONTACT_SOURCE_LABEL[c.source] ?? c.source : ''), render: (c) => (c.source ? <span className="inline-flex rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-xs">{CONTACT_SOURCE_LABEL[c.source] ?? c.source}</span> : <span className="opacity-40">—</span>) },
+    { id: 'source', label: 'Canal', width: 120, sortValue: (c) => (c.source ? contactSourceLabel(c.source) : ''), render: (c) => (c.source ? <span className="inline-flex rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5 text-xs">{contactSourceLabel(c.source)}</span> : <span className="opacity-40">—</span>) },
     { id: 'traffic', label: 'Origem', width: 130, sortValue: (c) => (c.traffic_type ? TRAFFIC_LABEL[c.traffic_type] ?? c.traffic_type : ''), render: (c) => (c.traffic_type ? <span className="text-xs text-[var(--color-text-secondary)]">{TRAFFIC_LABEL[c.traffic_type] ?? c.traffic_type}</span> : <span className="opacity-40">—</span>) },
     { id: 'first', label: 'Primeiro registro', width: 140, sortValue: (c) => c.first_seen_at ?? c.created_at, exportValue: (c) => fmtDate(c.first_seen_at ?? c.created_at), render: (c) => <span className="text-xs text-[var(--color-text-secondary)]">{fmtDate(c.first_seen_at ?? c.created_at)}</span> },
     { id: 'tags', label: 'Tags', width: 240, sortValue: (c) => c.tags.map((t) => t.name).join(', '), render: (c) => (
@@ -277,9 +297,9 @@ export default function ContactsPage() {
             className="h-10 rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] px-3 text-sm text-[var(--color-text-primary)]"
           >
             <option value="">Todos os canais</option>
-            {SOURCE_OPTIONS.map((s) => (
+            {sourceOptions.map((s) => (
               <option key={s} value={s}>
-                {CONTACT_SOURCE_LABEL[s] ?? s}
+                {contactSourceLabel(s)}
               </option>
             ))}
           </select>
@@ -371,7 +391,7 @@ export default function ContactsPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
                   {c.source && (
                     <span className="inline-flex rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5">
-                      {CONTACT_SOURCE_LABEL[c.source] ?? c.source}
+                      {contactSourceLabel(c.source)}
                     </span>
                   )}
                   {c.traffic_type && <span>{TRAFFIC_LABEL[c.traffic_type] ?? c.traffic_type}</span>}

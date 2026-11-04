@@ -9,7 +9,7 @@ import { useContactTimeline, type DayGroup } from '@/hooks/useContactTimeline';
 import { useContactChannelLinks, type ContactChannelLink } from '@/hooks/useContactChannelLinks';
 import { useOperators } from '@/hooks/useOperators';
 import { useTasks } from '@/hooks/useTasks';
-import { CONTACT_SOURCE_LABEL, getDealOrigin, TRAFFIC_TYPE_STYLE } from '@/types/crm';
+import { CONTACT_SOURCE_LABEL, contactSourceLabel, getDealOrigin, TRAFFIC_TYPE_STYLE } from '@/types/crm';
 import { LoadErrorBanner } from '@/components/LoadErrorBanner';
 import { AddToPipelineModal } from '@/components/funil/AddToPipelineModal';
 import { ProximaAcao } from '@/components/crm/ProximaAcao';
@@ -135,7 +135,7 @@ export default function ContactDetailPage() {
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-secondary)]">
               {contact.source && (
                 <span className="rounded-full bg-[var(--color-fill-subtle)] px-2 py-0.5">
-                  {CONTACT_SOURCE_LABEL[contact.source] ?? contact.source}
+                  {contactSourceLabel(contact.source)}
                 </span>
               )}
               <span>Primeiro registro: {new Date(contact.first_seen_at ?? contact.created_at).toLocaleDateString('pt-BR')}</span>
