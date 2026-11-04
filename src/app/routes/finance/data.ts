@@ -111,7 +111,9 @@ export function friendlyError(err: unknown): string {
     if (/code/i.test(raw)) return 'Já existe uma conta com esse código no plano de contas.';
     return 'Já existe um registro igual. Confira os dados.';
   }
-  if (/(relation|function) .*(fin_|does not exist)|schema cache/i.test(raw)) {
+  // Só é "módulo não instalado" quando o banco diz que a FUNÇÃO/TABELA não existe. Antes qualquer erro que citasse
+  // "function ... fin_" (ex.: erro de dentro de uma função do Financeiro) caía aqui e escondia o motivo real.
+  if (/(could not find the function|function .* does not exist|relation .* does not exist|schema cache)/i.test(raw) && /fin_/i.test(raw)) {
     return 'O módulo Financeiro ainda não foi instalado no banco. Peça para rodar o SQL do Financeiro no Supabase.';
   }
   if (/Failed to fetch|NetworkError|fetch failed/i.test(raw)) return 'Sem conexão com o servidor. Confira a internet e tente de novo.';

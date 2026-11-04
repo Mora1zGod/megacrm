@@ -182,14 +182,14 @@ export function EntryFormDialog({ kind, lookups, entry, hasSettlement, prefill, 
           },
         });
         if (Object.keys(amounts).length) {
-          try {
-            await rpc('fin_update_installment_amounts', { p_entry: entry!.id, p_amounts: amounts });
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (/fin_update_installment_amounts|schema cache|Could not find the function/i.test(msg)) {
-              throw new Error('Os dados e vencimentos foram salvos, mas o valor não: falta rodar o SQL-09-10-financeiro-editar-valor.sql no Supabase.');
+          // Chamada direta (sem o rpc() que já traduz o erro) para distinguir "função não instalada" do motivo real.
+          const { error: amtErr } = await getSupabase().rpc('fin_update_installment_amounts', { p_entry: entry!.id, p_amounts: amounts });
+          if (amtErr) {
+            const raw = `${amtErr.message ?? ''} ${amtErr.code ?? ''}`;
+            if (/PGRST202|Could not find the function|fin_update_installment_amounts.*does not exist/i.test(raw)) {
+              throw new Error('Os dados e vencimentos foram salvos, mas o valor não: falta instalar no Supabase o SQL "editar valor das parcelas".');
             }
-            throw new Error(`Os dados e vencimentos foram salvos, mas o valor não: ${msg}`);
+            throw new Error(`Os dados e vencimentos foram salvos, mas o valor não: ${friendlyError(amtErr)}`);
           }
         }
       } else {
