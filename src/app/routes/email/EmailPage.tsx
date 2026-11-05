@@ -143,11 +143,12 @@ function Mailbox({ account, accounts, onPick, onSetup, canSend }: { account: Mai
         <div className="space-y-2 border-b border-[var(--color-border-soft)] p-3">
           <div className="flex items-center gap-2">
             <h2 className="min-w-0 flex-1 truncate text-base font-bold text-[var(--color-text-primary)]">{current ? folderName(current) : 'Caixa de entrada'}</h2>
-            <select value={folder} onChange={(e) => { setFolder(e.target.value); setPage(0); }} className="h-8 rounded-md border border-[var(--color-border-card)] bg-[var(--color-surface)] px-1 text-xs md:hidden" aria-label="Pasta">
+            {/* Pastas escondidas (tela estreita, ou de 1024 a 1279 px com um e-mail aberto): a escolha da pasta vem para cá. */}
+            <select value={folder} onChange={(e) => { setFolder(e.target.value); setPage(0); setOpenUid(null); }} className={cn('h-8 rounded-md border border-[var(--color-border-card)] bg-[var(--color-surface)] px-1 text-xs', openUid ? 'xl:hidden' : 'md:hidden')} aria-label="Pasta">
               {(folders ?? []).map((f) => <option key={f.path} value={f.path}>{folderName(f)}</option>)}
             </select>
             <button type="button" onClick={refresh} aria-label="Atualizar" className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</button>
-            <Button size="sm" className="md:hidden" disabled={!canSend} onClick={() => setCompose({ mode: 'new' })}><PenSquare className="h-4 w-4" /></Button>
+            <Button size="sm" className={openUid ? 'xl:hidden' : 'md:hidden'} disabled={!canSend} onClick={() => setCompose({ mode: 'new' })}><PenSquare className="h-4 w-4" /></Button>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); setPage(0); setQuery(q.trim()); }} className="flex gap-2">
             <label className="relative flex-1">
