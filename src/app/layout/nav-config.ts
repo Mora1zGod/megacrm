@@ -15,6 +15,7 @@ import {
   Wallet,
   ShoppingCart,
   AtSign,
+  Fingerprint,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -57,6 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/quadros', label: 'Tarefas e quadros', icon: ClipboardList, group: 'Gestão', anyPerm: ['boards.view', 'tasks.view'] },
   { to: '/financeiro', label: 'Financeiro', icon: Wallet, group: 'Gestão', perm: 'financial.ledger_view' },
   { to: '/compras', label: 'Compras', icon: ShoppingCart, group: 'Gestão', perm: 'purchases.view' },
+  { to: '/ponto', label: 'Ponto', icon: Fingerprint, group: 'Gestão', perm: 'ponto.view' },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3, group: 'Gestão', perm: 'reports.view' },
   // Integrações, Logs de Auditoria e Organizações agora ficam dentro de Configurações.
   { to: '/configuracoes', label: 'Configurações', icon: Settings, group: 'Administração' },

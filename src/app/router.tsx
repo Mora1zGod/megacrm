@@ -30,6 +30,7 @@ const SettingsPage = lazyRetry(() => import('./routes/settings/SettingsPage'));
 const LegacySettingsRedirect = lazyRetry(() => import('./routes/settings/SettingsPage').then((m) => ({ default: m.LegacySettingsRedirect })));
 const FinancePage = lazyRetry(() => import('./routes/finance/FinancePage'));
 const PurchasesPage = lazyRetry(() => import('./routes/purchases/PurchasesPage'));
+const PontoPage = lazyRetry(() => import('./routes/ponto/PontoPage'));
 const EmailPage = lazyRetry(() => import('./routes/email/EmailPage'));
 const ReportsPage = lazyRetry(() => import('./routes/reports/ReportsPage'));
 const FilesPage = lazyRetry(() => import('./routes/files/FilesPage'));
@@ -240,6 +241,7 @@ export function AppRouter() {
           <Route path="/admin" element={<RequireSuperAdmin><Navigate to="/configuracoes/sistema/organizacoes" replace /></RequireSuperAdmin>} />
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
           <Route path="/email" element={<EmailPage />} />
+          <Route path="/ponto" element={<RequirePermission perm="ponto.view" area="Ponto"><PontoPage /></RequirePermission>} />
           <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
           <Route path="/tasks" element={<Navigate to="/quadros?modo=caixa" replace />} />
           <Route path="/relatorios" element={<RequirePermission perm="reports.view" area="Relatórios"><ReportsPage /></RequirePermission>} />

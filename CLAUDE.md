@@ -977,3 +977,22 @@ Regras:
   da org. Apagar tarefa de OUTRA empresa não é oferecido. Super admin em suporte: só as orgs onde é membro + a em uso.
 - `TaskFormDialog` aceita `companies` + `orgId`: com 2+ empresas mostra "Empresa" ao criar; tarefa de outra org salva por `task_xorg_save`.
 - Typecheck do front: `npx tsc --noEmit -p tsconfig.app.json` (o `-p .` não checa nada — tsconfig raiz só tem references).
+
+## Ponto — fase 1 (05/11/2026) — `20261105100000_ponto_base.sql`, rota `/ponto`, edge `controlid-push`
+- Relógio facial Control iD **iDFace** como coletor (Portaria 671, art. 75 p.ú.). O CRM guarda no formato do REP-P (Anexo IX):
+  `ponto_marks` (batida = AFD tipo 7: NSR, CPF, marcação e gravação com fuso, coletor, online/offline, SHA-256) e `ponto_records`
+  (tipos 4 relógio e 5 funcionário; 2/6 reservados). NSR por EMPRESA (`fin_companies` = estabelecimento/CNPJ) em `ponto_nsr`, único
+  contador para todos os tipos, com lock de linha (`_ponto_next_nsr`). Batidas e registros são IMUTÁVEIS (trigger `_ponto_immutable`,
+  nem a service role altera/apaga) — correção vira ajuste (fase 2). Funcionário com batida não se apaga (só "Desligar").
+- `ponto_employees` (CPF único por org, `device_user_id` = id do usuário no aparelho, sequência a partir de 1000; foto no bucket privado
+  `whatsapp-hub-ponto/<org>/funcionarios/…`, JPEG ≤ 1 MB). Trigger `_ponto_employee_after`: registro tipo 5 (I/A/E) e fila
+  `ponto_device_cmds` para os aparelhos da MESMA empresa (user_upsert / user_photo / user_delete).
+- Aparelho (`ponto_devices`) em modo **Push**: `push_remote_address = …/functions/v1/controlid-push/<push_token>` (token na URL =
+  autenticação; deploy `--no-verify-jwt`), período 30 s. A função busca `access_logs` (id > `last_log_id`) a cada 30 s e entre uma
+  busca e outra entrega a fila (cadastros juntos em 1 `create_or_modify_objects`, fotos de 4 em 4 em `user_set_image_list`,
+  `set_system_time` com a hora local do aparelho). Evento 7 + user_id → `ponto_register_mark` (só service_role, idempotente por
+  `(device_id, device_log_id)`). Todo log vai para `ponto_device_logs` (diagnóstico). Sem resultado em 3 min → reenvia (5 tentativas).
+- ASSUMIDO até o 1º teste com o aparelho: caminho `/push` e `/result` depois do token, filtro `where` do load_objects, fuso do campo
+  `time` (decide por lote: UTC ou hora local, o que der mais perto de agora).
+- Permissões `ponto.view` (batidas/funcionários), `ponto.manage` (cadastros, aparelhos, diagnóstico), `ponto.adjust` e `ponto.export`
+  (fases 2 e 3). Valor legal (REP-P): exige registro do programa no INPI, certificado ICP-Brasil e atestado técnico (fase 3, AFD/AEJ).
