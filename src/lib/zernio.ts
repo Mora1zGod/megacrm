@@ -68,19 +68,25 @@ async function zfetch(
   init: RequestInit = {},
 ): Promise<unknown> {
   let res: Response;
-  try {
-    res = await fetch(`${ZERNIO_API_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        ...(init.headers ?? {}),
-      },
-    });
-  } catch (err) {
-    throw new ZernioError(
-      `Falha de rede ao falar com o Zernio: ${err instanceof Error ? err.message : 'erro'}`,
-    );
+  // "Rate limit exceeded. Please retry after N seconds" (429): espera o tempo pedido (até 10 s) e tenta 1x de novo.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(`${ZERNIO_API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          ...(init.headers ?? {}),
+        },
+      });
+    } catch (err) {
+      throw new ZernioError(
+        `Falha de rede ao falar com o Zernio: ${err instanceof Error ? err.message : 'erro'}`,
+      );
+    }
+    if (res.status !== 429 || attempt >= 1) break;
+    const wait = Math.min(10, Math.max(1, Number(res.headers.get('retry-after')) || 7));
+    await new Promise((r) => setTimeout(r, wait * 1000));
   }
 
   const text = await res.text();

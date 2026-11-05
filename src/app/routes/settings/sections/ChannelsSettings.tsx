@@ -25,6 +25,11 @@ import { ImportHistoryModal } from './ImportHistoryModal';
 import { InstagramNamesBackfill } from './InstagramNamesBackfill';
 import { formatPhone } from '@/lib/format';
 
+const ZERNIO_PLATFORM_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp', instagram: 'Instagram', tiktok: 'TikTok', facebook: 'Facebook', metaads: 'Meta Ads',
+  youtube: 'YouTube', linkedin: 'LinkedIn', twitter: 'X', x: 'X', telegram: 'Telegram', threads: 'Threads',
+};
+
 // Configurações → Canais. Multi-número: cada linha de whatsapp_hub.channels é
 // um número de WhatsApp da organização —
 //   · provider 'zernio'  — API oficial da Meta via Zernio (janela de 24h)
@@ -136,7 +141,7 @@ export function ChannelsSettings() {
   }>({ qrcode: null, paircode: null, connected: false, status: null, loading: true, error: null });
   const qrPollRef = useRef<number | null>(null);
   const [zernioChoices, setZernioChoices] = useState<
-    { credentialId: string; accounts: { id: string; name: string }[] } | null
+    { credentialId: string; accounts: { id: string; name: string; platform?: string | null }[] } | null
   >(null);
   const [connectingZernio, setConnectingZernio] = useState<string | null>(null);
   // Contas Zernio (logins separados — cada um só aceita 2 contas sociais
@@ -1189,6 +1194,12 @@ export function ChannelsSettings() {
               <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
                 Escolha a conta para conectar
               </h4>
+              {zernioChoices.accounts.some((a) => a.platform && !['whatsapp', 'instagram'].includes(a.platform)) && (
+                <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                  O Atendimento recebe e responde só WhatsApp e Instagram. Contas de outras redes (ex.: TikTok) ainda não
+                  entram nas conversas.
+                </p>
+              )}
               <div className="mt-3 space-y-2">
                 {zernioChoices.accounts.map((acc) => (
                   <button
@@ -1197,7 +1208,15 @@ export function ChannelsSettings() {
                     disabled={connectingZernio === zernioChoices.credentialId}
                     className="flex w-full items-center justify-between rounded-lg border border-[var(--color-border-card)] bg-[var(--color-fill-subtle)] p-3 text-left text-sm text-[var(--color-text-primary)] transition hover:border-[var(--accent-primary)]"
                   >
-                    <span className="truncate">{acc.name}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-primary)]">
+                        {ZERNIO_PLATFORM_LABEL[acc.platform ?? ''] ?? (acc.platform || 'Rede')}
+                      </span>
+                      <span className="truncate">{acc.name}</span>
+                      {zernioChannels.some((c) => c.zernio_account_id === acc.id) && (
+                        <span className="shrink-0 text-[11px] text-[var(--color-success)]">já conectada</span>
+                      )}
+                    </span>
                     <span className="ml-3 shrink-0 font-mono text-[11px] text-[var(--color-text-secondary)]">
                       {acc.id}
                     </span>
