@@ -593,6 +593,14 @@ Deno.serve(async (req) => {
       }
     }
   }
+  // Imagem/documento/vídeo sem texto (visão falhou ou a mídia não veio): a IA responde mesmo assim,
+  // sabendo só QUE chegou um arquivo — senão o cliente que manda a foto do contrato fica sem resposta.
+  // Só em memória (não grava no content: a tela continua mostrando a mídia). Áudio continua esperando
+  // a transcrição (transcribe-audio re-dispara este pipeline).
+  if (!message.content && ['image', 'document', 'video'].includes(message.content_type)) {
+    const label = message.content_type === 'image' ? 'imagem' : message.content_type === 'video' ? 'vídeo' : 'documento';
+    message.content = `[${label} recebido(a) — não foi possível ler o conteúdo]`;
+  }
   if (!message.content) {
     return jsonResponse({ ok: true, skipped: `sem conteúdo textual (content_type=${message.content_type})` });
   }
