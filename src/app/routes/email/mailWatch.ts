@@ -11,7 +11,7 @@ import { useEmailPerms } from './useEmailPerm';
 // em segundo plano e os avisos estiverem liberados) e contador de não lidos no menu "E-mail".
 // O e-mail continua só na Hostinger: aqui guardamos no navegador apenas o último UID visto.
 
-const POLL_MS = 120_000;
+const POLL_MS = 300_000; // 5 min (11/11/2026: era 2 min — cada aba aberta consultava o banco a cada 2 min)
 const MIN_GAP_MS = 45_000;
 const UID_KEY = (id: string) => `megacrm_mail_uidnext:${id}`;
 const ACC_KEY = 'megacrm_mail_account';

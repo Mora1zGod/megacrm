@@ -248,28 +248,93 @@ export function useConversations(): UseConversationsResult {
   // API pública: recarrega mostrando loading (load inicial / retry manual).
   const reload = useCallback(() => load(false), [load]);
 
-  // Refresh do realtime: silencioso e com debounce, para coalescer rajadas de
-  // eventos (várias mensagens chegando juntas) num único refetch sem flicker.
+  // Refresh do realtime (11/11/2026 — pico de mensagens derrubava o banco do plano grátis):
+  // antes, CADA mensagem nova em QUALQUER conversa fazia cada aba aberta recarregar a lista
+  // inteira (conversas + contatos + tags + prévias + clientes + canais, em dezenas de pedidos).
+  // Agora:
+  //   • só as conversas que mudaram são buscadas de novo e encaixadas na lista;
+  //   • eventos são juntados por 1,5 s (no máx. 1 atualização em andamento por vez);
+  //   • aba em segundo plano não busca nada — ao voltar, recarrega a lista uma vez.
+  const pendingIds = useRef<Set<string>>(new Set());
+  const needFull = useRef(false);
+  const dirtyHidden = useRef(false);
+  const inFlight = useRef(false);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleSilentReload = useCallback(() => {
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => {
-      void load(true);
-    }, 300);
-  }, [load]);
+
+  const refreshSome = useCallback(async (ids: string[]) => {
+    const supabase = getSupabase();
+    const { data, error: err } = await supabase.from('conversations').select('*').in('id', ids);
+    if (err) throw new Error(err.message);
+    const rows = (data ?? []) as Conversation[];
+    const hydrated = rows.length ? await hydrateConversations(rows) : [];
+    const byId = new Map(hydrated.map((c) => [c.id, c]));
+    const asked = new Set(ids);
+    setConversations((prev) => {
+      // pedidas e não voltaram = apagadas ou fora da minha vista (RLS) → saem da lista
+      const kept = prev.filter((c) => !asked.has(c.id) || byId.has(c.id)).map((c) => byId.get(c.id) ?? c);
+      const known = new Set(kept.map((c) => c.id));
+      for (const c of hydrated) if (!known.has(c.id)) kept.push(c);
+      kept.sort((a, b) => {
+        const ta = a.last_message_at ? Date.parse(a.last_message_at) : -Infinity;
+        const tb = b.last_message_at ? Date.parse(b.last_message_at) : -Infinity;
+        return tb - ta;
+      });
+      return kept;
+    });
+  }, []);
+
+  const flush = useCallback(async () => {
+    refreshTimer.current = null;
+    if (inFlight.current) {
+      refreshTimer.current = setTimeout(() => { void flush(); }, 1500);
+      return;
+    }
+    const ids = Array.from(pendingIds.current);
+    const full = needFull.current || ids.length > 40;
+    pendingIds.current = new Set();
+    needFull.current = false;
+    if (!full && ids.length === 0) return;
+    inFlight.current = true;
+    try {
+      if (full) await load(true);
+      else await refreshSome(ids);
+    } catch {
+      needFull.current = true; // na próxima, lista inteira
+    } finally {
+      inFlight.current = false;
+    }
+  }, [load, refreshSome]);
+
+  const queueRefresh = useCallback((id: string | null | undefined) => {
+    if (id) pendingIds.current.add(id);
+    else needFull.current = true;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      dirtyHidden.current = true;
+      return;
+    }
+    if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { void flush(); }, 1500);
+  }, [flush]);
 
   useEffect(() => {
     void load(false);
   }, [load]);
 
   useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || !dirtyHidden.current) return;
+      dirtyHidden.current = false;
+      pendingIds.current = new Set();
+      needFull.current = true;
+      if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { void flush(); }, 300);
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
+      document.removeEventListener('visibilitychange', onVisible);
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
-  }, []);
+  }, [flush]);
 
-  // Realtime subscription — any INSERT/UPDATE/DELETE on conversations OR a
-  // new row in messages (which bumps last_message_at) triggers a refresh.
+  // Realtime: conversa criada/alterada/apagada ou mensagem nova → atualiza SÓ aquela conversa.
   // Randomized channel names to survive StrictMode double-mount.
   useEffect(() => {
     if (!userId) return;
@@ -284,7 +349,11 @@ export function useConversations(): UseConversationsResult {
           schema: 'whatsapp_hub',
           table: 'conversations',
         },
-        () => { scheduleSilentReload(); },
+        (payload) => {
+          const rowNew = payload.new as { id?: string } | null;
+          const rowOld = payload.old as { id?: string } | null;
+          queueRefresh(rowNew?.id ?? rowOld?.id ?? null);
+        },
       )
       .on(
         'postgres_changes',
@@ -293,13 +362,16 @@ export function useConversations(): UseConversationsResult {
           schema: 'whatsapp_hub',
           table: 'messages',
         },
-        () => { scheduleSilentReload(); },
+        (payload) => {
+          const row = payload.new as { conversation_id?: string } | null;
+          queueRefresh(row?.conversation_id ?? null);
+        },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, scheduleSilentReload]);
+  }, [userId, queueRefresh]);
 
   const setStatus: UseConversationsResult['setStatus'] = async (id, next) => {
     const supabase = getSupabase();
