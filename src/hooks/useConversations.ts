@@ -223,10 +223,14 @@ export function useConversations(): UseConversationsResult {
     // filtragem por canal / atendente / status / atribuído / tags / janela 24h
     // acontece no cliente (Módulo 7) — combinações multi-eixo ficam simples e
     // reativas. Débito: para volumes grandes, empurrar filtros para o servidor.
+    // 11/11/2026: só as 600 com atividade mais recente (antes: TODAS, e cada uma puxava contato, tags,
+    // prévia, cliente e canal — pesado demais no pico). Concluídas e a busca já vão ao servidor
+    // (inbox_search / aba Concluídas), então conversa antiga continua achável.
     const { data: convs, error: err } = await supabase
       .from('conversations')
       .select('*')
-      .order('last_message_at', { ascending: false, nullsFirst: false });
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .limit(600);
     if (err) {
       setError(err.message);
       setLoading(false);
