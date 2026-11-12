@@ -146,7 +146,7 @@ function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canMa
       `Titular: ${sub.holder_name}`, `CPF: ${fmtCpf(sub.holder_cpf)}`,
       sub.holder_birth ? `Nascimento: ${fmtDate(sub.holder_birth)}` : '',
       `E-mail: ${sub.holder_email ?? ''}`, `WhatsApp: ${sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : ''}`,
-      `Acesso ao portal por: ${sub.portal_access === 'email' ? 'e-mail' : 'WhatsApp'}`,
+      'Acesso ao portal: enviar login pelo WhatsApp e pelo e-mail',
       sub.passport_number ? `Nº passaporte/contrato: ${sub.passport_number}` : '',
       '', 'Dependentes:',
       ...people.map((p) => `${p.position}. ${p.name} | ${fmtDate(p.birth_date)} | ${relLabel(p)} | CPF ${fmtCpf(p.cpf) || '-'} | ${p.email ?? '-'}`),
@@ -226,7 +226,7 @@ function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canMa
           <CopyField label="Nascimento" value={fmtDate(sub.holder_birth)} field="titular_nascimento" />
           <CopyField label="E-mail" value={sub.holder_email ?? ''} field="titular_email" />
           <CopyField label="WhatsApp" value={sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : ''} field="titular_whatsapp" />
-          <CopyField label="Acesso portal" value={sub.portal_access === 'email' ? 'E-mail' : 'WhatsApp'} field="acesso_portal" />
+          <CopyField label="Acesso portal" value="WhatsApp e e-mail" field="acesso_portal" />
           {sub.contact_id && <Link to={`/contacts/${sub.contact_id}`} className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent-primary)] hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Abrir contato / conversa</Link>}
           <div className="mt-2 text-xs text-[var(--color-text-muted)]">RG / CNH</div>
           <Thumbs list={filesOf(null, 'documento')} />

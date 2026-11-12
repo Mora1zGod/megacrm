@@ -95,8 +95,9 @@ function cpfValid(raw: string): boolean {
 }
 
 // Aviso que aparece no começo e na conferência: nada é liberado na hora.
-function ReviewNotice({ portal }: { portal: 'email' | 'whatsapp' | '' }) {
-  const via = portal === 'email' ? 'por e-mail' : portal === 'whatsapp' ? 'pelo WhatsApp' : 'por e-mail ou WhatsApp';
+// O login do Portal vai SEMPRE pelos dois: WhatsApp e e-mail informados pelo titular.
+function ReviewNotice() {
+  const via = 'no seu WhatsApp e no seu e-mail';
   return (
     <div className="flex gap-3 rounded-[var(--radius-card)] border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] p-4 text-sm text-[var(--color-text-primary)]">
       <Info className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent-primary)]" />
@@ -261,7 +262,6 @@ export default function RecadastroPage() {
   const [passportFiles, setPassportFiles] = useState<File[]>([]);
   const [holder, setHolder] = useState({ name: '', cpf: '', birth: '', email: '', phone: '' });
   const [holderFiles, setHolderFiles] = useState<File[]>([]);
-  const [portal, setPortal] = useState<'email' | 'whatsapp' | ''>('');
   const [people, setPeople] = useState<Person[]>([]);
   const [openKey, setOpenKey] = useState<number | null>(null);
   const [marriageFiles, setMarriageFiles] = useState<File[]>([]);
@@ -325,14 +325,17 @@ export default function RecadastroPage() {
       if (name.length < 5 || !name.includes(' ')) return 'Informe o nome completo do titular.';
       if (!cpfValid(holder.cpf)) return 'CPF do titular inválido.';
       if (holder.phone.replace(/\D/g, '').length < 10) return 'Informe o WhatsApp com DDD.';
-      if (!portal) return 'Escolha como quer receber o login e a senha do Portal do Associado.';
-      if (portal === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(holder.email.trim())) return 'Informe um e-mail válido para receber o login do portal.';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(holder.email.trim())) return 'Informe um e-mail válido: o login do Portal também vai para ele.';
     }
     if (s === 2 && !holderFiles.length) return 'Envie a foto do RG ou CNH do titular.';
     if (s === 3) {
       for (let i = 0; i < people.length; i++) {
         const pr = personProblem(people[i], i);
         if (pr) { setOpenKey(people[i].key); return pr; }
+      }
+      if (plan === 'amai10' && people.length < maxDependents) {
+        const falta = maxDependents - people.length;
+        return `Seu AMAI 10 é para ${peopleCount} pessoas: falta${falta > 1 ? 'm' : ''} cadastrar ${falta} dependente${falta > 1 ? 's' : ''}. Toque em "Adicionar dependente".`;
       }
       if (needsMarriage && !marriageFiles.length) return 'Envie a certidão de casamento ou o documento da união estável.';
     }
@@ -390,7 +393,7 @@ export default function RecadastroPage() {
       action: 'submit', token, consent: true, plan,
       people_count: plan === 'amai10' ? Number(peopleCount) : null,
       passport_number: passportNumber.trim() || null,
-      portal_access: portal,
+      portal_access: 'whatsapp', // login vai pelos dois (WhatsApp e e-mail); campo mantido por compatibilidade
       holder: { name: holder.name.trim(), cpf: holder.cpf, birth: holder.birth || null, email: holder.email.trim() || null, phone: holder.phone },
       people: people.map((p) => ({
         name: p.name.trim(), birth: p.birth, relationship: p.relationship,
@@ -433,7 +436,7 @@ export default function RecadastroPage() {
   }
 
   if (phase === 'done') {
-    const via = portal === 'email' ? 'por e-mail' : 'pelo WhatsApp';
+    const via = 'no seu WhatsApp e no seu e-mail';
     return (
       <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-10">
         <div className="mx-auto max-w-xl space-y-5">
@@ -479,7 +482,7 @@ export default function RecadastroPage() {
 
         {step === 0 && (
           <>
-            <ReviewNotice portal="" />
+            <ReviewNotice />
             <Card title="Seu passaporte" hint="Leva uns 5 minutos. Tenha em mãos a foto do passaporte (ou do comprovante de pagamento) e o RG ou CNH de todos.">
               <Choice value={plan} cols={3} onChange={setPlan}
                 options={[['amai10', 'AMAI 10'], ['infinity', 'AMAI Infinity'], ['nao_sei', 'Não sei']] as const} />
@@ -508,10 +511,13 @@ export default function RecadastroPage() {
             <Field label="CPF"><input className={inputCls} inputMode="numeric" value={holder.cpf} onChange={(e) => setHolder({ ...holder, cpf: maskDoc(e.target.value).slice(0, 14) })} placeholder="000.000.000-00" /></Field>
             <DateInput label="Data de nascimento" optional value={holder.birth} onChange={(birth) => setHolder((h) => ({ ...h, birth }))} />
             <Field label="WhatsApp com DDD"><input className={inputCls} inputMode="tel" autoComplete="tel" value={holder.phone} maxLength={15} onChange={(e) => setHolder({ ...holder, phone: maskPhoneBR(e.target.value) })} placeholder="(68) 99999-0000" /></Field>
-            <Field label="E-mail"><input type="email" className={inputCls} autoComplete="email" value={holder.email} onChange={(e) => setHolder({ ...holder, email: e.target.value })} /></Field>
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-[var(--color-text-label)]">Depois da conferência, receber o login e a senha do Portal do Associado por</span>
-              <Choice value={portal} onChange={setPortal} options={[['whatsapp', 'WhatsApp'], ['email', 'E-mail']] as const} />
+            <Field label="E-mail"><input type="email" inputMode="email" className={inputCls} autoComplete="email" value={holder.email} onChange={(e) => setHolder({ ...holder, email: e.target.value })} /></Field>
+            <div className="flex gap-3 rounded-[var(--radius-control)] border border-[rgba(245,158,11,0.5)] bg-[rgba(245,158,11,0.1)] p-3 text-sm text-[var(--color-text-primary)]">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#b45309] dark:text-[#fbbf24]" />
+              <p>
+                <b>Atenção aos dados!</b> Depois da conferência, o <b>login e a senha do Portal do Associado</b> serão enviados
+                <b> para este WhatsApp e para este e-mail</b>. Confira se estão corretos — com dado errado, o acesso não chega até você.
+              </p>
             </div>
           </Card>
         )}
@@ -525,11 +531,11 @@ export default function RecadastroPage() {
         {step === 3 && (
           <Card title="Dependentes"
             hint={plan === 'amai10'
-              ? (maxDependents ? `Seu AMAI 10 é para ${peopleCount} pessoas: você + até ${maxDependents} dependente(s).` : 'Compra para 1 pessoa (só você): não há dependentes. Toque em Continuar.')
+              ? (maxDependents ? `Seu AMAI 10 é para ${peopleCount} pessoas: você + ${maxDependents} dependente(s). Cadastre todos para continuar.` : 'Compra para 1 pessoa (só você): não há dependentes. Toque em Continuar.')
               : plan === 'infinity'
                 ? 'AMAI Infinity: pai, mãe, sogro, sogra, esposo(a) e filhos. Só quem vai usar o passaporte com você.'
                 : 'Só quem vai usar o passaporte com você.'}>
-            {people.length === 0 && maxDependents > 0 && <p className="text-sm text-[var(--color-text-muted)]">Nenhum dependente adicionado. Se não tiver, toque em Continuar.</p>}
+            {people.length === 0 && maxDependents > 0 && <p className="text-sm text-[var(--color-text-muted)]">{plan === 'amai10' ? 'Nenhum dependente adicionado ainda.' : 'Nenhum dependente adicionado. Se não tiver, toque em Continuar.'}</p>}
             {people.map((p, i) => (
               openKey === p.key ? (
                 <div key={p.key} className="space-y-4 rounded-[var(--radius-control)] border-2 border-[var(--accent-primary)] p-3">
@@ -607,7 +613,7 @@ export default function RecadastroPage() {
               <Summary title="Titular" onEdit={() => goTo(1)}>
                 {holder.name.trim()} · CPF {holder.cpf}{holder.birth && ` · ${brDate(holder.birth)}`}<br />
                 {holder.phone}{holder.email.trim() && ` · ${holder.email.trim()}`}<br />
-                Login do portal por {portal === 'email' ? 'e-mail' : 'WhatsApp'}
+                Login do Portal vai para este WhatsApp e este e-mail
               </Summary>
               <Summary title="Documento do titular" onEdit={() => goTo(2)}>{holderFiles.length} foto(s)</Summary>
               <Summary title={`Dependentes (${people.length})`} onEdit={() => goTo(3)}>
@@ -615,7 +621,7 @@ export default function RecadastroPage() {
                 {needsMarriage && <div>Certidão de casamento/união: {marriageFiles.length} foto(s)</div>}
               </Summary>
             </Card>
-            <ReviewNotice portal={portal} />
+            <ReviewNotice />
             <label className="flex items-start gap-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
               <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
               <span>

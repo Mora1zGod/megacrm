@@ -204,6 +204,10 @@ Deno.serve(async (req) => {
       if (plan === 'amai10' && rawPeople.length > (peopleCount ?? 1) - 1) {
         return fail(`Seu AMAI 10 é para ${peopleCount} pessoa(s) contando você: cabem até ${(peopleCount ?? 1) - 1} dependente(s).`);
       }
+      // AMAI 10: todas as pessoas compradas têm de vir cadastradas (o recadastro atualiza os dados de todos).
+      if (plan === 'amai10' && rawPeople.length < (peopleCount ?? 1) - 1) {
+        return fail(`Seu AMAI 10 é para ${peopleCount} pessoa(s): cadastre os ${(peopleCount ?? 1) - 1} dependente(s).`);
+      }
       const seenCpf = new Set<string>([holderCpf]);
       const relCount: Record<string, number> = {};
       const people: Array<Record<string, unknown>> = [];
