@@ -1020,6 +1020,13 @@ Regras:
 - AMAIA (modelo ativo, seção 7): manda `{link_recadastro}` (variável em `ai_agent_config.variables`); só sem conseguir usar o link segue o
   caminho pelo chat (foto → dados → dependentes → documentos → resumo).
 
+## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
+- Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
+  `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do
+  handoff, etiqueta "Jurídico" no contato e aviso por UAZAPI aos `wa_notify_recipients` com o assunto `juridico`. Tudo best-effort.
+  `test-agent-profile` devolve `simulated_actions.legal`. Tela: Configurações → Notificações WhatsApp (responsável do jurídico + assuntos
+  Financeiro/Jurídico por destinatário).
+
 ## Servidor próprio (VPS) — desde 11/11/2026
 - Supabase self-hosted em `/opt/amai-crm-supabase` (projeto docker `amai-crm`), API pública `https://api-crm.amaipark.com` (Caddy publica só
   `/auth|rest|storage|realtime|functions/v1` e `/graphql/v1`). O Supabase da nuvem (`hneqnopjvvwquyqogwdu`) ficou só como cópia antiga.

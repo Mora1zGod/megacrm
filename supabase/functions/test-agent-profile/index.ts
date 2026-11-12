@@ -59,21 +59,25 @@ function inspectMarkers(reply: string): {
   wouldHandoff: boolean;
   wouldSendMedia: string[];
   wouldClose: boolean;
+  wouldLegal: boolean;
 } {
   const wouldSendMedia: string[] = [];
   let text = reply.replace(/\[media:\s*([a-z0-9_-]+)\s*\]/gi, (_w, label: string) => {
     wouldSendMedia.push(String(label).toLowerCase());
     return '';
   });
-  const wouldHandoff = /\[\s*handoff\s*\]/i.test(text);
+  // [JURIDICO] = handoff para o jurídico (process-ai-message: responsável + etiqueta + aviso).
+  const wouldLegal = /\[\s*jur[ií]dico\s*\]/i.test(text);
+  const wouldHandoff = wouldLegal || /\[\s*handoff\s*\]/i.test(text);
   const wouldClose = /\[\s*encerrar\s*\]/i.test(text) && !wouldHandoff;
   text = text
     .replace(/\[\s*handoff\s*\]/gi, '')
+    .replace(/\[\s*jur[ií]dico\s*\]/gi, '')
     .replace(/\[\s*encerrar\s*\]/gi, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
-  return { text, wouldHandoff, wouldSendMedia, wouldClose };
+  return { text, wouldHandoff, wouldSendMedia, wouldClose, wouldLegal };
 }
 
 Deno.serve(async (req) => {
@@ -237,6 +241,7 @@ Deno.serve(async (req) => {
       handoff: inspected.wouldHandoff,
       media: inspected.wouldSendMedia,
       close: inspected.wouldClose,
+      legal: inspected.wouldLegal,
     },
     unresolved_variables: unresolved,
     model: cfg?.model ?? null,

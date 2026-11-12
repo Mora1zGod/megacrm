@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { BellRing, Loader2, Plus, Send, Trash2, Users } from 'lucide-react';
+import { BellRing, Loader2, Plus, Scale, Send, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,10 @@ import { extractFunctionErrorMessage } from '@/lib/functionError';
 import { formatPhone } from '@/lib/format';
 import { maskPhoneBR } from '@/lib/phone';
 import { Field, inputCls } from '../sections/access/ui';
+import { operatorLabel, useOperators } from '@/hooks/useOperators';
+
+// Assuntos de cada destinatário: quais avisos ele recebe.
+const TOPICS: Array<[string, string]> = [['financeiro', 'Financeiro'], ['juridico', 'Jurídico']];
 
 export interface NotifyRecipient { id: string; name: string; phone: string; is_group: boolean; topics: string[]; is_active: boolean }
 interface UazChannel { id: string; label: string; phone: string | null; is_active: boolean }
@@ -46,22 +50,41 @@ export function WaNotifySettings() {
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [missing, setMissing] = useState(false);
+  const { operators } = useOperators();
+  const [legalMember, setLegalMember] = useState<string>('');
+  const [legalMissing, setLegalMissing] = useState(false);
 
   const load = useCallback(async () => {
     const sb = getSupabase();
-    const [ch, cfg, rc, gr] = await Promise.all([
+    const [ch, cfg, rc, gr, st] = await Promise.all([
       sb.from('channels').select('id, label, phone, is_active').eq('provider', 'uazapi').order('label'),
       sb.from('wa_notify_settings').select('channel_id').maybeSingle(),
       sb.from('wa_notify_recipients').select('id, name, phone, is_group, topics, is_active').order('name'),
       sb.from('contacts').select('name, phone').like('phone', '%@g.us').order('name').limit(200),
+      sb.from('app_settings').select('juridico_member').eq('org_id', orgId).limit(1).maybeSingle(),
     ]);
+    setLegalMissing(Boolean(st.error));
+    setLegalMember((st.data as { juridico_member: string | null } | null)?.juridico_member ?? '');
     if (cfg.error && /wa_notify_settings|schema cache|does not exist/i.test(cfg.error.message)) setMissing(true);
     setChannels((ch.data ?? []) as UazChannel[]);
     setChannelId((cfg.data as { channel_id: string | null } | null)?.channel_id ?? '');
     setRecipients((rc.data ?? []) as NotifyRecipient[]);
     setGroups(((gr.data ?? []) as Array<{ name: string | null; phone: string }>).filter((g) => g.phone?.endsWith('@g.us')).map((g) => ({ name: g.name?.trim() || 'Grupo sem nome', phone: g.phone })));
-  }, []);
+  }, [orgId]);
   useEffect(() => { void load(); }, [load]);
+
+  const saveLegal = async (id: string) => {
+    setLegalMember(id);
+    const { error } = await getSupabase().from('app_settings').update({ juridico_member: id || null }).eq('org_id', orgId);
+    if (error) { toast.error('Não consegui salvar o responsável do jurídico.', { description: error.message }); void load(); return; }
+    toast.success(id ? 'Responsável do jurídico salvo.' : 'Sem responsável: casos do jurídico vão para o rodízio.');
+  };
+  const toggleTopic = async (r: NotifyRecipient, topic: string) => {
+    const topics = r.topics.includes(topic) ? r.topics.filter((t) => t !== topic) : [...r.topics, topic];
+    const { error } = await getSupabase().from('wa_notify_recipients').update({ topics }).eq('id', r.id);
+    if (error) toast.error('Não consegui salvar.', { description: error.message });
+    void load();
+  };
 
   const saveChannel = async (id: string) => {
     setChannelId(id);
@@ -120,6 +143,26 @@ export function WaNotifySettings() {
         </Field>
       </div>
 
+      <div className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4">
+        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]"><Scale className="h-4 w-4 text-[var(--accent-primary)]" /> Jurídico (casos de inadimplência da AMAIA)</div>
+        <p className="mb-3 text-sm text-[var(--color-text-secondary)]">
+          Quando a AMAIA encaminha um caso ao jurídico, a conversa vai direto para o responsável abaixo, o contato ganha a etiqueta
+          <b> Jurídico</b> e quem tem o assunto <b>Jurídico</b> marcado na lista recebe um aviso aqui pelo WhatsApp.
+        </p>
+        {legalMissing
+          ? <p className="text-sm text-[var(--color-text-muted)]">Falta rodar o SQL do jurídico (<code>20261112180000_juridico.sql</code>) no banco.</p>
+          : (
+            <div className="max-w-lg">
+              <Field label="Responsável do jurídico no CRM" htmlFor="wn-legal">
+                <select id="wn-legal" value={legalMember} disabled={!canEdit} onChange={(e) => void saveLegal(e.target.value)} className={inputCls}>
+                  <option value="">— Ninguém (vai para o rodízio) —</option>
+                  {operators.map((o) => <option key={o.user_id} value={o.user_id}>{operatorLabel(o)}</option>)}
+                </select>
+              </Field>
+            </div>
+          )}
+      </div>
+
       <div>
         <h3 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">Quem recebe</h3>
         {recipients.length === 0 ? <p className="mb-3 text-sm text-[var(--color-text-muted)]">Ninguém ainda. Adicione um número ou um grupo.</p> : (
@@ -130,6 +173,17 @@ export function WaNotifySettings() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-[var(--color-text-primary)]">{r.name}</span>
                   <span className="block truncate text-xs text-[var(--color-text-muted)]">{r.is_group ? 'Grupo' : formatPhone(r.phone)}</span>
+                </span>
+                <span className="flex gap-1" aria-label="Assuntos que recebe">
+                  {TOPICS.map(([k, l]) => {
+                    const on = r.topics.includes(k);
+                    return (
+                      <button key={k} type="button" disabled={!canEdit} onClick={() => void toggleTopic(r, k)} aria-pressed={on}
+                        className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', on ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-muted)]')}>
+                        {on ? '✓ ' : ''}{l}
+                      </button>
+                    );
+                  })}
                 </span>
                 <Button size="sm" variant="outline" disabled={!channelId || !r.is_active} onClick={() => void test(r)}>Enviar teste</Button>
                 {canEdit && <>

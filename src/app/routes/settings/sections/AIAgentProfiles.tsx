@@ -34,7 +34,7 @@ interface Activation {
 interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
-  actions?: { handoff: boolean; media: string[] };
+  actions?: { handoff: boolean; media: string[]; legal?: boolean };
 }
 
 const fmtDateTime = (s: string) =>
@@ -439,7 +439,9 @@ function ProfileTester({ profile, accessToken, onClose }: { profile: Profile; ac
                   <div className="mt-2 space-y-1 border-t border-[var(--color-border-divider)] pt-2">
                     {t.actions.handoff && (
                       <div className="text-[0.7rem] text-[#F2B937]">
-                        ⚠ Em produção, transferiria para um atendente humano (não executado no teste).
+                        {t.actions.legal
+                          ? '⚖ Em produção, encaminharia ao JURÍDICO: responsável do jurídico + etiqueta + aviso no WhatsApp (não executado no teste).'
+                          : '⚠ Em produção, transferiria para um atendente humano (não executado no teste).'}
                       </div>
                     )}
                     {t.actions.media.length > 0 && (

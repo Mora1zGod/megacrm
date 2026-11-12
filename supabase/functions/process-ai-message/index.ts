@@ -24,6 +24,7 @@ import { loadAppCredentials } from '../_shared/tenant-credentials.ts';
 import { callLLM, type LLMProvider } from '../_shared/llm.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
 import { requireServiceRole } from '../_shared/auth.ts';
+import { uazapiContextFromChannel, uazapiSendText } from '../_shared/uazapi.ts';
 import { sendInboxWithResolve } from '../_shared/inbox-delivery.ts';
 import { buildSystemPrompt, loadActiveProfile } from '../_shared/agent-prompt.ts';
 
@@ -331,16 +332,19 @@ function applyVariables(prompt: string, vars: Record<string, string> | null): st
 // Reconhece [HANDOFF] em QUALQUER posição — o modelo costuma emitir no fim da
 // frase, não em linha própria (mesma regra do test-agent-profile). [ENCERRAR]
 // também é removido para nunca chegar ao contato.
-function extractHandoff(reply: string): { text: string; handoff: boolean; close: boolean } {
-  const handoff = /\[\s*handoff\s*\]/i.test(reply);
+function extractHandoff(reply: string): { text: string; handoff: boolean; close: boolean; legal: boolean } {
+  // [JURIDICO] = handoff para o jurídico (responsável do jurídico + etiqueta + aviso no WhatsApp).
+  const legal = /\[\s*jur[ií]dico\s*\]/i.test(reply);
+  const handoff = legal || /\[\s*handoff\s*\]/i.test(reply);
   const close = !handoff && /\[\s*encerrar\s*\]/i.test(reply);
   const text = reply
     .replace(/\[\s*handoff\s*\]/gi, '')
+    .replace(/\[\s*jur[ií]dico\s*\]/gi, '')
     .replace(/\[\s*encerrar\s*\]/gi, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
-  return { text, handoff, close };
+  return { text, handoff, close, legal };
 }
 
 // Detecta marcadores [MEDIA:rotulo] (case-insensitive) e devolve o texto sem
@@ -355,6 +359,83 @@ function extractMedia(reply: string): { text: string; labels: string[] } {
     .replace(/[ \t]+\n/g, '\n')
     .trim();
   return { text, labels };
+}
+
+// Caso jurídico (marcador [JURIDICO]): etiqueta "Jurídico" no contato, aviso no WhatsApp para os destinatários
+// com o assunto "juridico" (Configurações → Notificações WhatsApp) e devolve o responsável do jurídico
+// (app_settings.juridico_member, se ativo na org) para a conversa ir direto para ele. Tudo best-effort:
+// falha aqui nunca impede a resposta ao contato.
+async function routeToLegal(
+  admin: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  conversationId: string,
+  contactId: string,
+  lastText: string | null,
+): Promise<string | null> {
+  let member: string | null = null;
+  try {
+    const { data: st } = await admin.from('app_settings').select('juridico_member').eq('org_id', orgId).maybeSingle();
+    const candidate = (st as { juridico_member?: string | null } | null)?.juridico_member ?? null;
+    if (candidate) {
+      const { data: au } = await admin.from('app_users').select('user_id')
+        .eq('org_id', orgId).eq('user_id', candidate).eq('status', 'active').maybeSingle();
+      if (au) member = candidate;
+    }
+  } catch (err) {
+    console.log(JSON.stringify({ event: 'legal_member_error', org_id: orgId, error: String(err) }));
+  }
+
+  let contactName = '';
+  let contactPhone = '';
+  try {
+    const { data: c } = await admin.from('contacts').select('name, phone').eq('id', contactId).maybeSingle();
+    contactName = (c as { name?: string } | null)?.name ?? '';
+    contactPhone = (c as { phone?: string } | null)?.phone ?? '';
+    let { data: tag } = await admin.from('tags').select('id').eq('org_id', orgId).ilike('name', 'jurídico').maybeSingle();
+    if (!tag) {
+      const ins = await admin.from('tags').insert({ org_id: orgId, name: 'Jurídico', color: '#7C3AED' }).select('id').maybeSingle();
+      tag = ins.data;
+    }
+    const tagId = (tag as { id?: string } | null)?.id;
+    if (tagId) {
+      await admin.from('contact_tags').upsert({ org_id: orgId, contact_id: contactId, tag_id: tagId }, { onConflict: 'contact_id,tag_id', ignoreDuplicates: true });
+    }
+  } catch (err) {
+    console.log(JSON.stringify({ event: 'legal_tag_error', org_id: orgId, error: String(err) }));
+  }
+
+  try {
+    const { data: cfg } = await admin.from('wa_notify_settings').select('channel_id').eq('org_id', orgId).maybeSingle();
+    const channelId = (cfg as { channel_id?: string | null } | null)?.channel_id;
+    const { data: recs } = await admin.from('wa_notify_recipients').select('phone')
+      .eq('org_id', orgId).eq('is_active', true).contains('topics', ['juridico']);
+    const recipients = (recs ?? []) as Array<{ phone: string }>;
+    if (channelId && recipients.length) {
+      const { data: ch } = await admin.from('channels').select('org_id, provider, uazapi_server_url, uazapi_token_encrypted')
+        .eq('id', channelId).maybeSingle();
+      const channel = ch as { org_id: string; provider: string; uazapi_server_url: string | null; uazapi_token_encrypted: string | null } | null;
+      if (channel && channel.org_id === orgId && channel.provider === 'uazapi') {
+        const uctx = await uazapiContextFromChannel(channel);
+        const phoneFmt = contactPhone.replace(/\D/g, '');
+        const text = [
+          '⚖️ *Jurídico — caso de inadimplência (AMAIA)*',
+          `Cliente: ${contactName || 'sem nome'}`,
+          `WhatsApp: ${phoneFmt ? `+${phoneFmt}` : '—'}`,
+          lastText ? `Última mensagem: "${lastText.slice(0, 300)}"` : '',
+          `Abrir no CRM: https://crm.amaipark.com/inbox?conversation=${conversationId}`,
+        ].filter(Boolean).join('\n');
+        for (const r of recipients) {
+          try { await uazapiSendText(uctx, { phone: r.phone, text }); } catch (err) {
+            console.log(JSON.stringify({ event: 'legal_notify_error', org_id: orgId, error: String(err) }));
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.log(JSON.stringify({ event: 'legal_notify_error', org_id: orgId, error: String(err) }));
+  }
+  console.log(JSON.stringify({ event: 'legal_handoff', org_id: orgId, conversation_id: conversationId, member }));
+  return member;
 }
 
 async function embed(openaiKey: string, text: string): Promise<{ embedding: number[]; tokens: number }> {
@@ -744,7 +825,7 @@ Deno.serve(async (req) => {
   // Marcadores: [MEDIA:rotulo] (envia mídias) e [HANDOFF] (transfere). Remove
   // ambos do texto antes de enviar.
   const mediaExtract = extractMedia(reply);
-  const { text: cleanedText, handoff, close } = extractHandoff(mediaExtract.text);
+  const { text: cleanedText, handoff, close, legal } = extractHandoff(mediaExtract.text);
 
   await Promise.all([
     logUsage(admin, {
@@ -776,11 +857,16 @@ Deno.serve(async (req) => {
   // Nunca junto com handoff — o humano precisa dela aberta. Se o contato
   // escrever de novo, o trigger _reopen_closed_conversation reabre.
   const nowIso = new Date().toISOString();
+  // [JURIDICO]: responsável do jurídico vai junto no MESMO update (o rodízio só age com assigned_to vazio).
+  const legalMember = legal ? await routeToLegal(admin, orgId, conversation.id, conversation.contact_id, message.content) : null;
   await admin
     .from('conversations')
     .update(
       handoff
-        ? { last_message_at: nowIso, status: 'human_active', ai_paused: true }
+        ? {
+          last_message_at: nowIso, status: 'human_active', ai_paused: true,
+          ...(legalMember ? { assigned_to: legalMember, assigned_at: nowIso } : {}),
+        }
         : close
           ? { last_message_at: nowIso, status: 'closed', closed_at: nowIso }
           : { last_message_at: nowIso },
