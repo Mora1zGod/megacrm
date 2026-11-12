@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Check, Copy, ExternalLink, FileText, IdCard, Link2, Loader2, RefreshCw, Search, X } from 'lucide-react';
+import { ArrowLeft, Check, Copy, ExternalLink, FileText, IdCard, Link2, Loader2, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
@@ -167,19 +167,23 @@ function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canMa
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border-card)] p-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-xs text-[var(--color-text-muted)]">Protocolo #{sub.protocol} · enviado {fmtDateTime(sub.completed_at ?? sub.created_at)}</div>
-          <div className="truncate text-base font-semibold text-[var(--color-text-primary)]">{sub.holder_name}</div>
+      <div className="space-y-2 border-b border-[var(--color-border-card)] p-3">
+        <div className="flex items-start gap-2">
+          <button type="button" aria-label="Voltar para a lista" onClick={onClose} className="-ml-1 rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] lg:hidden"><ArrowLeft className="h-5 w-5" /></button>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-[var(--color-text-muted)]">Protocolo #{sub.protocol} · enviado {fmtDateTime(sub.completed_at ?? sub.created_at)}</div>
+            <div className="text-base font-semibold text-[var(--color-text-primary)]">{sub.holder_name}</div>
+          </div>
         </div>
-        {canManage ? (
-          <select value={sub.status} disabled={saving} onChange={(e) => void save({ status: e.target.value as Status })}
-            className="h-9 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)]">
-            {(Object.keys(STATUS) as Status[]).filter((s) => s !== 'enviando' || sub.status === 'enviando').map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
-          </select>
-        ) : <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', STATUS[sub.status].cls)}>{STATUS[sub.status].label}</span>}
-        <Button size="sm" variant="outline" onClick={() => void copy(allText, 'Dados copiados')}><Copy className="h-3.5 w-3.5" /> Copiar tudo</Button>
-        <button type="button" aria-label="Fechar" onClick={onClose} className="rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] lg:hidden"><X className="h-4 w-4" /></button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canManage ? (
+            <select value={sub.status} disabled={saving} onChange={(e) => void save({ status: e.target.value as Status })}
+              className="h-9 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] sm:flex-none">
+              {(Object.keys(STATUS) as Status[]).filter((s) => s !== 'enviando' || sub.status === 'enviando').map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
+            </select>
+          ) : <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', STATUS[sub.status].cls)}>{STATUS[sub.status].label}</span>}
+          <Button size="sm" variant="outline" onClick={() => void copy(allText, 'Dados copiados')}><Copy className="h-3.5 w-3.5" /> Copiar tudo</Button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" data-pocket-protocol={sub.protocol}>
@@ -286,14 +290,14 @@ export default function RecadastramentosPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className={cn('flex flex-wrap items-center gap-3', current && 'hidden lg:flex')}>
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]"><IdCard className="h-5 w-5" /></span>
         <div>
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Recadastramento</h1>
           <p className="text-sm text-[var(--color-text-secondary)]">Dados e documentos que os associados enviaram pelo link. Confira, lance no Pocket e marque como lançado.</p>
         </div>
       </div>
-      <LinkCard canManage={canManage} />
+      <div className={cn(current && 'hidden lg:block')}><LinkCard canManage={canManage} /></div>
       {error && <div className="rounded-[var(--radius-card)] border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.06)] p-3 text-sm text-[var(--color-error)]">{error}</div>}
 
       <div className="flex min-h-0 flex-1 gap-3">
