@@ -257,8 +257,10 @@ export function useConversations(): UseConversationsResult {
   // inteira (conversas + contatos + tags + prévias + clientes + canais, em dezenas de pedidos).
   // Agora:
   //   • só as conversas que mudaram são buscadas de novo e encaixadas na lista;
-  //   • eventos são juntados por 1,5 s (no máx. 1 atualização em andamento por vez);
-  //   • aba em segundo plano não busca nada — ao voltar, recarrega a lista uma vez.
+  //   • eventos são juntados por 400 ms (no máx. 1 atualização em andamento por vez) — 12/11/2026, no servidor
+  //     próprio (VPS) não há mais o limite do plano grátis: antes eram 1,5 s e a lista parecia demorar;
+  //   • aba em segundo plano não busca nada — ao voltar, busca só as conversas que mudaram (lista inteira só se
+  //     forem mais de 40 ou se chegou evento sem id).
   const pendingIds = useRef<Set<string>>(new Set());
   const needFull = useRef(false);
   const dirtyHidden = useRef(false);
@@ -290,7 +292,7 @@ export function useConversations(): UseConversationsResult {
   const flush = useCallback(async () => {
     refreshTimer.current = null;
     if (inFlight.current) {
-      refreshTimer.current = setTimeout(() => { void flush(); }, 1500);
+      refreshTimer.current = setTimeout(() => { void flush(); }, 400);
       return;
     }
     const ids = Array.from(pendingIds.current);
@@ -316,7 +318,7 @@ export function useConversations(): UseConversationsResult {
       dirtyHidden.current = true;
       return;
     }
-    if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { void flush(); }, 1500);
+    if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { void flush(); }, 400);
   }, [flush]);
 
   useEffect(() => {
@@ -327,9 +329,8 @@ export function useConversations(): UseConversationsResult {
     const onVisible = () => {
       if (document.visibilityState !== 'visible' || !dirtyHidden.current) return;
       dirtyHidden.current = false;
-      pendingIds.current = new Set();
-      needFull.current = true;
-      if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { void flush(); }, 300);
+      // As conversas que mudaram com a aba escondida ficaram em pendingIds: busca só elas.
+      if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { void flush(); }, 100);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
