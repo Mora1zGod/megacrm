@@ -133,11 +133,24 @@ function Field({ label, children, optional }: { label: string; children: ReactNo
   );
 }
 
+// Fluxo fácil no celular: depois de escolher/adicionar algo, rola a tela até o próximo campo (o elemento
+// seguinte no mesmo bloco ou no bloco de cima). Sem próximo, vai para o fim — o botão Continuar fica fixo embaixo.
+function scrollToNext(from: HTMLElement | null) {
+  window.setTimeout(() => {
+    let el: Element | null = from;
+    while (el && !el.nextElementSibling) el = el.parentElement;
+    const next = el?.nextElementSibling as HTMLElement | null | undefined;
+    if (next && next.getBoundingClientRect().height > 0) next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    else window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }, 150);
+}
+
 function Choice<T extends string>({ value, options, onChange, cols = 2 }: { value: T | ''; options: readonly (readonly [T, string])[]; onChange: (v: T) => void; cols?: 2 | 3 }) {
+  const ref = useRef<HTMLDivElement>(null);
   return (
-    <div className={`grid grid-cols-1 gap-2 ${cols === 3 ? 'sm:grid-cols-3' : 'grid-cols-2'}`}>
+    <div ref={ref} className={`grid grid-cols-1 gap-2 ${cols === 3 ? 'sm:grid-cols-3' : 'grid-cols-2'}`}>
       {options.map(([v, l]) => (
-        <button key={v} type="button" onClick={() => onChange(v)}
+        <button key={v} type="button" onClick={() => { onChange(v); scrollToNext(ref.current); }}
           className={`h-12 rounded-[var(--radius-control)] border text-[15px] font-semibold ${value === v ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)]'}`}>
           {l}
         </button>
@@ -197,12 +210,16 @@ function Thumb({ file }: { file: File }) {
 function PhotoPicker({ label, hint, files, onChange }: { label: string; hint?: string; files: File[]; onChange: (f: File[]) => void }) {
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const add = (list: FileList | null) => {
     const ok = Array.from(list ?? []).filter((f) => f.size <= MAX_FILE * 3);
+    if (!ok.length) return;
     onChange([...files, ...ok].slice(0, 6));
+    // Deixa à vista a miniatura e o próximo passo (verso / próximo campo / Continuar).
+    scrollToNext(boxRef.current);
   };
   return (
-    <div className="space-y-2">
+    <div ref={boxRef} className="space-y-2">
       <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">{label}</div>
       <p className="flex items-start gap-1.5 text-sm text-[var(--color-text-secondary)]">
         <Camera className="mt-0.5 h-4 w-4 shrink-0" />
@@ -271,6 +288,7 @@ export default function RecadastroPage() {
   const [protocol, setProtocol] = useState<number | null>(null);
   const pending = useRef<{ submissionId: string; uploadKey: string; queue: UploadItem[] } | null>(null);
   const nextKey = useRef(1);
+  const openedRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,6 +312,7 @@ export default function RecadastroPage() {
     const key = nextKey.current++;
     setPeople((ps) => [...ps, { key, name: '', birth: '', relationship: '', relationshipOther: '', cpf: '', email: '', files: [] }]);
     setOpenKey(key);
+    openedRef.current = key; // o cartão novo rola até o topo e foca o nome
   };
 
   // AMAI 10: se diminuir a quantidade, corta os dependentes que não cabem mais.
@@ -543,7 +562,8 @@ export default function RecadastroPage() {
             {people.length === 0 && maxDependents > 0 && <p className="text-sm text-[var(--color-text-muted)]">{plan === 'amai10' ? 'Nenhum dependente adicionado ainda.' : 'Nenhum dependente adicionado. Se não tiver, toque em Continuar.'}</p>}
             {people.map((p, i) => (
               openKey === p.key ? (
-                <div key={p.key} className="space-y-4 rounded-[var(--radius-control)] border-2 border-[var(--accent-primary)] p-3">
+                <div key={p.key} className="scroll-mt-4 space-y-4 rounded-[var(--radius-control)] border-2 border-[var(--accent-primary)] p-3"
+                  ref={(el) => { if (el && openedRef.current === p.key) { openedRef.current = null; window.setTimeout(() => { el.querySelector('input')?.focus({ preventScroll: true }); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120); } }}>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[var(--color-text-primary)]">Dependente {i + 1}</span>
                     <button type="button" className="flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-error)]" onClick={() => { setPeople((ps) => ps.filter((x) => x.key !== p.key)); setOpenKey(null); }}>
@@ -570,6 +590,11 @@ export default function RecadastroPage() {
                     const pr = personProblem(p, i);
                     if (pr) { setError(pr); return; }
                     setError(null); setOpenKey(null);
+                    window.setTimeout(() => {
+                      const nxt = document.getElementById('recad-dep-next');
+                      if (nxt) nxt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      else window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                    }, 150);
                   }}>
                     <Check className="h-5 w-5" /> Salvar dependente
                   </Button>
@@ -594,7 +619,7 @@ export default function RecadastroPage() {
               )
             ))}
             {people.length < maxDependents && openKey === null && (
-              <Button type="button" variant="outline" className="h-12 w-full" onClick={addPerson}>
+              <Button id="recad-dep-next" type="button" variant="outline" className="h-12 w-full" onClick={addPerson}>
                 <Plus className="h-5 w-5" /> Adicionar dependente {plan === 'amai10' ? `(${people.length} de ${maxDependents})` : ''}
               </Button>
             )}
