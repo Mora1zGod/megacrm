@@ -14,12 +14,13 @@ import { usePermission } from '../../providers/PermissionsProvider';
 
 const BUCKET = 'whatsapp-hub-recadastro';
 
-type Status = 'enviando' | 'novo' | 'em_analise' | 'pendente' | 'lancado' | 'recusado';
+type Status = 'enviando' | 'novo' | 'em_analise' | 'pendente' | 'conferido' | 'lancado' | 'recusado';
 interface Submission {
   id: string; protocol: number; status: Status; plan: 'amai10' | 'infinity' | 'nao_sei'; people_count: number | null;
   passport_number: string | null; holder_name: string; holder_cpf: string; holder_birth: string | null; holder_email: string | null;
   holder_phone: string | null; portal_access: 'email' | 'whatsapp'; contact_id: string | null; team_notes: string | null;
   reviewed_at: string | null; completed_at: string | null; created_at: string;
+  checked_at: string | null; launched_at: string | null;
 }
 interface PersonRow { id: string; position: number; name: string; birth_date: string; relationship: string; relationship_other: string | null; cpf: string | null; email: string | null }
 interface FileRow { id: string; person_id: string | null; kind: 'passaporte' | 'documento' | 'certidao_casamento'; path: string; mime: string }
@@ -29,11 +30,13 @@ const STATUS: Record<Status, { label: string; cls: string }> = {
   novo: { label: 'Novo', cls: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' },
   em_analise: { label: 'Em análise', cls: 'bg-[rgba(245,158,11,0.14)] text-[#b45309] dark:text-[#fbbf24]' },
   pendente: { label: 'Pendência', cls: 'bg-[rgba(239,68,68,0.12)] text-[var(--color-error)]' },
+  conferido: { label: 'Conferido', cls: 'bg-[rgba(14,165,233,0.14)] text-[#0369a1] dark:text-[#38bdf8]' },
   lancado: { label: 'Lançado no Pocket', cls: 'bg-[rgba(34,197,94,0.14)] text-[var(--color-success)]' },
   recusado: { label: 'Recusado', cls: 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]' },
 };
 const FILTERS: [string, Status[] | null][] = [
-  ['A fazer', ['novo', 'em_analise', 'pendente']],
+  ['A conferir', ['novo', 'em_analise', 'pendente']],
+  ['Para lançar', ['conferido']],
   ['Lançados', ['lancado']],
   ['Recusados', ['recusado']],
   ['Incompletos', ['enviando']],
@@ -130,7 +133,7 @@ function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canMa
   async function save(patch: Partial<Pick<Submission, 'status' | 'team_notes'>>) {
     setSaving(true);
     const { data, error } = await getSupabase().from('recad_submissions').update(patch).eq('id', sub.id)
-      .select('id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at').single();
+      .select('id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at').single();
     setSaving(false);
     if (error) { toast.error('Não foi possível salvar', { description: error.message }); return; }
     onChanged(data as Submission);
@@ -179,14 +182,33 @@ function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canMa
           {canManage ? (
             <select value={sub.status} disabled={saving} onChange={(e) => void save({ status: e.target.value as Status })}
               className="h-9 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] sm:flex-none">
-              {(Object.keys(STATUS) as Status[]).filter((s) => s !== 'enviando' || sub.status === 'enviando').map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
+              {(Object.keys(STATUS) as Status[])
+                .filter((s) => (s !== 'enviando' || sub.status === 'enviando') && (s !== 'lancado' || sub.status === 'conferido' || sub.status === 'lancado'))
+                .map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
             </select>
           ) : <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', STATUS[sub.status].cls)}>{STATUS[sub.status].label}</span>}
+          {canManage && ['novo', 'em_analise', 'pendente'].includes(sub.status) && (
+            <Button size="sm" disabled={saving} data-pocket-action="conferir" onClick={() => void save({ status: 'conferido' })}>
+              <Check className="h-3.5 w-3.5" /> Marcar como conferido
+            </Button>
+          )}
+          {canManage && sub.status === 'conferido' && (
+            <Button size="sm" disabled={saving} data-pocket-action="marcar-lancado" onClick={() => void save({ status: 'lancado' })}>
+              <Check className="h-3.5 w-3.5" /> Marcar como lançado no Pocket
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => void copy(allText, 'Dados copiados')}><Copy className="h-3.5 w-3.5" /> Copiar tudo</Button>
         </div>
+        {(sub.checked_at || sub.launched_at) && (
+          <div className="text-xs text-[var(--color-text-muted)]">
+            {sub.checked_at && <>Conferido em {fmtDateTime(sub.checked_at)}</>}
+            {sub.checked_at && sub.launched_at && ' · '}
+            {sub.launched_at && <>Lançado no Pocket em {fmtDateTime(sub.launched_at)}</>}
+          </div>
+        )}
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" data-pocket-protocol={sub.protocol}>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" data-pocket-protocol={sub.protocol} data-pocket-status={sub.status}>
         {sub.status === 'enviando' && (
           <p className="rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2 text-sm text-[var(--color-text-primary)]">O associado começou mas não terminou de enviar os documentos.</p>
         )}
@@ -258,7 +280,7 @@ export default function RecadastramentosPage() {
 
   const load = useCallback(async () => {
     const { data, error: e } = await getSupabase().from('recad_submissions')
-      .select('id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at')
+      .select('id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at')
       .order('created_at', { ascending: false }).limit(1000);
     if (e) { setError(/recad_submissions/.test(e.message) ? 'O módulo de recadastramento ainda não foi instalado no banco.' : e.message); setRows([]); return; }
     setError(null);
@@ -319,7 +341,7 @@ export default function RecadastramentosPage() {
             {rows === null && <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-[var(--accent-primary)]" /></div>}
             {rows !== null && list.length === 0 && <p className="p-6 text-center text-sm text-[var(--color-text-muted)]">Nada por aqui.</p>}
             {list.map((r) => (
-              <button key={r.id} type="button" onClick={() => setSelected(r.id)}
+              <button key={r.id} type="button" onClick={() => setSelected(r.id)} data-pocket-item={r.protocol} data-pocket-status={r.status}
                 className={cn('flex w-full items-start gap-2 border-b border-[var(--color-border-soft)] px-3 py-2.5 text-left hover:bg-[var(--color-surface-hover)]', selected === r.id && 'bg-[var(--color-accent-subtle)]')}>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{r.holder_name}</div>

@@ -1008,7 +1008,13 @@ Regras:
   exceto filhos). Conferidas na função e na tela.
 - Tabelas `recad_links` (token por org; "Gerar novo" desativa o antigo), `recad_submissions` (protocolo `recad_protocol_seq`),
   `recad_people`, `recad_files` (bucket PRIVADO `whatsapp-hub-recadastro/<org>/<envio>/…`). Permissões `recad.view` / `recad.manage`.
-  A equipe só muda `status` (novo → em_analise → pendente → lancado/recusado) e `team_notes` (trigger `_recad_sub_guard`).
+  A equipe só muda `status` (novo → em_analise → pendente → conferido → lancado, ou recusado) e `team_notes` (trigger `_recad_sub_guard`).
+  `20261112170000_recad_conferido.sql`: "lancado" SÓ a partir de "conferido" (a extensão nunca lança envio que ninguém conferiu);
+  `checked_at/by` e `launched_at/by` preenchidos pelo banco. Tela: abas "A conferir" · "Para lançar" (conferido) · "Lançados";
+  botões `data-pocket-action="conferir"` / `"marcar-lancado"`; itens da lista com `data-pocket-item` + `data-pocket-status`.
+- Formulário (12/11/2026): 5 etapas (Passaporte → Titular → Documentos → Dependentes → Conferência), "Tirar foto" (capture) separado de
+  "Escolher arquivo", miniaturas com excluir, data em 3 caixas (dia/mês/ano), aviso de que tudo passa por conferência interna e só depois
+  chega o login/senha do Portal. Link curto `/atualizar` = redirect no `vercel.json` para o token da AMAI (trocou o token → atualizar lá).
 - Tela `/recadastramentos`: lista com filtros, detalhe com botões de copiar e `data-pocket="campo"` em cada valor (para copiar para o
   Pocket com a extensão do navegador), miniaturas dos documentos (link assinado 1 h), "Copiar tudo", link do formulário.
 - AMAIA (modelo ativo, seção 7): manda `{link_recadastro}` (variável em `ai_agent_config.variables`); só sem conseguir usar o link segue o
