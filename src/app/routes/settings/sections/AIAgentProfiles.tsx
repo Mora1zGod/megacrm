@@ -457,6 +457,26 @@ function ProfileTester({ profile, accessToken, onClose }: { profile: Profile; ac
               </div>
             )}
           </div>
+          {/* No atendimento real a AMAIA recebe foto como "[imagem] descrição" (visão), PDF sem texto como
+              "[documento recebido(a) — …]" e áudio já transcrito. Aqui não dá para anexar arquivo, então simula assim. */}
+          <div className="mt-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-surface-hover)] px-2.5 py-2 text-[0.72rem] text-[var(--color-text-secondary)]">
+            <span className="font-semibold text-[var(--color-text-primary)]">Simular foto ou documento:</span> o teste não aceita anexo.
+            Escreva do jeito que a AMAIA recebe: foto = <code>[imagem]</code> + o que aparece nela; PDF = <code>[documento recebido(a)]</code>; áudio chega já
+            transcrito, então é só escrever o que a pessoa falou.
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {[
+                ['Foto do passaporte', '[imagem] Foto de um passaporte AMAI Infinity com o nome do titular'],
+                ['Comprovante', '[imagem] Comprovante de pagamento PIX para AMAI Park'],
+                ['RG / CNH', '[imagem] Foto de um RG (carteira de identidade)'],
+                ['PDF', '[documento recebido(a) — não foi possível ler o conteúdo]'],
+              ].map(([label, text]) => (
+                <button key={label} type="button" disabled={sending} onClick={() => setInput(text)}
+                  className="rounded-full border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 py-0.5 text-[0.7rem] text-[var(--color-text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]">
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2 mt-2">
             <Input
               value={input}
