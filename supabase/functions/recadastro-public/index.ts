@@ -225,7 +225,9 @@ Deno.serve(async (req) => {
         if (rel === 'outro' && !relOther) return fail(`Dependente ${n}: diga qual é o parentesco.`);
         relCount[rel] = (relCount[rel] ?? 0) + 1;
         if (ONLY_ONE.has(rel) && relCount[rel] > 1) return fail(`Só pode haver um(a) ${REL_LABEL[rel]}.`);
-        if (cpf) {
+        // Pocket exige CPF de cada dependente (nome, nascimento, parentesco e CPF obrigatórios).
+        if (!cpf) return fail(`Dependente ${n}: informe o CPF.`);
+        {
           if (!cpfValid(cpf)) return fail(`Dependente ${n}: CPF inválido.`);
           if (seenCpf.has(cpf)) return fail(`Dependente ${n}: CPF repetido.`);
           seenCpf.add(cpf);

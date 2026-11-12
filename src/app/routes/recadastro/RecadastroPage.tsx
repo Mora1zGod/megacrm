@@ -308,7 +308,8 @@ export default function RecadastroPage() {
     if (!p.birth) return `${n}: informe a data de nascimento (dia, mês e ano).`;
     if (!p.relationship) return `${n}: escolha o parentesco.`;
     if (p.relationship === 'outro' && !p.relationshipOther.trim()) return `${n}: diga qual é o parentesco.`;
-    if (p.cpf && !cpfValid(p.cpf)) return `${n}: CPF inválido.`;
+    if (!p.cpf) return `${n}: informe o CPF (criança também tem CPF; está na certidão de nascimento).`;
+    if (!cpfValid(p.cpf)) return `${n}: CPF inválido.`;
     if (!p.files.length) return `${n}: envie a foto do RG, CNH ou certidão de nascimento.`;
     return null;
   }
@@ -551,8 +552,8 @@ export default function RecadastroPage() {
                     <Field label="Qual parentesco?"><input className={inputCls} maxLength={40} value={p.relationshipOther} onChange={(e) => setPerson(p.key, { relationshipOther: e.target.value })} /></Field>
                   )}
                   <DateInput label="Data de nascimento" value={p.birth} onChange={(birth) => setPerson(p.key, { birth })} />
-                  <Field label="CPF" optional><input className={inputCls} inputMode="numeric" value={p.cpf} onChange={(e) => setPerson(p.key, { cpf: maskDoc(e.target.value).slice(0, 14) })} /></Field>
-                  <Field label="E-mail" optional><input type="email" className={inputCls} value={p.email} onChange={(e) => setPerson(p.key, { email: e.target.value })} /></Field>
+                  <Field label="CPF"><input className={inputCls} inputMode="numeric" value={p.cpf} placeholder="000.000.000-00" onChange={(e) => setPerson(p.key, { cpf: maskDoc(e.target.value).slice(0, 14) })} /></Field>
+                  <p className="-mt-2 text-xs text-[var(--color-text-muted)]">Criança também tem CPF: o número está na certidão de nascimento.</p>
                   <PhotoPicker label="RG ou CNH (criança sem RG: certidão de nascimento)" files={p.files} onChange={(files) => setPerson(p.key, { files })} />
                   <Button type="button" className="h-12 w-full" onClick={() => {
                     const pr = personProblem(p, i);
@@ -610,7 +611,7 @@ export default function RecadastroPage() {
               </Summary>
               <Summary title="Documento do titular" onEdit={() => goTo(2)}>{holderFiles.length} foto(s)</Summary>
               <Summary title={`Dependentes (${people.length})`} onEdit={() => goTo(3)}>
-                {people.length ? people.map((p) => <div key={p.key}>{p.name.trim()} — {relLabel(p)} · {brDate(p.birth)}</div>) : 'Nenhum'}
+                {people.length ? people.map((p) => <div key={p.key}>{p.name.trim()} — {relLabel(p)} · {brDate(p.birth)} · CPF {p.cpf}</div>) : 'Nenhum'}
                 {needsMarriage && <div>Certidão de casamento/união: {marriageFiles.length} foto(s)</div>}
               </Summary>
             </Card>
