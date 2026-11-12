@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { CheckCircle2, FileText, ImagePlus, Loader2, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Camera, Check, CheckCircle2, ChevronLeft, ChevronRight, FileText, Info, Loader2, Pencil, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSupabase } from '@/lib/supabase';
 import { maskPhoneBR } from '@/lib/phone';
@@ -94,17 +94,29 @@ function cpfValid(raw: string): boolean {
   return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
 }
 
-function Section({ n, title, hint, children }: { n: number; title: string; hint?: ReactNode; children: ReactNode }) {
+// Aviso que aparece no começo e na conferência: nada é liberado na hora.
+function ReviewNotice({ portal }: { portal: 'email' | 'whatsapp' | '' }) {
+  const via = portal === 'email' ? 'por e-mail' : portal === 'whatsapp' ? 'pelo WhatsApp' : 'por e-mail ou WhatsApp';
+  return (
+    <div className="flex gap-3 rounded-[var(--radius-card)] border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] p-4 text-sm text-[var(--color-text-primary)]">
+      <Info className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent-primary)]" />
+      <div className="space-y-1">
+        <p className="font-semibold">Seus dados serão conferidos pela nossa equipe.</p>
+        <p className="text-[var(--color-text-secondary)]">
+          Depois da conferência, você recebe {via} o <b className="text-[var(--color-text-primary)]">login e a senha do Portal do Associado</b>.
+          O acesso não é liberado na hora.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4 sm:p-5">
-      <div className="mb-3 flex items-start gap-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-sm font-bold text-white">{n}</span>
-        <div>
-          <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{title}</h2>
-          {hint && <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">{hint}</p>}
-        </div>
-      </div>
-      <div className="space-y-3">{children}</div>
+      <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h2>
+      {hint && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{hint}</p>}
+      <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
 }
@@ -120,41 +132,119 @@ function Field({ label, children, optional }: { label: string; children: ReactNo
   );
 }
 
-function FilePicker({ label, files, onChange }: { label: string; files: File[]; onChange: (f: File[]) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
+function Choice<T extends string>({ value, options, onChange, cols = 2 }: { value: T | ''; options: readonly (readonly [T, string])[]; onChange: (v: T) => void; cols?: 2 | 3 }) {
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-medium text-[var(--color-text-label)]">{label}</div>
-      {files.length > 0 && (
-        <ul className="space-y-1.5">
-          {files.map((f, i) => (
-            <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-2.5 py-1.5 text-sm">
-              <FileText className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
-              <span className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]">{f.name}</span>
-              <button type="button" aria-label="Remover arquivo" className="rounded p-1 text-[var(--color-text-muted)] hover:text-[var(--color-error)]" onClick={() => onChange(files.filter((_, j) => j !== i))}>
-                <X className="h-4 w-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*,application/pdf"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          const list = Array.from(e.target.files ?? []).filter((f) => f.size <= MAX_FILE * 3);
-          onChange([...files, ...list].slice(0, 6));
-          e.target.value = '';
-        }}
-      />
-      <Button type="button" variant="outline" className="w-full" onClick={() => ref.current?.click()}>
-        <ImagePlus className="h-4 w-4" /> {files.length ? 'Adicionar mais (ex.: verso)' : 'Tirar foto ou escolher arquivo'}
-      </Button>
+    <div className={`grid grid-cols-1 gap-2 ${cols === 3 ? 'sm:grid-cols-3' : 'grid-cols-2'}`}>
+      {options.map(([v, l]) => (
+        <button key={v} type="button" onClick={() => onChange(v)}
+          className={`h-12 rounded-[var(--radius-control)] border text-[15px] font-semibold ${value === v ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)]'}`}>
+          {l}
+        </button>
+      ))}
     </div>
   );
+}
+
+// Data digitada em 3 caixas (dia / mês / ano) com teclado numérico. Devolve 'AAAA-MM-DD' ou '' se incompleta/inválida.
+function DateInput({ value, onChange, label, optional }: { value: string; onChange: (iso: string) => void; label: string; optional?: boolean }) {
+  const init = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split('-') : ['', '', ''];
+  const [d, setD] = useState(init[2]);
+  const [m, setM] = useState(init[1]);
+  const [y, setY] = useState(init[0]);
+  const mRef = useRef<HTMLInputElement>(null);
+  const yRef = useRef<HTMLInputElement>(null);
+  const full = d.length >= 1 && m.length >= 1 && y.length === 4;
+  let iso = '';
+  if (full) {
+    const dd = Number(d), mm = Number(m), yy = Number(y);
+    const dt = new Date(Date.UTC(yy, mm - 1, dd));
+    const ok = yy >= 1900 && dt.getUTCFullYear() === yy && dt.getUTCMonth() === mm - 1 && dt.getUTCDate() === dd && dt.getTime() <= Date.now();
+    if (ok) iso = `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+  useEffect(() => { if (iso !== value) onChange(iso); }, [iso]); // eslint-disable-line react-hooks/exhaustive-deps
+  const box = `${inputCls} text-center`;
+  const num = (s: string, n: number) => s.replace(/\D/g, '').slice(0, n);
+  return (
+    <div className="space-y-1">
+      <span className="text-sm font-medium text-[var(--color-text-label)]">
+        {label} {optional && <span className="font-normal text-[var(--color-text-muted)]">(se tiver)</span>}
+      </span>
+      <div className="grid grid-cols-[1fr_1fr_1.5fr] gap-2">
+        <input aria-label="Dia" className={box} inputMode="numeric" placeholder="Dia" value={d}
+          onChange={(e) => { const v = num(e.target.value, 2); setD(v); if (v.length === 2) mRef.current?.focus(); }} />
+        <input ref={mRef} aria-label="Mês" className={box} inputMode="numeric" placeholder="Mês" value={m}
+          onChange={(e) => { const v = num(e.target.value, 2); setM(v); if (v.length === 2) yRef.current?.focus(); }} />
+        <input ref={yRef} aria-label="Ano" className={box} inputMode="numeric" placeholder="Ano" value={y}
+          onChange={(e) => setY(num(e.target.value, 4))} />
+      </div>
+      {full && !iso && <p className="text-sm text-[var(--color-error)]">Data inválida. Confira dia, mês e ano.</p>}
+    </div>
+  );
+}
+
+function Thumb({ file }: { file: File }) {
+  const url = useMemo(() => (file.type.startsWith('image/') ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+  if (!url) {
+    return <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-1 text-[var(--color-text-muted)]"><FileText className="h-7 w-7" /><span className="w-full truncate text-center text-[10px]">{file.name}</span></div>;
+  }
+  return <img src={url} alt="" className="h-full w-full object-cover" />;
+}
+
+// Fotos de documento: "Tirar foto" (abre a câmera) separado de "Escolher arquivo"; mostra o que já foi
+// escolhido, com excluir; depois da 1ª, o botão vira "Adicionar verso / outra foto".
+function PhotoPicker({ label, hint, files, onChange }: { label: string; hint?: string; files: File[]; onChange: (f: File[]) => void }) {
+  const camRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const add = (list: FileList | null) => {
+    const ok = Array.from(list ?? []).filter((f) => f.size <= MAX_FILE * 3);
+    onChange([...files, ...ok].slice(0, 6));
+  };
+  return (
+    <div className="space-y-2">
+      <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">{label}</div>
+      <p className="flex items-start gap-1.5 text-sm text-[var(--color-text-secondary)]">
+        <Camera className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{hint ?? 'Fotografe o documento inteiro, sem cortar as bordas, em lugar claro e sem reflexo.'}</span>
+      </p>
+      {files.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {files.map((f, i) => (
+            <div key={`${f.name}-${i}`} className="relative aspect-[3/4] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)]">
+              <Thumb file={f} />
+              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold text-white">{i === 0 ? 'Frente' : i === 1 ? 'Verso' : `${i + 1}ª`}</span>
+              <button type="button" aria-label="Excluir foto" onClick={() => onChange(files.filter((_, j) => j !== i))}
+                className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
+      {files.length < 6 && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="button" className="h-12" onClick={() => camRef.current?.click()}>
+            <Camera className="h-5 w-5" /> {files.length ? 'Foto do verso' : 'Tirar foto'}
+          </Button>
+          <Button type="button" variant="outline" className="h-12" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-5 w-5" /> Escolher arquivo
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const STEPS = ['Passaporte', 'Titular', 'Documentos', 'Dependentes', 'Conferência'] as const;
+
+function relLabel(p: Person) {
+  if (p.relationship === 'outro') return p.relationshipOther || 'Outro';
+  return REL_OPTIONS.find((o) => o.value === p.relationship)?.label ?? '—';
+}
+function brDate(iso: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split('-').reverse().join('/') : '—';
 }
 
 export default function RecadastroPage() {
@@ -163,6 +253,7 @@ export default function RecadastroPage() {
   const [invalidMsg, setInvalidMsg] = useState('');
   const [orgName, setOrgName] = useState('AMAI Park');
   const [logo, setLogo] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
 
   const [plan, setPlan] = useState<Plan | ''>('');
   const [peopleCount, setPeopleCount] = useState('');
@@ -172,6 +263,7 @@ export default function RecadastroPage() {
   const [holderFiles, setHolderFiles] = useState<File[]>([]);
   const [portal, setPortal] = useState<'email' | 'whatsapp' | ''>('');
   const [people, setPeople] = useState<Person[]>([]);
+  const [openKey, setOpenKey] = useState<number | null>(null);
   const [marriageFiles, setMarriageFiles] = useState<File[]>([]);
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +290,11 @@ export default function RecadastroPage() {
   const usedOnce = useMemo(() => new Set(people.map((p) => p.relationship).filter((r) => ONLY_ONE.includes(r as Rel))), [people]);
 
   const setPerson = (key: number, patch: Partial<Person>) => setPeople((ps) => ps.map((p) => (p.key === key ? { ...p, ...patch } : p)));
-  const addPerson = () => setPeople((ps) => [...ps, { key: nextKey.current++, name: '', birth: '', relationship: '', relationshipOther: '', cpf: '', email: '', files: [] }]);
+  const addPerson = () => {
+    const key = nextKey.current++;
+    setPeople((ps) => [...ps, { key, name: '', birth: '', relationship: '', relationshipOther: '', cpf: '', email: '', files: [] }]);
+    setOpenKey(key);
+  };
 
   // AMAI 10: se diminuir a quantidade, corta os dependentes que não cabem mais.
   useEffect(() => {
@@ -206,30 +302,54 @@ export default function RecadastroPage() {
     if (plan === 'infinity') setPeople((ps) => ps.map((p) => (p.relationship === 'outro' ? { ...p, relationship: '' } : p)));
   }, [plan, maxDependents]);
 
-  function validate(): string | null {
-    if (!plan) return 'Escolha o seu passaporte (AMAI 10 ou AMAI Infinity).';
-    if (plan === 'amai10' && !(Number(peopleCount) >= 1 && Number(peopleCount) <= 10)) return 'No AMAI 10, diga para quantas pessoas foi a compra (de 1 a 10, contando você).';
-    if (!passportFiles.length) return 'Envie a foto do passaporte, título, contrato ou comprovante de pagamento.';
-    const name = holder.name.trim();
-    if (name.length < 5 || !name.includes(' ')) return 'Informe o nome completo do titular.';
-    if (!cpfValid(holder.cpf)) return 'CPF do titular inválido.';
-    if (holder.phone.replace(/\D/g, '').length < 10) return 'Informe o WhatsApp com DDD.';
-    if (!portal) return 'Escolha como quer receber o acesso ao Portal do Associado.';
-    if (portal === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(holder.email.trim())) return 'Informe um e-mail válido para receber o acesso ao portal.';
-    if (!holderFiles.length) return 'Envie a foto do RG ou CNH do titular.';
-    for (let i = 0; i < people.length; i++) {
-      const p = people[i];
-      const n = `Dependente ${i + 1}`;
-      if (p.name.trim().length < 5 || !p.name.trim().includes(' ')) return `${n}: informe o nome completo.`;
-      if (!p.birth) return `${n}: informe a data de nascimento.`;
-      if (!p.relationship) return `${n}: escolha o parentesco.`;
-      if (p.relationship === 'outro' && !p.relationshipOther.trim()) return `${n}: diga qual é o parentesco.`;
-      if (p.cpf && !cpfValid(p.cpf)) return `${n}: CPF inválido.`;
-      if (!p.files.length) return `${n}: envie a foto do RG, CNH ou certidão de nascimento.`;
-    }
-    if (needsMarriage && !marriageFiles.length) return 'Envie a certidão de casamento ou o documento da união estável.';
-    if (!consent) return 'Marque que concorda com o uso dos dados para o recadastramento.';
+  function personProblem(p: Person, i: number): string | null {
+    const n = `Dependente ${i + 1}`;
+    if (p.name.trim().length < 5 || !p.name.trim().includes(' ')) return `${n}: informe o nome completo.`;
+    if (!p.birth) return `${n}: informe a data de nascimento (dia, mês e ano).`;
+    if (!p.relationship) return `${n}: escolha o parentesco.`;
+    if (p.relationship === 'outro' && !p.relationshipOther.trim()) return `${n}: diga qual é o parentesco.`;
+    if (p.cpf && !cpfValid(p.cpf)) return `${n}: CPF inválido.`;
+    if (!p.files.length) return `${n}: envie a foto do RG, CNH ou certidão de nascimento.`;
     return null;
+  }
+
+  function stepProblem(s: number): string | null {
+    if (s === 0) {
+      if (!plan) return 'Escolha o seu passaporte (AMAI 10 ou AMAI Infinity).';
+      if (plan === 'amai10' && !(Number(peopleCount) >= 1 && Number(peopleCount) <= 10)) return 'No AMAI 10, diga para quantas pessoas foi a compra (de 1 a 10, contando você).';
+      if (!passportFiles.length) return 'Envie a foto do passaporte, título, contrato ou comprovante de pagamento.';
+    }
+    if (s === 1) {
+      const name = holder.name.trim();
+      if (name.length < 5 || !name.includes(' ')) return 'Informe o nome completo do titular.';
+      if (!cpfValid(holder.cpf)) return 'CPF do titular inválido.';
+      if (holder.phone.replace(/\D/g, '').length < 10) return 'Informe o WhatsApp com DDD.';
+      if (!portal) return 'Escolha como quer receber o login e a senha do Portal do Associado.';
+      if (portal === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(holder.email.trim())) return 'Informe um e-mail válido para receber o login do portal.';
+    }
+    if (s === 2 && !holderFiles.length) return 'Envie a foto do RG ou CNH do titular.';
+    if (s === 3) {
+      for (let i = 0; i < people.length; i++) {
+        const pr = personProblem(people[i], i);
+        if (pr) { setOpenKey(people[i].key); return pr; }
+      }
+      if (needsMarriage && !marriageFiles.length) return 'Envie a certidão de casamento ou o documento da união estável.';
+    }
+    if (s === 4 && !consent) return 'Marque que concorda com o uso dos dados para o recadastramento.';
+    return null;
+  }
+
+  function goTo(s: number) {
+    setError(null);
+    setStep(s);
+    window.scrollTo({ top: 0 });
+  }
+
+  function next() {
+    const pr = stepProblem(step);
+    if (pr) { setError(pr); return; }
+    if (step === 3) setOpenKey(null);
+    goTo(step + 1);
   }
 
   async function runUploads() {
@@ -260,8 +380,10 @@ export default function RecadastroPage() {
       try { await runUploads(); } catch (e) { setError((e as Error).message); setPhase('form'); }
       return;
     }
-    const problem = validate();
-    if (problem) { setError(problem); return; }
+    for (let s = 0; s <= 4; s++) {
+      const pr = stepProblem(s);
+      if (pr) { setError(pr); if (s !== 4) setStep(s); return; }
+    }
     setPhase('sending');
     const r = await callFn({
       action: 'submit', token, consent: true, plan,
@@ -310,19 +432,25 @@ export default function RecadastroPage() {
   }
 
   if (phase === 'done') {
+    const via = portal === 'email' ? 'por e-mail' : 'pelo WhatsApp';
     return (
       <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-10">
         <div className="mx-auto max-w-xl space-y-5">
           {header}
-          <div className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-5 text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-[var(--color-success)]" />
-            <h2 className="text-lg font-bold text-[var(--color-text-primary)]">Recebemos o seu recadastramento!</h2>
-            <p className="text-[var(--color-text-secondary)]">Protocolo <b className="text-[var(--color-text-primary)]">#{protocol}</b></p>
-            <div className="space-y-2 text-left text-sm text-[var(--color-text-secondary)]">
-              <p>• A nossa equipe vai analisar os dados e os documentos.</p>
-              <p>• Depois de concluído, você recebe o acesso ao <b>Portal do Associado</b> por {portal === 'email' ? 'e-mail' : 'WhatsApp'}.</p>
-              <p>• No portal, você tira a <b>foto do rosto</b> — sua e de cada dependente — para o reconhecimento facial na entrada. <b>Essa foto é feita uma única vez</b>, então faça com calma, em lugar claro.</p>
+          <div className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-5">
+            <div className="text-center">
+              <CheckCircle2 className="mx-auto h-12 w-12 text-[var(--color-success)]" />
+              <h2 className="mt-2 text-lg font-bold text-[var(--color-text-primary)]">Recebemos o seu recadastramento!</h2>
+              <p className="text-[var(--color-text-secondary)]">Protocolo <b className="text-[var(--color-text-primary)]">#{protocol}</b></p>
             </div>
+            <ol className="space-y-3 text-sm text-[var(--color-text-secondary)]">
+              <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">1</span>
+                <span><b className="text-[var(--color-text-primary)]">Conferência interna.</b> Nossa equipe confere os dados e os documentos que você enviou. Se faltar algo, a gente te chama.</span></li>
+              <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">2</span>
+                <span><b className="text-[var(--color-text-primary)]">Login e senha.</b> Depois da conferência, você recebe {via} o login e a senha do <b>Portal do Associado</b>.</span></li>
+              <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">3</span>
+                <span><b className="text-[var(--color-text-primary)]">Foto do rosto.</b> No portal, você cadastra o rosto — o seu e o de cada dependente — para o reconhecimento facial na entrada. <b>Essa foto é feita uma única vez</b>: faça com calma, em lugar claro.</span></li>
+            </ol>
           </div>
         </div>
       </div>
@@ -330,127 +458,209 @@ export default function RecadastroPage() {
   }
 
   const sending = phase === 'sending';
+  const pct = Math.round(((step + 1) / STEPS.length) * 100);
+  const holderLabel = 'RG ou CNH do titular (frente e verso)';
+
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-6 sm:py-10">
-      <div className="mx-auto max-w-xl space-y-4">
+    <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 pb-32 pt-6 sm:pt-10">
+      <div className="mx-auto max-w-xl space-y-4" onChangeCapture={() => setError(null)} onClickCapture={() => setError(null)}>
         {header}
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Preencha os seus dados e os dos dependentes e envie as fotos dos documentos. Leva uns 5 minutos.
-          Tenha em mãos: foto do passaporte (ou comprovante de pagamento) e o RG ou CNH de todos.
-        </p>
 
-        <Section n={1} title="Seu passaporte">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {([['amai10', 'AMAI 10'], ['infinity', 'AMAI Infinity'], ['nao_sei', 'Não sei']] as const).map(([v, l]) => (
-              <button key={v} type="button" onClick={() => setPlan(v)}
-                className={`h-11 rounded-[var(--radius-control)] border text-sm font-semibold ${plan === v ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)]'}`}>
-                {l}
-              </button>
-            ))}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-[var(--color-text-primary)]">{STEPS[step]}</span>
+            <span className="text-[var(--color-text-muted)]">Etapa {step + 1} de {STEPS.length}</span>
           </div>
-          {plan === 'amai10' && (
-            <Field label="Para quantas pessoas foi a compra? (contando você)">
-              <select className={inputCls} value={peopleCount} onChange={(e) => setPeopleCount(e.target.value)}>
-                <option value="">Escolha…</option>
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} {n === 1 ? 'pessoa (só eu)' : 'pessoas'}</option>)}
-              </select>
-            </Field>
-          )}
-          {plan === 'infinity' && <p className="text-sm text-[var(--color-text-secondary)]">O AMAI Infinity é familiar: podem entrar pai, mãe, sogro, sogra, esposo(a) e filhos.</p>}
-          <Field label="Número do passaporte ou contrato" optional>
-            <input className={inputCls} value={passportNumber} maxLength={40} onChange={(e) => setPassportNumber(e.target.value)} />
-          </Field>
-          <FilePicker label="Foto do passaporte, título, contrato ou comprovante de pagamento" files={passportFiles} onChange={setPassportFiles} />
-        </Section>
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--color-border-soft)]">
+            <div className="h-full rounded-full bg-[var(--accent-fill)] transition-all" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
 
-        <Section n={2} title="Titular">
-          <Field label="Nome completo"><input className={inputCls} autoComplete="name" value={holder.name} onChange={(e) => setHolder({ ...holder, name: e.target.value })} /></Field>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="CPF"><input className={inputCls} inputMode="numeric" value={holder.cpf} onChange={(e) => setHolder({ ...holder, cpf: maskDoc(e.target.value).slice(0, 14) })} placeholder="000.000.000-00" /></Field>
-            <Field label="Data de nascimento" optional><input type="date" className={inputCls} value={holder.birth} onChange={(e) => setHolder({ ...holder, birth: e.target.value })} /></Field>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="WhatsApp com DDD"><input className={inputCls} inputMode="tel" autoComplete="tel" value={holder.phone} maxLength={15} onChange={(e) => setHolder({ ...holder, phone: maskPhoneBR(e.target.value) })} placeholder="(68) 99999-0000" /></Field>
-            <Field label="E-mail"><input type="email" className={inputCls} autoComplete="email" value={holder.email} onChange={(e) => setHolder({ ...holder, email: e.target.value })} /></Field>
-          </div>
-          <div className="space-y-1">
-            <span className="text-sm font-medium text-[var(--color-text-label)]">Receber o acesso ao Portal do Associado por</span>
-            <div className="grid grid-cols-2 gap-2">
-              {([['whatsapp', 'WhatsApp'], ['email', 'E-mail']] as const).map(([v, l]) => (
-                <button key={v} type="button" onClick={() => setPortal(v)}
-                  className={`h-11 rounded-[var(--radius-control)] border text-sm font-semibold ${portal === v ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)]'}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-          <FilePicker label="Foto do RG ou CNH do titular (frente e verso)" files={holderFiles} onChange={setHolderFiles} />
-        </Section>
-
-        <Section n={3} title="Dependentes"
-          hint={plan === 'amai10'
-            ? (maxDependents ? `Seu AMAI 10 permite até ${maxDependents} dependente(s).` : 'Compra para 1 pessoa: não há dependentes.')
-            : 'Só quem vai usar o passaporte com você.'}>
-          {people.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">Nenhum dependente adicionado.</p>}
-          {people.map((p, i) => (
-            <div key={p.key} className="space-y-3 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-[var(--color-text-primary)]">Dependente {i + 1}</span>
-                <button type="button" className="flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-error)]" onClick={() => setPeople((ps) => ps.filter((x) => x.key !== p.key))}>
-                  <Trash2 className="h-4 w-4" /> Remover
-                </button>
-              </div>
-              <Field label="Nome completo"><input className={inputCls} value={p.name} onChange={(e) => setPerson(p.key, { name: e.target.value })} /></Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Data de nascimento"><input type="date" className={inputCls} value={p.birth} onChange={(e) => setPerson(p.key, { birth: e.target.value })} /></Field>
-                <Field label="Parentesco">
-                  <select className={inputCls} value={p.relationship} onChange={(e) => setPerson(p.key, { relationship: e.target.value as Rel })}>
+        {step === 0 && (
+          <>
+            <ReviewNotice portal="" />
+            <Card title="Seu passaporte" hint="Leva uns 5 minutos. Tenha em mãos a foto do passaporte (ou do comprovante de pagamento) e o RG ou CNH de todos.">
+              <Choice value={plan} cols={3} onChange={setPlan}
+                options={[['amai10', 'AMAI 10'], ['infinity', 'AMAI Infinity'], ['nao_sei', 'Não sei']] as const} />
+              {plan === 'amai10' && (
+                <Field label="Para quantas pessoas foi a compra? (contando você)">
+                  <select className={inputCls} value={peopleCount} onChange={(e) => setPeopleCount(e.target.value)}>
                     <option value="">Escolha…</option>
-                    {relOptions.map((o) => (
-                      <option key={o.value} value={o.value} disabled={o.value !== p.relationship && usedOnce.has(o.value)}>{o.label}</option>
-                    ))}
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} {n === 1 ? 'pessoa (só eu)' : 'pessoas'}</option>)}
                   </select>
                 </Field>
-              </div>
-              {p.relationship === 'outro' && (
-                <Field label="Qual parentesco?"><input className={inputCls} maxLength={40} value={p.relationshipOther} onChange={(e) => setPerson(p.key, { relationshipOther: e.target.value })} /></Field>
               )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="CPF" optional><input className={inputCls} inputMode="numeric" value={p.cpf} onChange={(e) => setPerson(p.key, { cpf: maskDoc(e.target.value).slice(0, 14) })} /></Field>
-                <Field label="E-mail" optional><input type="email" className={inputCls} value={p.email} onChange={(e) => setPerson(p.key, { email: e.target.value })} /></Field>
-              </div>
-              <FilePicker label="RG ou CNH (criança sem RG: certidão de nascimento)" files={p.files} onChange={(files) => setPerson(p.key, { files })} />
-            </div>
-          ))}
-          {plan && people.length < maxDependents && (
-            <Button type="button" variant="outline" className="w-full" onClick={addPerson}><Plus className="h-4 w-4" /> Adicionar dependente</Button>
-          )}
-          {!plan && <p className="text-sm text-[var(--color-text-muted)]">Escolha o passaporte no passo 1 para adicionar dependentes.</p>}
-        </Section>
-
-        {needsMarriage && (
-          <Section n={4} title="Comprovante de casamento ou união" hint="Como você incluiu esposo(a), sogro ou sogra, envie a certidão de casamento ou o documento que comprove a união estável.">
-            <FilePicker label="Certidão de casamento ou união estável" files={marriageFiles} onChange={setMarriageFiles} />
-          </Section>
+              {plan === 'infinity' && <p className="text-sm text-[var(--color-text-secondary)]">O AMAI Infinity é familiar: podem entrar pai, mãe, sogro, sogra, esposo(a) e filhos.</p>}
+              <Field label="Número do passaporte ou contrato" optional>
+                <input className={inputCls} value={passportNumber} maxLength={40} onChange={(e) => setPassportNumber(e.target.value)} />
+              </Field>
+              <PhotoPicker label="Foto do passaporte, título, contrato ou comprovante de pagamento"
+                hint="Fotografe o documento inteiro, com os dados legíveis. Também pode ser o print ou PDF do comprovante."
+                files={passportFiles} onChange={setPassportFiles} />
+            </Card>
+          </>
         )}
 
-        <label className="flex items-start gap-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
-          <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-          <span>
-            <ShieldCheck className="mr-1 inline h-4 w-4 text-[var(--accent-primary)]" />
-            Concordo que o {orgName} use estes dados e documentos somente para o recadastramento e o acesso ao parque, conforme a LGPD.
-          </span>
-        </label>
+        {step === 1 && (
+          <Card title="Dados do titular" hint="Quem comprou o passaporte.">
+            <Field label="Nome completo"><input className={inputCls} autoComplete="name" value={holder.name} onChange={(e) => setHolder({ ...holder, name: e.target.value })} /></Field>
+            <Field label="CPF"><input className={inputCls} inputMode="numeric" value={holder.cpf} onChange={(e) => setHolder({ ...holder, cpf: maskDoc(e.target.value).slice(0, 14) })} placeholder="000.000.000-00" /></Field>
+            <DateInput label="Data de nascimento" optional value={holder.birth} onChange={(birth) => setHolder((h) => ({ ...h, birth }))} />
+            <Field label="WhatsApp com DDD"><input className={inputCls} inputMode="tel" autoComplete="tel" value={holder.phone} maxLength={15} onChange={(e) => setHolder({ ...holder, phone: maskPhoneBR(e.target.value) })} placeholder="(68) 99999-0000" /></Field>
+            <Field label="E-mail"><input type="email" className={inputCls} autoComplete="email" value={holder.email} onChange={(e) => setHolder({ ...holder, email: e.target.value })} /></Field>
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-[var(--color-text-label)]">Depois da conferência, receber o login e a senha do Portal do Associado por</span>
+              <Choice value={portal} onChange={setPortal} options={[['whatsapp', 'WhatsApp'], ['email', 'E-mail']] as const} />
+            </div>
+          </Card>
+        )}
 
-        {error && <p role="alert" className="rounded-[var(--radius-control)] border border-[var(--color-error)] bg-[rgba(220,38,38,0.08)] p-3 text-sm text-[var(--color-error)]">{error}</p>}
+        {step === 2 && (
+          <Card title="Documento do titular" hint={`${holder.name.trim() || 'Titular'}: envie o RG ou a CNH. Se for RG, mande a frente e o verso.`}>
+            <PhotoPicker label={holderLabel} files={holderFiles} onChange={setHolderFiles} />
+          </Card>
+        )}
 
-        <Button type="button" className="h-12 w-full text-base" disabled={sending} onClick={() => void send()}>
-          {sending
-            ? <><Loader2 className="h-5 w-5 animate-spin" /> Enviando {progress.total ? `${progress.done}/${progress.total} arquivos` : '…'}</>
-            : pending.current ? 'Tentar de novo' : 'Enviar recadastramento'}
-        </Button>
-        <p className="pb-6 text-center text-xs text-[var(--color-text-muted)]">Seus dados são enviados com segurança e vistos só pela equipe do {orgName}.</p>
+        {step === 3 && (
+          <Card title="Dependentes"
+            hint={plan === 'amai10'
+              ? (maxDependents ? `Seu AMAI 10 é para ${peopleCount} pessoas: você + até ${maxDependents} dependente(s).` : 'Compra para 1 pessoa (só você): não há dependentes. Toque em Continuar.')
+              : plan === 'infinity'
+                ? 'AMAI Infinity: pai, mãe, sogro, sogra, esposo(a) e filhos. Só quem vai usar o passaporte com você.'
+                : 'Só quem vai usar o passaporte com você.'}>
+            {people.length === 0 && maxDependents > 0 && <p className="text-sm text-[var(--color-text-muted)]">Nenhum dependente adicionado. Se não tiver, toque em Continuar.</p>}
+            {people.map((p, i) => (
+              openKey === p.key ? (
+                <div key={p.key} className="space-y-4 rounded-[var(--radius-control)] border-2 border-[var(--accent-primary)] p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[var(--color-text-primary)]">Dependente {i + 1}</span>
+                    <button type="button" className="flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-error)]" onClick={() => { setPeople((ps) => ps.filter((x) => x.key !== p.key)); setOpenKey(null); }}>
+                      <Trash2 className="h-4 w-4" /> Remover
+                    </button>
+                  </div>
+                  <Field label="Nome completo"><input className={inputCls} value={p.name} onChange={(e) => setPerson(p.key, { name: e.target.value })} /></Field>
+                  <Field label="Parentesco">
+                    <select className={inputCls} value={p.relationship} onChange={(e) => setPerson(p.key, { relationship: e.target.value as Rel })}>
+                      <option value="">Escolha…</option>
+                      {relOptions.map((o) => (
+                        <option key={o.value} value={o.value} disabled={o.value !== p.relationship && usedOnce.has(o.value)}>{o.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  {p.relationship === 'outro' && (
+                    <Field label="Qual parentesco?"><input className={inputCls} maxLength={40} value={p.relationshipOther} onChange={(e) => setPerson(p.key, { relationshipOther: e.target.value })} /></Field>
+                  )}
+                  <DateInput label="Data de nascimento" value={p.birth} onChange={(birth) => setPerson(p.key, { birth })} />
+                  <Field label="CPF" optional><input className={inputCls} inputMode="numeric" value={p.cpf} onChange={(e) => setPerson(p.key, { cpf: maskDoc(e.target.value).slice(0, 14) })} /></Field>
+                  <Field label="E-mail" optional><input type="email" className={inputCls} value={p.email} onChange={(e) => setPerson(p.key, { email: e.target.value })} /></Field>
+                  <PhotoPicker label="RG ou CNH (criança sem RG: certidão de nascimento)" files={p.files} onChange={(files) => setPerson(p.key, { files })} />
+                  <Button type="button" className="h-12 w-full" onClick={() => {
+                    const pr = personProblem(p, i);
+                    if (pr) { setError(pr); return; }
+                    setError(null); setOpenKey(null);
+                  }}>
+                    <Check className="h-5 w-5" /> Salvar dependente
+                  </Button>
+                </div>
+              ) : (
+                <div key={p.key} className="flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-border-card)] p-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-subtle)] text-sm font-bold text-[var(--accent-primary)]">{i + 1}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-[var(--color-text-primary)]">{p.name.trim() || `Dependente ${i + 1}`}</div>
+                    <div className="text-sm text-[var(--color-text-secondary)]">
+                      {relLabel(p)} · {brDate(p.birth)} · {p.files.length} foto(s)
+                      {personProblem(p, i) && <span className="ml-1 font-semibold text-[var(--color-error)]">· incompleto</span>}
+                    </div>
+                  </div>
+                  <button type="button" aria-label="Editar" className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]" onClick={() => { setError(null); setOpenKey(p.key); }}>
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button type="button" aria-label="Remover" className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-text-muted)] hover:text-[var(--color-error)]" onClick={() => setPeople((ps) => ps.filter((x) => x.key !== p.key))}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              )
+            ))}
+            {people.length < maxDependents && openKey === null && (
+              <Button type="button" variant="outline" className="h-12 w-full" onClick={addPerson}>
+                <Plus className="h-5 w-5" /> Adicionar dependente {plan === 'amai10' ? `(${people.length} de ${maxDependents})` : ''}
+              </Button>
+            )}
+            {needsMarriage && (
+              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-soft)] p-3">
+                <PhotoPicker label="Certidão de casamento ou união estável"
+                  hint="Como você incluiu esposo(a), sogro ou sogra, envie a certidão de casamento ou o documento da união estável."
+                  files={marriageFiles} onChange={setMarriageFiles} />
+              </div>
+            )}
+          </Card>
+        )}
+
+        {step === 4 && (
+          <>
+            <Card title="Confira antes de enviar">
+              <Summary title="Passaporte" onEdit={() => goTo(0)}>
+                {plan === 'amai10' ? `AMAI 10 · ${peopleCount} pessoa(s)` : plan === 'infinity' ? 'AMAI Infinity' : 'Não sei'}
+                {passportNumber.trim() && ` · nº ${passportNumber.trim()}`} · {passportFiles.length} foto(s)
+              </Summary>
+              <Summary title="Titular" onEdit={() => goTo(1)}>
+                {holder.name.trim()} · CPF {holder.cpf}{holder.birth && ` · ${brDate(holder.birth)}`}<br />
+                {holder.phone}{holder.email.trim() && ` · ${holder.email.trim()}`}<br />
+                Login do portal por {portal === 'email' ? 'e-mail' : 'WhatsApp'}
+              </Summary>
+              <Summary title="Documento do titular" onEdit={() => goTo(2)}>{holderFiles.length} foto(s)</Summary>
+              <Summary title={`Dependentes (${people.length})`} onEdit={() => goTo(3)}>
+                {people.length ? people.map((p) => <div key={p.key}>{p.name.trim()} — {relLabel(p)} · {brDate(p.birth)}</div>) : 'Nenhum'}
+                {needsMarriage && <div>Certidão de casamento/união: {marriageFiles.length} foto(s)</div>}
+              </Summary>
+            </Card>
+            <ReviewNotice portal={portal} />
+            <label className="flex items-start gap-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
+              <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+              <span>
+                <ShieldCheck className="mr-1 inline h-4 w-4 text-[var(--accent-primary)]" />
+                Concordo que o {orgName} use estes dados e documentos somente para o recadastramento e o acesso ao parque, conforme a LGPD.
+              </span>
+            </label>
+          </>
+        )}
+
+        <p className="text-center text-xs text-[var(--color-text-muted)]">Seus dados são enviados com segurança e vistos só pela equipe do {orgName}.</p>
       </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-[var(--color-border-card)] bg-[var(--color-surface)] px-4 py-3">
+        {error && <p role="alert" className="mx-auto mb-2 max-w-xl rounded-[var(--radius-control)] border border-[var(--color-error)] bg-[rgba(220,38,38,0.08)] p-2.5 text-sm text-[var(--color-error)]">{error}</p>}
+        <div className="mx-auto flex max-w-xl gap-2">
+          {step > 0 && (
+            <Button type="button" variant="outline" className="h-12 px-4" disabled={sending} onClick={() => goTo(step - 1)}>
+              <ChevronLeft className="h-5 w-5" /> Voltar
+            </Button>
+          )}
+          {step < 4 ? (
+            <Button type="button" className="h-12 flex-1 text-base" onClick={next}>
+              Continuar <ChevronRight className="h-5 w-5" />
+            </Button>
+          ) : (
+            <Button type="button" className="h-12 flex-1 text-base" disabled={sending} onClick={() => void send()}>
+              {sending
+                ? <><Loader2 className="h-5 w-5 animate-spin" /> Enviando {progress.total ? `${progress.done}/${progress.total}` : '…'}</>
+                : pending.current ? 'Tentar de novo' : 'Enviar para conferência'}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Summary({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 border-b border-[var(--color-border-soft)] pb-3 last:border-0 last:pb-0">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</div>
+        <div className="mt-0.5 break-words text-sm text-[var(--color-text-secondary)]">{children}</div>
+      </div>
+      <button type="button" className="text-sm font-semibold text-[var(--accent-primary)]" onClick={onEdit}>Alterar</button>
     </div>
   );
 }

@@ -13,6 +13,13 @@
       "maxDuration": 60
     }
   },
+  "redirects": [
+    {
+      "source": "/atualizar",
+      "destination": "/recadastro/0ab6d1c7ff37b27db52672d074fe9cb6",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/mail",
