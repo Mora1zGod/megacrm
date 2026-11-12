@@ -996,3 +996,28 @@ Regras:
   `time` (decide por lote: UTC ou hora local, o que der mais perto de agora).
 - Permissões `ponto.view` (batidas/funcionários), `ponto.manage` (cadastros, aparelhos, diagnóstico), `ponto.adjust` e `ponto.export`
   (fases 2 e 3). Valor legal (REP-P): exige registro do programa no INPI, certificado ICP-Brasil e atestado técnico (fase 3, AFD/AEJ).
+
+## Recadastramento de associados (11/11/2026) — `20261111200000_recadastramento.sql`, rotas `/recadastro/:token` e `/recadastramentos`
+- Página PÚBLICA `/recadastro/<token>` (sem login): o associado do AMAI 10 / AMAI Infinity informa titular, dependentes e manda as fotos
+  dos documentos. Tudo passa pela Edge Function `recadastro-public` (sem JWT): `info` → `submit` (cria o envio `status='enviando'` + segredo de
+  upload com hash em `recad_upload_keys`, 6 h) → `upload` (1 arquivo por chamada, base64; tipo conferido pelos bytes; ≤ 8 MB; 60 por envio) →
+  `finish` (confere: foto do passaporte/comprovante, RG/CNH do titular e de cada dependente, certidão de casamento/união se houver cônjuge,
+  sogro ou sogra; liga ao contato pelo WhatsApp; `status='novo'`). Limite 5 envios por IP a cada 30 min. Fotos são reduzidas no navegador
+  (≤ 1800 px JPEG) antes de subir.
+- Regras: AMAI 10 = 1 a 10 pessoas CONTANDO o titular (`people_count`); Infinity = pai, mãe, sogro, sogra, cônjuge e filhos (1 de cada,
+  exceto filhos). Conferidas na função e na tela.
+- Tabelas `recad_links` (token por org; "Gerar novo" desativa o antigo), `recad_submissions` (protocolo `recad_protocol_seq`),
+  `recad_people`, `recad_files` (bucket PRIVADO `whatsapp-hub-recadastro/<org>/<envio>/…`). Permissões `recad.view` / `recad.manage`.
+  A equipe só muda `status` (novo → em_analise → pendente → lancado/recusado) e `team_notes` (trigger `_recad_sub_guard`).
+- Tela `/recadastramentos`: lista com filtros, detalhe com botões de copiar e `data-pocket="campo"` em cada valor (para copiar para o
+  Pocket com a extensão do navegador), miniaturas dos documentos (link assinado 1 h), "Copiar tudo", link do formulário.
+- AMAIA (modelo ativo, seção 7): manda `{link_recadastro}` (variável em `ai_agent_config.variables`); só sem conseguir usar o link segue o
+  caminho pelo chat (foto → dados → dependentes → documentos → resumo).
+
+## Servidor próprio (VPS) — desde 11/11/2026
+- Supabase self-hosted em `/opt/amai-crm-supabase` (projeto docker `amai-crm`), API pública `https://api-crm.amaipark.com` (Caddy publica só
+  `/auth|rest|storage|realtime|functions/v1` e `/graphql/v1`). O Supabase da nuvem (`hneqnopjvvwquyqogwdu`) ficou só como cópia antiga.
+- Edge Functions: o código vai em `/opt/amai-crm-supabase/volumes/functions/<nome>/` (o roteador `main` chama pela pasta); depois
+  `docker restart amai-crm-functions`. `supabase functions deploy` NÃO vale mais para produção.
+- Migrações: rodar no banco da VPS com `psql -U supabase_admin` + `set role postgres` (donos = postgres, como na nuvem).
+- Vercel: `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` apontam para a VPS (o build usa `SUPABASE_*`, não `VITE_*`).

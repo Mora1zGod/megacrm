@@ -72,6 +72,7 @@ export const MODULE_LABELS: Record<string, string> = {
   reports: 'Relatórios',
   users: 'Equipe e usuários',
   settings: 'Configurações',
+  recad: 'Recadastramento de associados',
 };
 
 export const SCOPE_MODULES: { key: 'inbox' | 'deals' | 'tasks' | 'visits'; label: string }[] = [

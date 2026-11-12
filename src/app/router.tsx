@@ -16,6 +16,8 @@ const LoginPage = lazyRetry(() => import('./routes/auth/LoginPage'));
 const SignupPage = lazyRetry(() => import('./routes/auth/SignupPage'));
 const InvitePage = lazyRetry(() => import('./routes/invite/InvitePage'));
 const SelfSignupPage = lazyRetry(() => import('./routes/auth/SelfSignupPage'));
+const RecadastroPage = lazyRetry(() => import('./routes/recadastro/RecadastroPage'));
+const RecadastramentosPage = lazyRetry(() => import('./routes/recadastro/RecadastramentosPage'));
 const DashboardPage = lazyRetry(() => import('./routes/dashboard/DashboardPage'));
 const InboxPage = lazyRetry(() => import('./routes/inbox/InboxPage'));
 const CampaignsPage = lazyRetry(() => import('./routes/campaigns/CampaignsPage'));
@@ -167,6 +169,15 @@ export function AppRouter() {
             </RequireSetup>
           }
         />
+        {/* Recadastramento de associados pelo link público (sem login). */}
+        <Route
+          path="/recadastro/:token"
+          element={
+            <RequireSetup>
+              <RecadastroPage />
+            </RequireSetup>
+          }
+        />
         {/* /invite NÃO usa RedirectIfAuthenticated: o link de convite do
             Supabase estabelece uma sessão, e o convidado precisa dela aberta
             para definir a senha (updateUser) antes de seguir para o app. */}
@@ -241,6 +252,7 @@ export function AppRouter() {
           <Route path="/admin" element={<RequireSuperAdmin><Navigate to="/configuracoes/sistema/organizacoes" replace /></RequireSuperAdmin>} />
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
           <Route path="/email" element={<EmailPage />} />
+          <Route path="/recadastramentos" element={<RequirePermission perm="recad.view" area="Recadastramento"><RecadastramentosPage /></RequirePermission>} />
           <Route path="/ponto" element={<RequirePermission perm="ponto.view" area="Ponto"><PontoPage /></RequirePermission>} />
           <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
           <Route path="/tasks" element={<Navigate to="/quadros?modo=caixa" replace />} />
