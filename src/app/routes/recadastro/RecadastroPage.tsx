@@ -102,10 +102,10 @@ function ReviewNotice() {
     <div className="flex gap-3 rounded-[var(--radius-card)] border border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] p-4 text-sm text-[var(--color-text-primary)]">
       <Info className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent-primary)]" />
       <div className="space-y-1">
-        <p className="font-semibold">Seus dados serão conferidos pela nossa equipe.</p>
+        <p className="font-semibold">Seus dados passam por análise da nossa equipe.</p>
         <p className="text-[var(--color-text-secondary)]">
-          Depois da conferência, você recebe {via} o <b className="text-[var(--color-text-primary)]">login e a senha do Portal do Associado</b>.
-          O acesso não é liberado na hora.
+          Em até <b className="text-[var(--color-text-primary)]">72 horas</b> entramos em contato {via}. Estando tudo certo, você recebe o
+          <b className="text-[var(--color-text-primary)]"> login e a senha do Portal do Associado</b>. O acesso não é liberado na hora.
         </p>
       </div>
     </div>
@@ -444,17 +444,22 @@ export default function RecadastroPage() {
           <div className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-5">
             <div className="text-center">
               <CheckCircle2 className="mx-auto h-12 w-12 text-[var(--color-success)]" />
-              <h2 className="mt-2 text-lg font-bold text-[var(--color-text-primary)]">Recebemos o seu recadastramento!</h2>
-              <p className="text-[var(--color-text-secondary)]">Protocolo <b className="text-[var(--color-text-primary)]">#{protocol}</b></p>
+              <h2 className="mt-2 text-lg font-bold text-[var(--color-text-primary)]">Recebemos o seu envio!</h2>
+              <p className="text-[var(--color-text-secondary)]">Protocolo <b className="text-[var(--color-text-primary)]">#{protocol}</b> · guarde este número</p>
             </div>
             <ol className="space-y-3 text-sm text-[var(--color-text-secondary)]">
               <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">1</span>
-                <span><b className="text-[var(--color-text-primary)]">Conferência interna.</b> Nossa equipe confere os dados e os documentos que você enviou. Se faltar algo, a gente te chama.</span></li>
+                <span><b className="text-[var(--color-text-primary)]">Análise.</b> Nossa equipe vai analisar os dados e os documentos enviados.
+                  O recebimento deste envio não representa aprovação nem confirmação de cadastro.</span></li>
               <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">2</span>
-                <span><b className="text-[var(--color-text-primary)]">Login e senha.</b> Depois da conferência, você recebe {via} o login e a senha do <b>Portal do Associado</b>.</span></li>
+                <span><b className="text-[var(--color-text-primary)]">Retorno em até 72 horas.</b> Entramos em contato {via}.
+                  Estando tudo certo, você recebe o <b>login e a senha do Portal do Associado</b>. Se faltar algum dado ou documento,
+                  avisamos para você refazer a atualização cadastral.</span></li>
               <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">3</span>
-                <span><b className="text-[var(--color-text-primary)]">Foto do rosto.</b> No portal, você cadastra o rosto — o seu e o de cada dependente — para o reconhecimento facial na entrada. <b>Essa foto é feita uma única vez</b>: faça com calma, em lugar claro.</span></li>
+                <span><b className="text-[var(--color-text-primary)]">Foto do rosto.</b> Com o acesso liberado, no portal você cadastra o rosto — o seu e o de cada
+                  dependente — para o reconhecimento facial na entrada. <b>Essa foto é feita uma única vez</b>: faça com calma, em lugar claro.</span></li>
             </ol>
+            <p className="text-center text-sm text-[var(--color-text-secondary)]">Agora é só aguardar o nosso contato. Não precisa enviar de novo.</p>
           </div>
         </div>
       </div>
