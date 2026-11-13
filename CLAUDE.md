@@ -1027,6 +1027,14 @@ Regras:
   `test-agent-profile` devolve `simulated_actions.legal`. Tela: Configurações → Notificações WhatsApp (responsável do jurídico + assuntos
   Financeiro/Jurídico por destinatário).
 
+## Monitoramento (12/11/2026) — `20261112190000_monitoring.sql`, rota `/monitoramento`, edge `monitor-alerts`
+- `monitor_overview()` (tela, `dashboard.view`) = `_monitor_data(org)` + alertas: envio por número em 24 h (enviadas/entregues/lidas/
+  falhas/presas em "enviado" +30 min — só oficial: o UAZAPI não devolve entrega), motivos de falha, clientes esperando (+10 min),
+  AMAIA por canal, custo da IA (ai_usage_log), gasto estimado do WhatsApp no mês (modelos por categoria × preço INFORMADO pela empresa em
+  `app_settings.wa_price_*_cents`, limite `wa_budget_month_cents`), última mensagem de cliente recebida, cron com erro.
+- `monitor_check(org)` (service role) = lista de alertas; edge `monitor-alerts` (cron `monitor-alerts-15min`, só se houver destinatário
+  com o assunto `monitoramento`) manda por UAZAPI, 1x a cada 2 h por tipo (`monitor_alert_log`). Liga/desliga: `monitor_alerts_enabled`.
+
 ## Servidor próprio (VPS) — desde 11/11/2026
 - Supabase self-hosted em `/opt/amai-crm-supabase` (projeto docker `amai-crm`), API pública `https://api-crm.amaipark.com` (Caddy publica só
   `/auth|rest|storage|realtime|functions/v1` e `/graphql/v1`). O Supabase da nuvem (`hneqnopjvvwquyqogwdu`) ficou só como cópia antiga.

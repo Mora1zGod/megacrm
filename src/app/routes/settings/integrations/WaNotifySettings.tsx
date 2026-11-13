@@ -14,7 +14,7 @@ import { Field, inputCls } from '../sections/access/ui';
 import { operatorLabel, useOperators } from '@/hooks/useOperators';
 
 // Assuntos de cada destinatário: quais avisos ele recebe.
-const TOPICS: Array<[string, string]> = [['financeiro', 'Financeiro'], ['juridico', 'Jurídico']];
+const TOPICS: Array<[string, string]> = [['financeiro', 'Financeiro'], ['juridico', 'Jurídico'], ['monitoramento', 'Monitoramento']];
 
 export interface NotifyRecipient { id: string; name: string; phone: string; is_group: boolean; topics: string[]; is_active: boolean }
 interface UazChannel { id: string; label: string; phone: string | null; is_active: boolean }

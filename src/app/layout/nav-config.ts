@@ -17,6 +17,7 @@ import {
   AtSign,
   Fingerprint,
   IdCard,
+  Activity,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -62,6 +63,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/recadastramentos', label: 'Recadastramento', icon: IdCard, group: 'Gestão', perm: 'recad.view' },
   { to: '/ponto', label: 'Ponto', icon: Fingerprint, group: 'Gestão', perm: 'ponto.view' },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3, group: 'Gestão', perm: 'reports.view' },
+  { to: '/monitoramento', label: 'Monitoramento', icon: Activity, group: 'Administração', perm: 'dashboard.view' },
   // Integrações, Logs de Auditoria e Organizações agora ficam dentro de Configurações.
   { to: '/configuracoes', label: 'Configurações', icon: Settings, group: 'Administração' },
 ];

@@ -18,6 +18,7 @@ const InvitePage = lazyRetry(() => import('./routes/invite/InvitePage'));
 const SelfSignupPage = lazyRetry(() => import('./routes/auth/SelfSignupPage'));
 const RecadastroPage = lazyRetry(() => import('./routes/recadastro/RecadastroPage'));
 const RecadastramentosPage = lazyRetry(() => import('./routes/recadastro/RecadastramentosPage'));
+const MonitorPage = lazyRetry(() => import('./routes/monitor/MonitorPage'));
 const DashboardPage = lazyRetry(() => import('./routes/dashboard/DashboardPage'));
 const InboxPage = lazyRetry(() => import('./routes/inbox/InboxPage'));
 const CampaignsPage = lazyRetry(() => import('./routes/campaigns/CampaignsPage'));
@@ -253,6 +254,7 @@ export function AppRouter() {
           <Route path="/financeiro" element={<RequirePermission perm="financial.ledger_view" area="Financeiro"><FinancePage /></RequirePermission>} />
           <Route path="/email" element={<EmailPage />} />
           <Route path="/recadastramentos" element={<RequirePermission perm="recad.view" area="Recadastramento"><RecadastramentosPage /></RequirePermission>} />
+          <Route path="/monitoramento" element={<RequirePermission perm="dashboard.view" area="Monitoramento"><MonitorPage /></RequirePermission>} />
           <Route path="/ponto" element={<RequirePermission perm="ponto.view" area="Ponto"><PontoPage /></RequirePermission>} />
           <Route path="/compras" element={<RequirePermission perm="purchases.view" area="Compras"><PurchasesPage /></RequirePermission>} />
           <Route path="/tasks" element={<Navigate to="/quadros?modo=caixa" replace />} />
