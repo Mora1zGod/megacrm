@@ -909,18 +909,35 @@ async function handleStatus(
   const message = asObject(data.message);
   const zernioMessageId = str(message, ['id', '_id']) ?? str(message, ['platformMessageId']);
   if (!zernioMessageId) return;
+  // 12/11/2026: o envio pela inbox guarda em zernio_message_id o que o Zernio devolve — às vezes o id
+  // dele, às vezes o "wamid" da Meta. O webhook de status traz os dois (id e platformMessageId). Antes
+  // só o id era procurado: entregue/lida/FALHA de mensagens gravadas com o wamid nunca chegavam ao CRM
+  // (por isso o CRM mostrava "enviado" enquanto a Meta recusava tudo por pagamento).
+  const candidateIds = [...new Set([zernioMessageId, str(message, ['platformMessageId']), str(message, ['wamid'])]
+    .filter((x): x is string => typeof x === 'string' && x.trim() !== ''))];
 
   // Envios DIRETOS de campanha (variaveis de negocio, 1:1) tem
   // zernio_message_id na linha de campaign_contacts — o status deles chega por
   // aqui, nao pelo sync de broadcast. Avanca a linha + contadores agregados.
-  await syncCampaignContactStatus(admin, orgId, status, zernioMessageId, data);
+  for (const cid of candidateIds) await syncCampaignContactStatus(admin, orgId, status, cid, data);
 
-  const { data: msg } = await admin
+  let { data: msg } = await admin
     .from('messages')
     .select('*')
     .eq('org_id', orgId)
-    .eq('zernio_message_id', zernioMessageId)
+    .in('zernio_message_id', candidateIds)
+    .limit(1)
     .maybeSingle();
+  if (!msg) {
+    const alt = await admin
+      .from('messages')
+      .select('*')
+      .eq('org_id', orgId)
+      .in('platform_message_id', candidateIds)
+      .limit(1)
+      .maybeSingle();
+    msg = alt.data;
+  }
   if (!msg) {
     if (status === 'sent') {
       await insertOutboundFromCompanionDevice(admin, orgId, data, channel, zernioMessageId);
