@@ -135,6 +135,7 @@ export default function InboxPage() {
   const { operators, allOperators } = useOperators();
   const { queues } = useQueues();
   const { tags } = useTags();
+  const tagsById = useMemo(() => new Map(tags.map((t) => [t.id, { name: t.name, color: t.color ?? null }])), [tags]);
   const { userId, role } = useAppUser();
   const perms = usePermission();
   const { aiEnabledForChannel } = useAiChannels();
@@ -461,6 +462,7 @@ export default function InboxPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               aiEnabledForChannel={aiEnabledForChannel}
+              tagsById={tagsById}
               operatorName={operatorName}
               isLocked={isLocked}
               providerOf={providerOf}

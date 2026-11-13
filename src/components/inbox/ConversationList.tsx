@@ -51,20 +51,24 @@ interface ConversationListProps {
   // Texto quando a lista está vazia (ex.: busca sem resultado, aba Concluídas vazia).
   emptyTitle?: string;
   emptyText?: string;
+  // Etiquetas do contato (id → nome/cor) para mostrar na linha.
+  tagsById?: Map<string, { name: string; color: string | null }>;
 }
 
-function statusChip(c: ConversationWithContact, aiEnabled: boolean, assignedName: string | null) {
-  // Selo "Concluída" (aparece também nos resultados da busca em todas as conversas).
-  if (c.status === 'closed') {
-    return { Icon: CheckCircle2, label: 'Concluída', className: 'bg-[rgba(34,197,94,0.14)] text-[var(--inbox-done-text,#15803D)]' };
+// Responsável (quem atende) — separado do estado da IA, que tem selo próprio.
+function ownerChip(assignedName: string | null) {
+  return assignedName
+    ? { Icon: User, label: assignedName, className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' }
+    : { Icon: User, label: 'Não atribuído', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-muted)]' };
+}
+
+// Estado da AMAIA nesta conversa: ativa (responde sozinha), pausada (equipe atende) ou desligada no canal.
+function aiChip(c: ConversationWithContact, aiEnabled: boolean) {
+  if (!aiEnabled) return { Icon: Bot, label: 'IA desligada', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-muted)]' };
+  if (c.ai_paused || c.status === 'human_active') {
+    return { Icon: PauseCircle, label: 'AMAIA pausada', className: 'bg-[rgba(245,158,11,0.14)] text-[var(--inbox-warn-text)] font-semibold' };
   }
-  if (assignedName) {
-    return { Icon: User, label: assignedName, className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
-  }
-  if (c.status === 'ai_active' && aiEnabled) {
-    return { Icon: Bot, label: 'AMAIA', className: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' };
-  }
-  return { Icon: User, label: 'Não atribuído', className: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
+  return { Icon: Bot, label: 'AMAIA ativa', className: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)] font-semibold' };
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -90,6 +94,7 @@ export function ConversationList({
   now = Date.now(),
   emptyTitle,
   emptyText,
+  tagsById,
 }: ConversationListProps) {
   if (loading) {
     return (
@@ -124,8 +129,9 @@ export function ConversationList({
         const locked = isLocked?.(c) ?? false;
         const assignedName = operatorName?.(c.assigned_to) ?? null;
         const aiEnabled = aiEnabledForChannel?.(c.channel ?? null) ?? true;
-        const status = statusChip(c, aiEnabled, assignedName);
-        const StatusIcon = status.Icon;
+        const owner = ownerChip(assignedName);
+        const ai = aiChip(c, aiEnabled);
+        const tagList = (c.tagIds ?? []).map((id) => tagsById?.get(id)).filter((t): t is { name: string; color: string | null } => Boolean(t));
         const isGroup = (c.contact?.phone ?? '').endsWith('@g.us');
         const chan = channelBadge(
           c.channel,
@@ -212,14 +218,30 @@ export function ConversationList({
                       <Users className="h-3 w-3" /> Grupo
                     </span>
                   )}
-                  {!isGroup && c.ai_paused && aiEnabled && c.status !== 'closed' ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-[rgba(245,158,11,0.14)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--inbox-warn-text)]">
-                      <PauseCircle className="h-3 w-3" /> AMAIA pausada
+                  {!isGroup && c.status === 'closed' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-[rgba(34,197,94,0.14)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--inbox-done-text,#15803D)]">
+                      <CheckCircle2 className="h-3 w-3" /> Concluída
                     </span>
-                  ) : !isGroup && (
-                    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium', status.className)}>
-                      <StatusIcon className="h-3 w-3" /> {status.label}
+                  )}
+                  {!isGroup && c.status !== 'closed' && (
+                    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px]', ai.className)}>
+                      <ai.Icon className="h-3 w-3" /> {ai.label}
                     </span>
+                  )}
+                  {!isGroup && (
+                    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium', owner.className)}>
+                      <owner.Icon className="h-3 w-3" /> {owner.label}
+                    </span>
+                  )}
+                  {tagList.slice(0, 3).map((t) => (
+                    <span key={t.name} title={`Etiqueta: ${t.name}`}
+                      className="inline-flex max-w-[120px] items-center gap-1 rounded-md border border-[var(--color-border-soft)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: t.color || '#94A3B8' }} />
+                      <span className="truncate">{t.name}</span>
+                    </span>
+                  ))}
+                  {tagList.length > 3 && (
+                    <span title={tagList.slice(3).map((t) => t.name).join(', ')} className="rounded-md px-1 py-0.5 text-[11px] text-[var(--color-text-muted)]">+{tagList.length - 3}</span>
                   )}
                 </div>
               </div>

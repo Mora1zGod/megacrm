@@ -7,22 +7,29 @@ import { getSupabase } from '@/lib/supabase';
 export function useAiChannels(): { aiEnabledForChannel: (channel: string | null) => boolean } {
   const [config, setConfig] = useState<{ is_active: boolean; active_whatsapp: boolean; active_instagram: boolean } | null>(null);
 
+  // Relê ao voltar para a aba e a cada 2 min: ligar/desligar a IA reflete no Atendimento sem recarregar a página.
   useEffect(() => {
-    const supabase = getSupabase();
-    void supabase
-      .from('ai_agent_config')
-      .select('is_active, active_whatsapp, active_instagram')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setConfig({
-            is_active: Boolean(data.is_active),
-            active_whatsapp: Boolean(data.active_whatsapp ?? true),
-            active_instagram: Boolean(data.active_instagram ?? false),
-          });
-        }
-      });
+    const load = () => {
+      void getSupabase()
+        .from('ai_agent_config')
+        .select('is_active, active_whatsapp, active_instagram')
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setConfig({
+              is_active: Boolean(data.is_active),
+              active_whatsapp: Boolean(data.active_whatsapp ?? true),
+              active_instagram: Boolean(data.active_instagram ?? false),
+            });
+          }
+        });
+    };
+    load();
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') load(); }, 120_000);
+    return () => { document.removeEventListener('visibilitychange', onVis); window.clearInterval(t); };
   }, []);
 
   const aiEnabledForChannel = useCallback(
