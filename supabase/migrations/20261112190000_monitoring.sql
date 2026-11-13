@@ -46,7 +46,7 @@ GRANT ALL ON whatsapp_hub.monitor_alert_log TO service_role;
 GRANT USAGE ON SEQUENCE whatsapp_hub.monitor_alert_log_id_seq TO service_role;
 
 -- Índice para as contas de 24 h / mês (mensagens enviadas por org e data).
-CREATE INDEX IF NOT EXISTS messages_org_out_created_idx ON whatsapp_hub.messages (org_id, created_at) WHERE direction = 'outbound';
+CREATE INDEX CONCURRENTLY IF NOT EXISTS messages_org_out_created_idx ON whatsapp_hub.messages (org_id, created_at) WHERE direction = 'outbound';
 
 -- 3. Números (mesma conta de cima, por org) — usado pela tela e pelos alertas
 CREATE OR REPLACE FUNCTION whatsapp_hub._monitor_data(p_org uuid)
