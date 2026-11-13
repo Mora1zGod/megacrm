@@ -1,72 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, Copy, ExternalLink, FileText, IdCard, Link2, Loader2, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Copy, ExternalLink, IdCard, Link2, Loader2, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
-import { formatPhoneDisplay } from '@/lib/phone';
+import { operatorLabel, useOperators } from '@/hooks/useOperators';
 import { usePermission } from '../../providers/PermissionsProvider';
+import RecadDetail from './RecadDetail';
+import { PLAN, SUB_COLS, StatusChip, copy, fmtDateTime, type Status, type Submission } from './recadShared';
 
-// Recadastramento de associados (20261111200000_recadastramento.sql). O associado preenche o link público
-// /recadastro/<token>; aqui a equipe confere os dados e documentos, copia para o Pocket e marca o status.
-// Os campos ficam com data-pocket="…" para facilitar a cópia automática (extensão do navegador).
+// Central de Recadastramento (13/11/2026). O associado preenche o link público /recadastro/<token>; aqui a equipe confere
+// dados e documentos, registra pendências e observações (banco, tempo real), chama no WhatsApp e lança no Pocket.
+// Os valores têm data-pocket="…" e os botões data-pocket-action="…" (extensão do navegador que copia para o Pocket).
+// Layout por container (@container): ≥1040 px = 3 colunas; ≥760 px = lista + cadastro; abaixo = lista OU cadastro.
 
-const BUCKET = 'whatsapp-hub-recadastro';
-
-type Status = 'enviando' | 'novo' | 'em_analise' | 'pendente' | 'conferido' | 'lancado' | 'recusado';
-interface Submission {
-  id: string; protocol: number; status: Status; plan: 'amai10' | 'infinity' | 'nao_sei'; people_count: number | null;
-  passport_number: string | null; holder_name: string; holder_cpf: string; holder_birth: string | null; holder_email: string | null;
-  holder_phone: string | null; portal_access: 'email' | 'whatsapp'; contact_id: string | null; team_notes: string | null;
-  reviewed_at: string | null; completed_at: string | null; created_at: string;
-  checked_at: string | null; launched_at: string | null;
-}
-interface PersonRow { id: string; position: number; name: string; birth_date: string; relationship: string; relationship_other: string | null; cpf: string | null; email: string | null }
-interface FileRow { id: string; person_id: string | null; kind: 'passaporte' | 'documento' | 'certidao_casamento'; path: string; mime: string }
-
-const STATUS: Record<Status, { label: string; cls: string }> = {
-  enviando: { label: 'Incompleto', cls: 'bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]' },
-  novo: { label: 'Novo', cls: 'bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' },
-  em_analise: { label: 'Em análise', cls: 'bg-[rgba(245,158,11,0.14)] text-[#b45309] dark:text-[#fbbf24]' },
-  pendente: { label: 'Pendência', cls: 'bg-[rgba(239,68,68,0.12)] text-[var(--color-error)]' },
-  conferido: { label: 'Conferido', cls: 'bg-[rgba(14,165,233,0.14)] text-[#0369a1] dark:text-[#38bdf8]' },
-  lancado: { label: 'Lançado no Pocket', cls: 'bg-[rgba(34,197,94,0.14)] text-[var(--color-success)]' },
-  recusado: { label: 'Recusado', cls: 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]' },
-};
 const FILTERS: [string, Status[] | null][] = [
-  ['A conferir', ['novo', 'em_analise', 'pendente']],
-  ['Para lançar', ['conferido']],
+  ['A conferir', ['novo', 'em_analise']],
+  ['Aguardando retorno', ['pendente']],
+  ['Prontos para lançar', ['conferido']],
   ['Lançados', ['lancado']],
   ['Recusados', ['recusado']],
   ['Incompletos', ['enviando']],
   ['Todos', null],
 ];
-const PLAN: Record<string, string> = { amai10: 'AMAI 10', infinity: 'AMAI Infinity', nao_sei: 'Não sabe' };
-const REL: Record<string, string> = { pai: 'Pai', mae: 'Mãe', sogro: 'Sogro', sogra: 'Sogra', conjuge: 'Cônjuge', filho: 'Filho(a)', outro: 'Outro' };
-
-const fmtCpf = (c: string | null) => (c && c.length === 11 ? `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}` : c ?? '');
-const fmtDate = (d: string | null) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '');
-const fmtDateTime = (d: string | null) => (d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
-const relLabel = (p: PersonRow) => (p.relationship === 'outro' ? `Outro: ${p.relationship_other ?? ''}` : REL[p.relationship] ?? p.relationship);
-
-async function copy(text: string, what = 'Copiado') {
-  try { await navigator.clipboard.writeText(text); toast.success(what); } catch { toast.error('Não foi possível copiar.'); }
-}
-
-function CopyField({ label, value, field }: { label: string; value: string; field: string }) {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <span className="w-28 shrink-0 text-xs text-[var(--color-text-muted)]">{label}</span>
-      <span data-pocket={field} className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)]">{value || '—'}</span>
-      {value && (
-        <button type="button" aria-label={`Copiar ${label}`} onClick={() => void copy(value, `${label} copiado`)} className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]">
-          <Copy className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </div>
-  );
-}
 
 function LinkCard({ canManage }: { canManage: boolean }) {
   const [token, setToken] = useState<string | null>(null);
@@ -86,185 +42,17 @@ function LinkCard({ canManage }: { canManage: boolean }) {
     const { error: e2 } = e1 ? { error: e1 } : await sb.from('recad_links').insert({});
     setBusy(false);
     if (e2) { toast.error('Não foi possível gerar o link', { description: e2.message }); return; }
-    toast.success('Link novo gerado. Atualize o link da AMAIA (variável link_recadastro).');
+    toast.success('Link novo gerado. Atualize o link da AMAIA (variável link_recadastro) e o /atualizar.');
     void load();
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-3">
-      <Link2 className="h-4 w-4 text-[var(--accent-primary)]" />
-      <span className="text-sm font-medium text-[var(--color-text-primary)]">Link do formulário:</span>
-      <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-secondary)]">{url || 'nenhum link ativo'}</span>
-      {url && <Button size="sm" variant="outline" onClick={() => void copy(url, 'Link copiado')}><Copy className="h-3.5 w-3.5" /> Copiar</Button>}
+    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+      <Link2 className="h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
+      <span className="min-w-0 max-w-[260px] truncate text-xs text-[var(--color-text-secondary)]" title={url}>{url || 'nenhum link ativo'}</span>
+      {url && <Button size="sm" variant="outline" onClick={() => void copy(url, 'Link copiado')}><Copy className="h-3.5 w-3.5" /> Copiar link</Button>}
       {url && <a href={url} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost"><ExternalLink className="h-3.5 w-3.5" /> Abrir</Button></a>}
       {canManage && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void regenerate()}><RefreshCw className="h-3.5 w-3.5" /> Gerar novo</Button>}
-    </div>
-  );
-}
-
-function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canManage: boolean; onClose: () => void; onChanged: (s: Submission) => void }) {
-  const [people, setPeople] = useState<PersonRow[]>([]);
-  const [files, setFiles] = useState<(FileRow & { url: string | null })[]>([]);
-  const [notes, setNotes] = useState(sub.team_notes ?? '');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setNotes(sub.team_notes ?? '');
-    let cancelled = false;
-    (async () => {
-      const sb = getSupabase();
-      const [{ data: p }, { data: f }] = await Promise.all([
-        sb.from('recad_people').select('id, position, name, birth_date, relationship, relationship_other, cpf, email').eq('submission_id', sub.id).order('position'),
-        sb.from('recad_files').select('id, person_id, kind, path, mime').eq('submission_id', sub.id).order('created_at'),
-      ]);
-      const fl = (f ?? []) as FileRow[];
-      let urls: Record<string, string | null> = {};
-      if (fl.length) {
-        const { data: signed } = await sb.storage.from(BUCKET).createSignedUrls(fl.map((x) => x.path), 3600);
-        urls = Object.fromEntries((signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path ?? '', s.signedUrl]));
-      }
-      if (cancelled) return;
-      setPeople((p ?? []) as PersonRow[]);
-      setFiles(fl.map((x) => ({ ...x, url: urls[x.path] ?? null })));
-    })();
-    return () => { cancelled = true; };
-  }, [sub.id, sub.team_notes]);
-
-  async function save(patch: Partial<Pick<Submission, 'status' | 'team_notes'>>) {
-    setSaving(true);
-    const { data, error } = await getSupabase().from('recad_submissions').update(patch).eq('id', sub.id)
-      .select('id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at').single();
-    setSaving(false);
-    if (error) { toast.error('Não foi possível salvar', { description: error.message }); return; }
-    onChanged(data as Submission);
-    toast.success('Salvo');
-  }
-
-  const allText = useMemo(() => {
-    const lines = [
-      `Protocolo #${sub.protocol} — ${PLAN[sub.plan]}${sub.people_count ? ` (${sub.people_count} pessoas)` : ''}`,
-      `Titular: ${sub.holder_name}`, `CPF: ${fmtCpf(sub.holder_cpf)}`,
-      sub.holder_birth ? `Nascimento: ${fmtDate(sub.holder_birth)}` : '',
-      `E-mail: ${sub.holder_email ?? ''}`, `WhatsApp: ${sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : ''}`,
-      'Acesso ao portal: enviar login pelo WhatsApp e pelo e-mail',
-      sub.passport_number ? `Nº passaporte/contrato: ${sub.passport_number}` : '',
-      '', 'Dependentes:',
-      ...people.map((p) => `${p.position}. ${p.name} | ${fmtDate(p.birth_date)} | ${relLabel(p)} | CPF ${fmtCpf(p.cpf) || '-'} | ${p.email ?? '-'}`),
-    ];
-    return lines.filter((l, i) => l !== '' || i > 0).join('\n');
-  }, [sub, people]);
-
-  const filesOf = (personId: string | null, kind?: FileRow['kind']) => files.filter((f) => f.person_id === personId && (!kind || f.kind === kind));
-  const Thumbs = ({ list }: { list: typeof files }) => (
-    <div className="flex flex-wrap gap-2">
-      {list.length === 0 && <span className="text-xs text-[var(--color-error)]">sem arquivo</span>}
-      {list.map((f) => (
-        <a key={f.id} href={f.url ?? '#'} target="_blank" rel="noreferrer" className="block h-20 w-20 overflow-hidden rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-hover)]">
-          {f.mime.startsWith('image/') && f.url
-            ? <img src={f.url} alt="Documento" className="h-full w-full object-cover" />
-            : <span className="flex h-full w-full flex-col items-center justify-center text-xs text-[var(--color-text-secondary)]"><FileText className="h-6 w-6" />PDF</span>}
-        </a>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="flex h-full min-h-0 flex-col rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]">
-      <div className="space-y-2 border-b border-[var(--color-border-card)] p-3">
-        <div className="flex items-start gap-2">
-          <button type="button" aria-label="Voltar para a lista" onClick={onClose} className="-ml-1 rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] lg:hidden"><ArrowLeft className="h-5 w-5" /></button>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-[var(--color-text-muted)]">Protocolo #{sub.protocol} · enviado {fmtDateTime(sub.completed_at ?? sub.created_at)}</div>
-            <div className="text-base font-semibold text-[var(--color-text-primary)]">{sub.holder_name}</div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canManage ? (
-            <select value={sub.status} disabled={saving} onChange={(e) => void save({ status: e.target.value as Status })}
-              className="h-9 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] sm:flex-none">
-              {(Object.keys(STATUS) as Status[])
-                .filter((s) => (s !== 'enviando' || sub.status === 'enviando') && (s !== 'lancado' || sub.status === 'conferido' || sub.status === 'lancado'))
-                .map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
-            </select>
-          ) : <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', STATUS[sub.status].cls)}>{STATUS[sub.status].label}</span>}
-          {canManage && ['novo', 'em_analise', 'pendente'].includes(sub.status) && (
-            <Button size="sm" disabled={saving} data-pocket-action="conferir" onClick={() => void save({ status: 'conferido' })}>
-              <Check className="h-3.5 w-3.5" /> Marcar como conferido
-            </Button>
-          )}
-          {canManage && sub.status === 'conferido' && (
-            <Button size="sm" disabled={saving} data-pocket-action="marcar-lancado" onClick={() => void save({ status: 'lancado' })}>
-              <Check className="h-3.5 w-3.5" /> Marcar como lançado no Pocket
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => void copy(allText, 'Dados copiados')}><Copy className="h-3.5 w-3.5" /> Copiar tudo</Button>
-        </div>
-        {(sub.checked_at || sub.launched_at) && (
-          <div className="text-xs text-[var(--color-text-muted)]">
-            {sub.checked_at && <>Conferido em {fmtDateTime(sub.checked_at)}</>}
-            {sub.checked_at && sub.launched_at && ' · '}
-            {sub.launched_at && <>Lançado no Pocket em {fmtDateTime(sub.launched_at)}</>}
-          </div>
-        )}
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" data-pocket-protocol={sub.protocol} data-pocket-status={sub.status}>
-        {sub.status === 'enviando' && (
-          <p className="rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2 text-sm text-[var(--color-text-primary)]">O associado começou mas não terminou de enviar os documentos.</p>
-        )}
-        <section>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Passaporte</h3>
-          <CopyField label="Passaporte" value={`${PLAN[sub.plan]}${sub.people_count ? ` — ${sub.people_count} pessoa(s)` : ''}`} field="plano" />
-          <CopyField label="Nº passaporte" value={sub.passport_number ?? ''} field="numero_passaporte" />
-          <div className="mt-1"><Thumbs list={filesOf(null, 'passaporte')} /></div>
-        </section>
-
-        <section>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Titular</h3>
-          <CopyField label="Nome" value={sub.holder_name} field="titular_nome" />
-          <CopyField label="CPF" value={fmtCpf(sub.holder_cpf)} field="titular_cpf" />
-          <CopyField label="Nascimento" value={fmtDate(sub.holder_birth)} field="titular_nascimento" />
-          <CopyField label="E-mail" value={sub.holder_email ?? ''} field="titular_email" />
-          <CopyField label="WhatsApp" value={sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : ''} field="titular_whatsapp" />
-          <CopyField label="Acesso portal" value="WhatsApp e e-mail" field="acesso_portal" />
-          {sub.contact_id && <Link to={`/contacts/${sub.contact_id}`} className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent-primary)] hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Abrir contato / conversa</Link>}
-          <div className="mt-2 text-xs text-[var(--color-text-muted)]">RG / CNH</div>
-          <Thumbs list={filesOf(null, 'documento')} />
-        </section>
-
-        <section>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Dependentes ({people.length})</h3>
-          {people.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">Nenhum.</p>}
-          <div className="space-y-3">
-            {people.map((p) => (
-              <div key={p.id} data-pocket-dependente={p.position} className="rounded-[var(--radius-control)] border border-[var(--color-border-soft)] p-2.5">
-                <CopyField label="Nome" value={p.name} field="dep_nome" />
-                <CopyField label="Nascimento" value={fmtDate(p.birth_date)} field="dep_nascimento" />
-                <CopyField label="Parentesco" value={relLabel(p)} field="dep_parentesco" />
-                <CopyField label="CPF" value={fmtCpf(p.cpf)} field="dep_cpf" />
-                <CopyField label="E-mail" value={p.email ?? ''} field="dep_email" />
-                <div className="mt-1"><Thumbs list={filesOf(p.id)} /></div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {(files.some((f) => f.kind === 'certidao_casamento') || people.some((p) => ['conjuge', 'sogro', 'sogra'].includes(p.relationship))) && (
-          <section>
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Certidão de casamento / união</h3>
-            <Thumbs list={filesOf(null, 'certidao_casamento')} />
-          </section>
-        )}
-
-        <section>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Observação da equipe</h3>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} rows={3} disabled={!canManage}
-            className="w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]" placeholder="Ex.: falta o verso do RG da filha" />
-          {canManage && notes !== (sub.team_notes ?? '') && (
-            <Button size="sm" className="mt-2" disabled={saving} onClick={() => void save({ team_notes: notes.trim() || null })}><Check className="h-3.5 w-3.5" /> Salvar observação</Button>
-          )}
-        </section>
-      </div>
     </div>
   );
 }
@@ -272,90 +60,167 @@ function Detail({ sub, canManage, onClose, onChanged }: { sub: Submission; canMa
 export default function RecadastramentosPage() {
   const perms = usePermission();
   const canManage = perms.can('recad.manage');
+  const { allOperators } = useOperators();
   const [rows, setRows] = useState<Submission[] | null>(null);
+  const [openCount, setOpenCount] = useState<Record<string, number>>({});
+  const [centralReady, setCentralReady] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState(0);
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
-  const load = useCallback(async () => {
-    const { data, error: e } = await getSupabase().from('recad_submissions')
-      .select('id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at')
-      .order('created_at', { ascending: false }).limit(1000);
+  const nameOf = useCallback((uid: string | null) => {
+    if (!uid) return 'Equipe';
+    const op = allOperators.find((o) => o.user_id === uid);
+    return op ? operatorLabel(op) : 'Equipe';
+  }, [allOperators]);
+
+  const loadSubs = useCallback(async () => {
+    const { data, error: e } = await getSupabase().from('recad_submissions').select(SUB_COLS).order('created_at', { ascending: false }).limit(2000);
     if (e) { setError(/recad_submissions/.test(e.message) ? 'O módulo de recadastramento ainda não foi instalado no banco.' : e.message); setRows([]); return; }
     setError(null);
     setRows((data ?? []) as Submission[]);
   }, []);
+  const loadCounts = useCallback(async () => {
+    const { data, error: e } = await getSupabase().from('recad_issues').select('submission_id').eq('status', 'aberta').is('deleted_at', null).limit(10000);
+    if (e) { setCentralReady(false); return; }
+    setCentralReady(true);
+    const m: Record<string, number> = {};
+    for (const r of (data ?? []) as { submission_id: string }[]) m[r.submission_id] = (m[r.submission_id] ?? 0) + 1;
+    setOpenCount(m);
+  }, []);
 
+  // tempo real: envios (lista/contadores) e pendências/observações (painel + contadores) — com debounce
+  const timers = useRef<{ s?: ReturnType<typeof setTimeout>; i?: ReturnType<typeof setTimeout> }>({});
   useEffect(() => {
-    void load();
-    let t: ReturnType<typeof setTimeout> | null = null;
-    const ch = getSupabase().channel('recad-submissions')
-      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'recad_submissions' }, () => {
-        if (t) clearTimeout(t);
-        t = setTimeout(() => void load(), 1500);
-      })
+    void loadSubs();
+    void loadCounts();
+    const t = timers.current;
+    const onSub = () => { if (t.s) clearTimeout(t.s); t.s = setTimeout(() => void loadSubs(), 800); };
+    const onSide = () => {
+      if (t.i) clearTimeout(t.i);
+      t.i = setTimeout(() => { void loadCounts(); setTick((x) => x + 1); }, 500);
+    };
+    const ch = getSupabase().channel('recad-central')
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'recad_submissions' }, onSub)
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'recad_issues' }, onSide)
+      .on('postgres_changes', { event: '*', schema: 'whatsapp_hub', table: 'recad_notes' }, onSide)
       .subscribe();
-    return () => { if (t) clearTimeout(t); void getSupabase().removeChannel(ch); };
-  }, [load]);
+    // ao voltar para a aba, confere de novo (realtime pode ter caído)
+    const vis = () => { if (document.visibilityState === 'visible') { onSub(); onSide(); } };
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      if (t.s) clearTimeout(t.s);
+      if (t.i) clearTimeout(t.i);
+      document.removeEventListener('visibilitychange', vis);
+      void getSupabase().removeChannel(ch);
+    };
+  }, [loadSubs, loadCounts]);
 
   const statuses = FILTERS[filter][1];
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const qd = qq.replace(/\D/g, '');
     return (rows ?? []).filter((r) => (!statuses || statuses.includes(r.status)) && (!qq
-      || r.holder_name.toLowerCase().includes(qq) || String(r.protocol).includes(qq)
+      || r.holder_name.toLowerCase().includes(qq) || String(r.protocol).includes(qq) || (PLAN[r.plan] ?? '').toLowerCase().includes(qq)
       || (qd.length >= 3 && (r.holder_cpf.includes(qd) || (r.holder_phone ?? '').includes(qd)))));
   }, [rows, statuses, q]);
-  const counts = useMemo(() => FILTERS.map(([, st]) => (rows ?? []).filter((r) => !st || st.includes(r.status)).length), [rows]);
+  const counts = useMemo(() => FILTERS.map(([, st]) => (rows ?? []).filter((r) => (st ? st.includes(r.status) : r.status !== 'enviando')).length), [rows]);
+  const metrics: [string, number, typeof ClipboardList, number | null][] = [
+    ['Solicitações', counts[6], ClipboardList, 6],
+    ['A conferir', counts[0], AlertTriangle, 0],
+    ['Aguardando retorno', counts[1], Clock, 1],
+    ['Prontos para lançar', counts[2], CheckCircle2, 2],
+  ];
   const current = (rows ?? []).find((r) => r.id === selected) ?? null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className={cn('flex flex-wrap items-center gap-3', current && 'hidden lg:flex')}>
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]"><IdCard className="h-5 w-5" /></span>
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Recadastramento</h1>
-          <p className="text-sm text-[var(--color-text-secondary)]">Dados e documentos que os associados enviaram pelo link. Confira, lance no Pocket e marque como lançado.</p>
+    <div className="@container flex h-full min-h-0 flex-col gap-3">
+      <div className={cn('flex flex-wrap items-center justify-between gap-x-4 gap-y-2', current && 'hidden @min-[760px]:flex')}>
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]"><IdCard className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Central de Recadastramento</h1>
+            <p className="text-sm text-[var(--color-text-secondary)]">Conferência de solicitações, documentos e pendências em um só lugar.</p>
+          </div>
         </div>
+        <LinkCard canManage={canManage} />
       </div>
-      <div className={cn(current && 'hidden lg:block')}><LinkCard canManage={canManage} /></div>
+
+      <div className={cn('grid grid-cols-2 gap-2 @min-[760px]:grid-cols-4', current && 'hidden @min-[760px]:grid')}>
+        {metrics.map(([label, n, Icon, fi]) => (
+          <button key={label} type="button" onClick={() => fi !== null && setFilter(fi)}
+            className={cn('flex min-w-0 items-center gap-2.5 rounded-[var(--radius-card)] border bg-[var(--color-surface)] p-2.5 text-left hover:bg-[var(--color-surface-hover)]',
+              filter === fi ? 'border-[var(--accent-primary)]' : 'border-[var(--color-border-card)]')}>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]"><Icon className="h-4 w-4" /></span>
+            <span className="min-w-0">
+              <span className="block truncate text-[11px] font-medium text-[var(--color-text-muted)]">{label}</span>
+              <span className="block text-lg font-semibold leading-tight text-[var(--color-text-primary)]">{rows === null ? '…' : n}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
       {error && <div className="rounded-[var(--radius-card)] border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.06)] p-3 text-sm text-[var(--color-error)]">{error}</div>}
 
       <div className="flex min-h-0 flex-1 gap-3">
-        <div className={cn('flex min-h-0 w-full flex-col gap-2 lg:w-[380px] lg:shrink-0', current && 'hidden lg:flex')}>
-          <div className="flex max-w-full flex-wrap gap-1.5">
-            {FILTERS.map(([label], i) => (
-              <button key={label} type="button" onClick={() => setFilter(i)}
-                className={cn('rounded-full border px-3 py-1 text-xs font-semibold', filter === i ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)]')}>
-                {label} <span className="opacity-70">{counts[i]}</span>
-              </button>
-            ))}
+        {/* LISTA */}
+        <aside className={cn('flex min-h-0 w-full flex-col rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] @min-[760px]:w-[280px] @min-[760px]:shrink-0',
+          current && 'hidden @min-[760px]:flex')} aria-label="Solicitações">
+          <div className="space-y-2 border-b border-[var(--color-border-card)] p-2.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-semibold text-[var(--color-text-primary)]">Solicitações</span>
+              <span className="text-xs text-[var(--color-text-muted)]">{list.length}</span>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, CPF, WhatsApp ou protocolo" aria-label="Buscar solicitações"
+                className="h-9 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] pl-8 pr-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]" />
+            </div>
+            <div className="flex max-w-full flex-wrap gap-1">
+              {FILTERS.map(([label], i) => (
+                <button key={label} type="button" onClick={() => setFilter(i)}
+                  className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', filter === i ? 'border-[var(--accent-primary)] bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]' : 'border-[var(--color-border-card)] text-[var(--color-text-secondary)]')}>
+                  {label} <span className="opacity-70">{counts[i]}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, CPF, WhatsApp ou protocolo"
-              className="h-9 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] pl-8 pr-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]" />
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)]">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {rows === null && <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-[var(--accent-primary)]" /></div>}
-            {rows !== null && list.length === 0 && <p className="p-6 text-center text-sm text-[var(--color-text-muted)]">Nada por aqui.</p>}
-            {list.map((r) => (
-              <button key={r.id} type="button" onClick={() => setSelected(r.id)} data-pocket-item={r.protocol} data-pocket-status={r.status}
-                className={cn('flex w-full items-start gap-2 border-b border-[var(--color-border-soft)] px-3 py-2.5 text-left hover:bg-[var(--color-surface-hover)]', selected === r.id && 'bg-[var(--color-accent-subtle)]')}>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{r.holder_name}</div>
-                  <div className="truncate text-xs text-[var(--color-text-muted)]">#{r.protocol} · {PLAN[r.plan]}{r.people_count ? ` · ${r.people_count} pess.` : ''} · {fmtDateTime(r.completed_at ?? r.created_at)}</div>
-                </div>
-                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', STATUS[r.status].cls)}>{STATUS[r.status].label}</span>
-              </button>
-            ))}
+            {rows !== null && list.length === 0 && <p className="p-6 text-center text-sm text-[var(--color-text-muted)]">Nenhuma solicitação neste filtro.</p>}
+            {list.map((r) => {
+              const n = openCount[r.id] ?? 0;
+              return (
+                <button key={r.id} type="button" onClick={() => setSelected(r.id)} data-pocket-item={r.protocol} data-pocket-status={r.status}
+                  className={cn('block w-full border-b border-l-2 border-b-[var(--color-border-soft)] px-3 py-2.5 text-left hover:bg-[var(--color-surface-hover)]',
+                    selected === r.id ? 'border-l-[var(--accent-primary)] bg-[var(--color-accent-subtle)]' : 'border-l-transparent')}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text-primary)]">{r.holder_name}</span>
+                    <StatusChip status={r.status} />
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">#{r.protocol} · {fmtDateTime(r.completed_at ?? r.created_at)}</div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="truncate text-xs text-[var(--color-text-secondary)]">{PLAN[r.plan]}{r.people_count ? ` · ${r.people_count} pess.` : ''}</span>
+                    {centralReady && (n
+                      ? <span className="shrink-0 rounded-full bg-[rgba(239,68,68,0.12)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-error)]">{n} pendência{n > 1 ? 's' : ''}</span>
+                      : <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">sem pendências</span>)}
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        </div>
-        <div className={cn('min-h-0 flex-1', !current && 'hidden lg:block')}>
+        </aside>
+
+        {/* CADASTRO */}
+        <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', !current && 'hidden @min-[760px]:flex')}>
           {current
-            ? <Detail sub={current} canManage={canManage} onClose={() => setSelected(null)} onChanged={(s) => setRows((rs) => (rs ?? []).map((x) => (x.id === s.id ? s : x)))} />
-            : <div className="flex h-full items-center justify-center rounded-[var(--radius-card)] border border-dashed border-[var(--color-border-card)] p-6 text-sm text-[var(--color-text-muted)]">Escolha um recadastramento na lista.</div>}
+            ? <RecadDetail key={current.id} sub={current} canManage={canManage} centralReady={centralReady} tick={tick} nameOf={nameOf}
+                onClose={() => setSelected(null)}
+                onChanged={(s) => setRows((rs) => (rs ?? []).map((x) => (x.id === s.id ? s : x)))}
+                onIssuesChanged={() => void loadCounts()} />
+            : <div className="flex h-full items-center justify-center rounded-[var(--radius-card)] border border-dashed border-[var(--color-border-card)] p-6 text-sm text-[var(--color-text-muted)]">Escolha uma solicitação na lista.</div>}
         </div>
       </div>
     </div>

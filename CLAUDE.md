@@ -1020,6 +1020,19 @@ Regras:
 - AMAIA (modelo ativo, seção 7): manda `{link_recadastro}` (variável em `ai_agent_config.variables`); só sem conseguir usar o link segue o
   caminho pelo chat (foto → dados → dependentes → documentos → resumo).
 
+- Central de Recadastramento (13/11/2026, `20261113090000_recad_central.sql`): `/recadastramentos` em 3 colunas (container query: ≥1040 px
+  lista | cadastro | pendências; ≥760 px lista + cadastro; abaixo, um ou outro). Arquivos: `RecadastramentosPage.tsx` (lista, contadores,
+  tempo real), `RecadDetail.tsx` (cadastro, documentos com visualizador, pendências, WhatsApp, observações, histórico), `recadShared.tsx`.
+  Tabelas `recad_issues` (pendência aberta/resolvida, exclusão LÓGICA `deleted_at`; texto não se edita), `recad_notes` (observação: só
+  inclusão), `recad_events` (histórico gravado pelos triggers; a tela só grava `whatsapp_aberto`). Autor/org sempre do banco
+  (`_recad_child_fill`). Pendência aberta (nova ou reaberta) põe Novo/Em análise/Conferido em "pendente" (rótulo "Aguardando associado");
+  `_recad_sub_guard` recusa conferido/lancado com pendência aberta (vale para a extensão do Pocket também) e deixa a equipe corrigir
+  `holder_phone`. `team_notes` antigo virou a 1ª observação (campo mantido). WhatsApp: `wa.me` com mensagem editável só das pendências
+  abertas (`buildWhatsMessage`) — nunca envia sozinho, nunca leva observação interna/CPF/documento.
+- Formulário (13/11/2026): retorno "em até 5 dias úteis após o envio"; passaporte = até 2 fotos (frente e verso, juntadas numa imagem só
+  no navegador, `joinFrontBack`) ou 1 PDF. `recadastro-public`: além de 5/IP/30 min, 3 envios por CPF em 24 h, 300 por link por hora,
+  60 MB por envio, passaporte ≤ 2 arquivos, documento por pessoa/certidão ≤ 6.
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do

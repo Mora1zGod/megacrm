@@ -15,7 +15,9 @@
 //   AMAI 10  = individual, 1 a 10 pessoas CONTANDO o titular;
 //   Infinity = familiar: pai, mãe, sogro, sogra, cônjuge e filhos.
 // Nada de org/status vem do navegador: a org sai do link no banco.
-// Limites: 5 envios por IP a cada 30 min; 8 MB por arquivo; 60 arquivos por envio.
+// Limites: 5 envios por IP a cada 30 min; 3 por CPF em 24 h; 300 por link por hora (trava geral, mesmo que o IP seja
+// falsificado); 8 MB por arquivo, 60 MB e 60 arquivos por envio; passaporte = até 2 arquivos (frente e verso ou 1 PDF);
+// documento de cada pessoa e certidão = até 6.
 // ============================================================================
 
 import { getAdminClient } from '../_shared/supabase-admin.ts';
@@ -27,6 +29,10 @@ const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
 const BUCKET = 'whatsapp-hub-recadastro';
 const MAX_PER_IP = 5;
 const MAX_FILES = 60;
+const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
+const MAX_PER_CPF_DAY = 3;
+const MAX_PER_LINK_HOUR = 300;
+const MAX_PER_KIND: Record<string, number> = { passaporte: 2, documento: 6, certidao_casamento: 6 };
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_PEOPLE = 30;
 const KEY_TTL_MS = 6 * 60 * 60 * 1000;
@@ -248,6 +254,16 @@ Deno.serve(async (req) => {
           .eq('ip', ip).gte('created_at', since);
         if ((count ?? 0) >= MAX_PER_IP) return fail('Muitos envios em sequência. Aguarde alguns minutos.', 429);
       }
+      {
+        const [{ count: byCpf }, { count: byLink }] = await Promise.all([
+          db.from('recad_submissions').select('id', { count: 'exact', head: true })
+            .eq('org_id', org.id).eq('holder_cpf', holderCpf).gte('created_at', new Date(Date.now() - 24 * 3600_000).toISOString()),
+          db.from('recad_submissions').select('id', { count: 'exact', head: true })
+            .eq('link_id', link.id).gte('created_at', new Date(Date.now() - 3600_000).toISOString()),
+        ]);
+        if ((byCpf ?? 0) >= MAX_PER_CPF_DAY) return fail('Já recebemos envios deste CPF hoje. Aguarde o retorno da equipe ou fale no WhatsApp do AMAI.', 429);
+        if ((byLink ?? 0) >= MAX_PER_LINK_HOUR) return fail('Muitos envios agora. Tente de novo em alguns minutos.', 429);
+      }
 
       const { data: sub, error: subErr } = await db
         .from('recad_submissions')
@@ -289,6 +305,7 @@ Deno.serve(async (req) => {
       if (body.person_position != null) {
         if (kind !== 'documento') return fail('Tipo de arquivo inválido.');
         const pos = Number(body.person_position);
+        if (!Number.isInteger(pos) || pos < 1 || pos > MAX_PEOPLE) return fail('Dependente não encontrado.');
         const { data: person } = await db
           .from('recad_people').select('id').eq('submission_id', sub.id).eq('position', pos).maybeSingle();
         if (!person) return fail('Dependente não encontrado.');
@@ -299,8 +316,13 @@ Deno.serve(async (req) => {
       if (bytes.length > MAX_BYTES) return fail('Arquivo maior que 8 MB.');
       const mime = sniffMime(bytes);
       if (!mime) return fail('Envie foto (JPG, PNG, WEBP) ou PDF.');
-      const { count } = await db.from('recad_files').select('id', { count: 'exact', head: true }).eq('submission_id', sub.id);
-      if ((count ?? 0) >= MAX_FILES) return fail('Limite de arquivos atingido.');
+      const { data: prev } = await db.from('recad_files').select('kind, person_id, size_bytes').eq('submission_id', sub.id);
+      const pv = (prev ?? []) as Array<{ kind: string; person_id: string | null; size_bytes: number | null }>;
+      if (pv.length >= MAX_FILES) return fail('Limite de arquivos atingido.');
+      if (pv.reduce((a, f) => a + (f.size_bytes ?? 0), 0) + bytes.length > MAX_TOTAL_BYTES) return fail('Os arquivos deste envio passaram de 60 MB.');
+      if (pv.filter((f) => f.kind === kind && f.person_id === personId).length >= MAX_PER_KIND[kind]) {
+        return fail(kind === 'passaporte' ? 'Do passaporte/título, mande só a frente e o verso (2 fotos) ou 1 PDF.' : 'Arquivos demais para este documento.');
+      }
 
       const who = personId ? `dep${body.person_position}` : 'titular';
       const path = `${sub.org_id}/${sub.id}/${kind}-${who}-${randomHex(6)}.${MIME_EXT[mime]}`;

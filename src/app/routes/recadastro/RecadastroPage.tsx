@@ -6,7 +6,7 @@ import { getSupabase } from '@/lib/supabase';
 import { maskPhoneBR } from '@/lib/phone';
 import { maskDoc } from '@/lib/format';
 
-// /recadastro/:token — PÚBLICA. O associado do AMAI 10 ou do AMAI Infinity informa os dados dele e dos
+// /recadastro/:token — PÚBLICA. O associado do AMAI 10 ou do AMAI INFINITY informa os dados dele e dos
 // dependentes e manda as fotos dos documentos. Tudo passa pela Edge Function recadastro-public
 // (o navegador nunca escreve no banco). A equipe confere em /recadastramentos e lança no Pocket.
 
@@ -63,7 +63,8 @@ async function callFn(body: Record<string, unknown>): Promise<Resp> {
 // Foto do celular costuma ter 4–8 MB: reduz para no máx. 1800 px (JPEG) antes de mandar. PDF vai como está.
 async function toBase64(file: File): Promise<string> {
   let blob: Blob = file;
-  if (file.type.startsWith('image/') && file.type !== 'image/gif') {
+  // a imagem frente+verso já vem do joinFrontBack no tamanho certo (até 3200 px de altura)
+  if (file.type.startsWith('image/') && file.type !== 'image/gif' && file.name !== 'passaporte-frente-verso.jpg') {
     try {
       const bmp = await createImageBitmap(file);
       const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
@@ -80,6 +81,31 @@ async function toBase64(file: File): Promise<string> {
   let bin = '';
   for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
   return btoa(bin);
+}
+
+// Passaporte com frente e verso em foto: junta as duas numa imagem só (frente em cima, verso embaixo) — chega 1 arquivo para a equipe.
+async function joinFrontBack(files: File[]): Promise<File[]> {
+  if (files.length !== 2 || !files.every((f) => f.type.startsWith('image/') && f.type !== 'image/gif')) return files;
+  try {
+    const [a, b] = await Promise.all(files.map((f) => createImageBitmap(f)));
+    const w = Math.min(1600, Math.max(a.width, b.width));
+    const ha = Math.round(a.height * (w / a.width));
+    const hb = Math.round(b.height * (w / b.width));
+    const gap = 16;
+    const scale = Math.min(1, 3200 / (ha + hb + gap));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round((ha + hb + gap) * scale);
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(a, 0, 0, canvas.width, Math.round(ha * scale));
+    ctx.drawImage(b, 0, Math.round((ha + gap) * scale), canvas.width, Math.round(hb * scale));
+    const blob = await new Promise<Blob>((res, rej) => canvas.toBlob((x) => (x ? res(x) : rej(new Error('img'))), 'image/jpeg', 0.85));
+    return [new File([blob], 'passaporte-frente-verso.jpg', { type: 'image/jpeg' })];
+  } catch {
+    return files; // o navegador não abriu a imagem: manda as duas como estão
+  }
 }
 
 function cpfValid(raw: string): boolean {
@@ -104,7 +130,7 @@ function ReviewNotice() {
       <div className="space-y-1">
         <p className="font-semibold">Seus dados passam por análise da nossa equipe.</p>
         <p className="text-[var(--color-text-secondary)]">
-          Em até <b className="text-[var(--color-text-primary)]">72 horas</b> entramos em contato {via}. Estando tudo certo, você recebe o
+          Em até <b className="text-[var(--color-text-primary)]">5 dias úteis</b> após o envio entramos em contato {via}. Estando tudo certo, você recebe o
           <b className="text-[var(--color-text-primary)]"> login e a senha do Portal do Associado</b>. O acesso não é liberado na hora.
         </p>
       </div>
@@ -207,14 +233,17 @@ function Thumb({ file }: { file: File }) {
 
 // Fotos de documento: "Tirar foto" (abre a câmera) separado de "Escolher arquivo"; mostra o que já foi
 // escolhido, com excluir; depois da 1ª, o botão vira "Adicionar verso / outra foto".
-function PhotoPicker({ label, hint, files, onChange }: { label: string; hint?: string; files: File[]; onChange: (f: File[]) => void }) {
+// max = quantas fotos (passaporte: 2 = frente e verso). Um PDF vale pelo documento inteiro: PDF escolhido substitui as fotos.
+function PhotoPicker({ label, hint, files, onChange, max = 6 }: { label: string; hint?: string; files: File[]; onChange: (f: File[]) => void; max?: number }) {
   const camRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const add = (list: FileList | null) => {
     const ok = Array.from(list ?? []).filter((f) => f.size <= MAX_FILE * 3);
     if (!ok.length) return;
-    onChange([...files, ...ok].slice(0, 6));
+    const pdf = ok.find((f) => f.type === 'application/pdf');
+    if (pdf) onChange([pdf]);
+    else onChange([...files.filter((f) => f.type !== 'application/pdf'), ...ok].slice(0, max));
     // Deixa à vista a miniatura e o próximo passo (verso / próximo campo / Continuar).
     scrollToNext(boxRef.current);
   };
@@ -230,7 +259,7 @@ function PhotoPicker({ label, hint, files, onChange }: { label: string; hint?: s
           {files.map((f, i) => (
             <div key={`${f.name}-${i}`} className="relative aspect-[3/4] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)]">
               <Thumb file={f} />
-              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold text-white">{i === 0 ? 'Frente' : i === 1 ? 'Verso' : `${i + 1}ª`}</span>
+              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold text-white">{f.type === 'application/pdf' ? 'PDF' : i === 0 ? 'Frente' : i === 1 ? 'Verso' : `${i + 1}ª`}</span>
               <button type="button" aria-label="Excluir foto" onClick={() => onChange(files.filter((_, j) => j !== i))}
                 className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white">
                 <Trash2 className="h-4 w-4" />
@@ -240,8 +269,8 @@ function PhotoPicker({ label, hint, files, onChange }: { label: string; hint?: s
         </div>
       )}
       <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
-      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
-      {files.length < 6 && (
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple={max > 1} className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
+      {files.length < max && !files.some((f) => f.type === 'application/pdf') && (
         <div className="grid grid-cols-2 gap-2">
           <Button type="button" className="h-12" onClick={() => camRef.current?.click()}>
             <Camera className="h-5 w-5" /> {files.length ? 'Foto do verso' : 'Tirar foto'}
@@ -251,6 +280,7 @@ function PhotoPicker({ label, hint, files, onChange }: { label: string; hint?: s
           </Button>
         </div>
       )}
+      {max <= 2 && files.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">Até 2 fotos (frente e verso) ou 1 PDF.</p>}
     </div>
   );
 }
@@ -335,7 +365,7 @@ export default function RecadastroPage() {
 
   function stepProblem(s: number): string | null {
     if (s === 0) {
-      if (!plan) return 'Escolha o seu passaporte (AMAI 10 ou AMAI Infinity).';
+      if (!plan) return 'Escolha o seu passaporte (AMAI 10 ou AMAI INFINITY).';
       if (plan === 'amai10' && !(Number(peopleCount) >= 1 && Number(peopleCount) <= 10)) return 'No AMAI 10, diga para quantas pessoas foi a compra (de 1 a 10, contando você).';
       if (!passportFiles.length) return 'Envie a foto do passaporte, título, contrato ou comprovante de pagamento.';
     }
@@ -421,8 +451,9 @@ export default function RecadastroPage() {
       })),
     });
     if (!r.ok) { setError(r.error ?? 'Não foi possível enviar.'); setPhase('form'); return; }
+    const passportUpload = await joinFrontBack(passportFiles);
     const queue: UploadItem[] = [
-      ...passportFiles.map((file) => ({ kind: 'passaporte' as Kind, personPosition: null, file, done: false })),
+      ...passportUpload.map((file) => ({ kind: 'passaporte' as Kind, personPosition: null, file, done: false })),
       ...holderFiles.map((file) => ({ kind: 'documento' as Kind, personPosition: null, file, done: false })),
       ...people.flatMap((p, i) => p.files.map((file) => ({ kind: 'documento' as Kind, personPosition: i + 1, file, done: false }))),
       ...(needsMarriage ? marriageFiles.map((file) => ({ kind: 'certidao_casamento' as Kind, personPosition: null, file, done: false })) : []),
@@ -471,7 +502,7 @@ export default function RecadastroPage() {
                 <span><b className="text-[var(--color-text-primary)]">Análise.</b> Nossa equipe vai analisar os dados e os documentos enviados.
                   O recebimento deste envio não representa aprovação nem confirmação de cadastro.</span></li>
               <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">2</span>
-                <span><b className="text-[var(--color-text-primary)]">Retorno em até 72 horas.</b> Entramos em contato {via}.
+                <span><b className="text-[var(--color-text-primary)]">Retorno em até 5 dias úteis após o envio.</b> Entramos em contato {via}.
                   Estando tudo certo, você recebe o <b>login e a senha do Portal do Associado</b>. Se faltar algum dado ou documento,
                   avisamos para você refazer a atualização cadastral.</span></li>
               <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-fill)] text-xs font-bold text-white">3</span>
@@ -509,7 +540,7 @@ export default function RecadastroPage() {
             <ReviewNotice />
             <Card title="Seu passaporte" hint="Leva uns 5 minutos. Tenha em mãos a foto do passaporte (ou do comprovante de pagamento) e o RG ou CNH de todos.">
               <Choice value={plan} cols={3} onChange={setPlan}
-                options={[['amai10', 'AMAI 10'], ['infinity', 'AMAI Infinity'], ['nao_sei', 'Não sei']] as const} />
+                options={[['amai10', 'AMAI 10'], ['infinity', 'AMAI INFINITY'], ['nao_sei', 'Não sei']] as const} />
               {plan === 'amai10' && (
                 <Field label="Para quantas pessoas foi a compra? (contando você)">
                   <select className={inputCls} value={peopleCount} onChange={(e) => setPeopleCount(e.target.value)}>
@@ -518,13 +549,13 @@ export default function RecadastroPage() {
                   </select>
                 </Field>
               )}
-              {plan === 'infinity' && <p className="text-sm text-[var(--color-text-secondary)]">O AMAI Infinity é familiar: podem entrar pai, mãe, sogro, sogra, esposo(a) e filhos.</p>}
+              {plan === 'infinity' && <p className="text-sm text-[var(--color-text-secondary)]">O AMAI INFINITY é familiar: podem entrar pai, mãe, sogro, sogra, esposo(a) e filhos.</p>}
               <Field label="Número do passaporte ou contrato" optional>
                 <input className={inputCls} value={passportNumber} maxLength={40} onChange={(e) => setPassportNumber(e.target.value)} />
               </Field>
               <PhotoPicker label="Foto do passaporte, título, contrato ou comprovante de pagamento"
                 hint="Fotografe o documento inteiro, com os dados legíveis. Também pode ser o print ou PDF do comprovante."
-                files={passportFiles} onChange={setPassportFiles} />
+                files={passportFiles} onChange={setPassportFiles} max={2} />
             </Card>
           </>
         )}
@@ -557,7 +588,7 @@ export default function RecadastroPage() {
             hint={plan === 'amai10'
               ? (maxDependents ? `Seu AMAI 10 é para ${peopleCount} pessoas: você + ${maxDependents} dependente(s). Cadastre todos para continuar.` : 'Compra para 1 pessoa (só você): não há dependentes. Toque em Continuar.')
               : plan === 'infinity'
-                ? 'AMAI Infinity: pai, mãe, sogro, sogra, esposo(a) e filhos. Só quem vai usar o passaporte com você.'
+                ? 'AMAI INFINITY: pai, mãe, sogro, sogra, esposo(a) e filhos. Só quem vai usar o passaporte com você.'
                 : 'Só quem vai usar o passaporte com você.'}>
             {people.length === 0 && maxDependents > 0 && <p className="text-sm text-[var(--color-text-muted)]">{plan === 'amai10' ? 'Nenhum dependente adicionado ainda.' : 'Nenhum dependente adicionado. Se não tiver, toque em Continuar.'}</p>}
             {people.map((p, i) => (
@@ -637,7 +668,7 @@ export default function RecadastroPage() {
           <>
             <Card title="Confira antes de enviar">
               <Summary title="Passaporte" onEdit={() => goTo(0)}>
-                {plan === 'amai10' ? `AMAI 10 · ${peopleCount} pessoa(s)` : plan === 'infinity' ? 'AMAI Infinity' : 'Não sei'}
+                {plan === 'amai10' ? `AMAI 10 · ${peopleCount} pessoa(s)` : plan === 'infinity' ? 'AMAI INFINITY' : 'Não sei'}
                 {passportNumber.trim() && ` · nº ${passportNumber.trim()}`} · {passportFiles.length} foto(s)
               </Summary>
               <Summary title="Titular" onEdit={() => goTo(1)}>
