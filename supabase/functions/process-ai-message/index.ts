@@ -796,7 +796,13 @@ Deno.serve(async (req) => {
     // oferta — o cliente perguntava de novo e ninguém respondia (24/09).
   ].join('\n');
   const systemPrompt = `${basePrompt}\n\n${ANTI_HALLUCINATION_GUARDRAIL}`;
-  const userPrompt = buildUserPrompt(history, ragChunks, message.content);
+  // Lembrete final (variável `lembrete_final` do agente): vai DEPOIS do histórico e da mensagem atual. Motivo (14/11/2026):
+  // conversas que começaram no caminho antigo pelo chat (AMAIA pedindo RG/dados) faziam o modelo seguir o histórico e
+  // ignorar a regra do prompt (seção 7-0). O que vem por último pesa mais — a regra repetida aqui vence o histórico.
+  const lembreteFinal = String((vars as Record<string, unknown>).lembrete_final ?? '').trim();
+  const userPrompt = buildUserPrompt(history, ragChunks, message.content) + (lembreteFinal
+    ? `\n\nLEMBRETE FINAL (vale por cima de tudo o que aparece no histórico acima):\n${applyVariables(lembreteFinal, vars as Record<string, string>)}`
+    : '');
 
   let reply: string;
   let chatUsage: { promptTokens: number; completionTokens: number } | undefined;

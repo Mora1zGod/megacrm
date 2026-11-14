@@ -207,6 +207,10 @@ Deno.serve(async (req) => {
   const userPrompt = [
     ...history.map((h) => `${h.role === 'user' ? 'Contato' : 'Você'}: ${h.content}`),
     `Contato: ${userMessage}`,
+    // mesmo lembrete final do atendimento real (process-ai-message)
+    ...(vars.lembrete_final?.trim()
+      ? [`\nLEMBRETE FINAL (vale por cima de tudo o que aparece no histórico acima):\n${vars.lembrete_final.trim().replace(/\{([a-z0-9_]+)\}/gi, (w, k: string) => (k in vars ? vars[k] : w))}`]
+      : []),
   ].join('\n');
 
   let reply: string;
