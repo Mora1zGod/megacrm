@@ -1039,6 +1039,11 @@ Regras:
   no navegador, `joinFrontBack`) ou 1 PDF. `recadastro-public`: além de 5/IP/30 min, 3 envios por CPF em 24 h, 300 por link por hora,
   60 MB por envio, passaporte ≤ 2 arquivos, documento por pessoa/certidão ≤ 6.
 
+- Sem documento nenhum (14/11/2026, `20261114180000_recad_no_proof.sql`): caixa "Não tenho passaporte, contrato, título nem comprovante"
+  no formulário → foto do passaporte/contrato opcional, `recad_submissions.no_proof = true` (travado no `_recad_sub_guard`) e a função
+  cria a pendência "Associado informou que não tem…" (trava Conferido/Lançado até a equipe/jurídico decidir). AMAIA (seção 7-0A e
+  `lembrete_final`): manda o link com essa orientação, nunca confirma nada; processo/Procon/contrato → [JURIDICO].
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do

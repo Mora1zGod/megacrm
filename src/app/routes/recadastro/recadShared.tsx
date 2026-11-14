@@ -13,8 +13,9 @@ export interface Submission {
   holder_phone: string | null; portal_access: 'email' | 'whatsapp'; contact_id: string | null; team_notes: string | null;
   reviewed_at: string | null; completed_at: string | null; created_at: string;
   checked_at: string | null; launched_at: string | null;
+  no_proof?: boolean;
 }
-export const SUB_COLS = 'id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at';
+export const SUB_COLS = 'id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at, no_proof';
 
 export interface PersonRow { id: string; position: number; name: string; birth_date: string; relationship: string; relationship_other: string | null; cpf: string | null; email: string | null }
 export interface FileRow { id: string; person_id: string | null; kind: 'passaporte' | 'documento' | 'certidao_casamento'; path: string; mime: string; url: string | null }

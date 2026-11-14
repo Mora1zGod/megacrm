@@ -258,7 +258,9 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
                   c.files.length ? 'border-[var(--color-border-soft)]' : 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.05)]')}>
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-xs font-semibold text-[var(--color-text-primary)]" title={c.label}>{c.label}</span>
-                    {c.files.length
+                    {c.key === 'pass' && sub.no_proof
+                      ? <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">declarou que não tem</span>
+                      : c.files.length
                       ? <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">● enviado · conferir</span>
                       : <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">○ não enviado</span>}
                   </div>

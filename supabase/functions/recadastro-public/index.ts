@@ -7,7 +7,9 @@
 //
 //   { action: 'info',   token }                         → nome/logo da organização
 //   { action: 'submit', token, plan, people_count?, passport_number?, holder, portal_access,
-//                       consent: true, people: [...] }   → cria o envio (status 'enviando')
+//                       consent: true, people: [...], no_proof? }   → cria o envio (status 'enviando')
+//   no_proof = o associado marcou que NÃO tem passaporte/contrato nem comprovante: a foto vira opcional e o envio
+//   nasce com a pendência "Sem passaporte/contrato nem comprovante" (a equipe/jurídico analisa; nada é confirmado).
 //   { action: 'upload', token, submission_id, upload_key, kind, person_position?, mime, data_base64 }
 //   { action: 'finish', token, submission_id, upload_key } → confere os documentos e conclui
 //
@@ -136,7 +138,7 @@ async function loadPending(db: Db, orgId: string, body: Record<string, unknown>)
   if (!UUID_RE.test(subId) || !/^[0-9a-f]{64}$/.test(key)) return { error: 'Envio inválido. Recomece o formulário.' } as const;
   const { data: sub } = await db
     .from('recad_submissions')
-    .select('id, org_id, status, plan, protocol, holder_phone')
+    .select('id, org_id, status, plan, protocol, holder_phone, no_proof')
     .eq('id', subId).eq('org_id', orgId).maybeSingle();
   if (!sub) return { error: 'Envio não encontrado. Recomece o formulário.' } as const;
   if (sub.status !== 'enviando') return { error: 'Este envio já foi concluído.' } as const;
@@ -144,7 +146,7 @@ async function loadPending(db: Db, orgId: string, body: Record<string, unknown>)
   if (!k || k.key_hash !== (await sha256(key)) || new Date(k.expires_at).getTime() < Date.now()) {
     return { error: 'O tempo para enviar os documentos acabou. Recomece o formulário.' } as const;
   }
-  return { sub: sub as { id: string; org_id: string; status: string; plan: string; protocol: number; holder_phone: string | null } } as const;
+  return { sub: sub as { id: string; org_id: string; status: string; plan: string; protocol: number; holder_phone: string | null; no_proof: boolean | null } } as const;
 }
 
 Deno.serve(async (req) => {
@@ -270,7 +272,7 @@ Deno.serve(async (req) => {
         .insert({
           org_id: org.id, link_id: link.id, status: 'enviando', plan, people_count: peopleCount,
           passport_number: passport, holder_name: holderName, holder_cpf: holderCpf, holder_birth: holderBirth,
-          holder_email: holderEmail, holder_phone: holderPhone, portal_access: portal,
+          holder_email: holderEmail, holder_phone: holderPhone, portal_access: portal, no_proof: body.no_proof === true,
           consent_at: new Date().toISOString(), ip, user_agent: (req.headers.get('user-agent') ?? '').slice(0, 300) || null,
         })
         .select('id, protocol')
@@ -353,7 +355,8 @@ Deno.serve(async (req) => {
       ]);
       const fl = (files ?? []) as Array<{ kind: string; person_id: string | null }>;
       const missing: string[] = [];
-      if (!fl.some((f) => f.kind === 'passaporte')) missing.push('foto do passaporte/contrato (ou título ou comprovante de pagamento)');
+      const noProof = (sub as { no_proof?: boolean }).no_proof === true;
+      if (!noProof && !fl.some((f) => f.kind === 'passaporte')) missing.push('foto do passaporte/contrato (ou título ou comprovante de pagamento)');
       if (!fl.some((f) => f.kind === 'documento' && f.person_id == null)) missing.push('RG ou CNH do titular');
       for (const p of (people ?? []) as Array<{ id: string; position: number; name: string; relationship: string }>) {
         if (!fl.some((f) => f.kind === 'documento' && f.person_id === p.id)) missing.push(`documento de ${p.name.split(' ')[0]}`);
@@ -376,6 +379,15 @@ Deno.serve(async (req) => {
         .eq('id', sub.id).eq('status', 'enviando');
       if (upErr) return fail('Não foi possível concluir. Tente novamente.', 500);
       await db.from('recad_upload_keys').delete().eq('submission_id', sub.id);
+      // Sem passaporte/contrato nem comprovante: pendência aberta (trava "Conferido"/"Lançado" até a equipe decidir).
+      if (noProof) {
+        const temArquivo = fl.some((f) => f.kind === 'passaporte');
+        const { error: iErr } = await db.from('recad_issues').insert({
+          submission_id: sub.id, org_id: sub.org_id,
+          text: `Associado informou que não tem passaporte/contrato nem comprovante de pagamento${temArquivo ? ' (enviou outros arquivos para análise)' : ''} — análise da equipe/jurídico.`,
+        });
+        if (iErr) console.error(JSON.stringify({ event: 'recad_no_proof_issue_failed', message: iErr.message }));
+      }
       return jsonResponse({ ok: true, protocol: sub.protocol });
     }
 

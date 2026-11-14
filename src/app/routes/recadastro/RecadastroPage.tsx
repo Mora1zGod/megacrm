@@ -307,6 +307,7 @@ export default function RecadastroPage() {
   const [peopleCount, setPeopleCount] = useState('');
   const [passportNumber, setPassportNumber] = useState('');
   const [passportFiles, setPassportFiles] = useState<File[]>([]);
+  const [noProof, setNoProof] = useState(false); // "não tenho passaporte/contrato nem comprovante"
   const [holder, setHolder] = useState({ name: '', cpf: '', birth: '', email: '', phone: '' });
   const [holderFiles, setHolderFiles] = useState<File[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -367,7 +368,7 @@ export default function RecadastroPage() {
     if (s === 0) {
       if (!plan) return 'Escolha o seu passaporte (AMAI 10 ou AMAI INFINITY).';
       if (plan === 'amai10' && !(Number(peopleCount) >= 1 && Number(peopleCount) <= 10)) return 'No AMAI 10, diga para quantas pessoas foi a compra (de 1 a 10, contando você).';
-      if (!passportFiles.length) return 'Envie a foto do passaporte/contrato (ou do título ou comprovante de pagamento).';
+      if (!passportFiles.length && !noProof) return 'Envie a foto do passaporte/contrato (ou do título ou comprovante de pagamento), ou marque que não tem nenhum desses documentos.';
     }
     if (s === 1) {
       const name = holder.name.trim();
@@ -439,7 +440,7 @@ export default function RecadastroPage() {
     }
     setPhase('sending');
     const r = await callFn({
-      action: 'submit', token, consent: true, plan,
+      action: 'submit', token, consent: true, plan, no_proof: noProof,
       people_count: plan === 'amai10' ? Number(peopleCount) : null,
       passport_number: passportNumber.trim() || null,
       portal_access: 'whatsapp', // login vai pelos dois (WhatsApp e e-mail); campo mantido por compatibilidade
@@ -556,6 +557,16 @@ export default function RecadastroPage() {
               <PhotoPicker label="Foto do passaporte/contrato (ou título ou comprovante de pagamento)"
                 hint="Fotografe o documento inteiro, com os dados legíveis. Também pode ser o print ou PDF do comprovante."
                 files={passportFiles} onChange={setPassportFiles} max={2} />
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-[var(--color-border-card)] p-3 text-sm text-[var(--color-text-primary)]">
+                <input type="checkbox" checked={noProof} onChange={(e) => setNoProof(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
+                <span>Não tenho passaporte, contrato, título nem comprovante de pagamento</span>
+              </label>
+              {noProof && (
+                <p className="rounded-xl bg-[rgba(245,158,11,0.1)] p-3 text-sm text-[var(--color-text-primary)]">
+                  Preencha com os dados que você tiver. Se tiver prints de conversas da época da compra, fatura do cartão ou extrato, envie no campo acima.
+                  Seu pedido será analisado pela equipe, que entra em contato em até 5 dias úteis após o envio.
+                </p>
+              )}
             </Card>
           </>
         )}
@@ -669,7 +680,7 @@ export default function RecadastroPage() {
             <Card title="Confira antes de enviar">
               <Summary title="Passaporte/contrato" onEdit={() => goTo(0)}>
                 {plan === 'amai10' ? `AMAI 10 · ${peopleCount} pessoa(s)` : plan === 'infinity' ? 'AMAI INFINITY' : 'Não sei'}
-                {passportNumber.trim() && ` · nº ${passportNumber.trim()}`} · {passportFiles.length} foto(s)
+                {passportNumber.trim() && ` · nº ${passportNumber.trim()}`} · {passportFiles.length} foto(s){noProof && ' · informou que não tem passaporte/contrato nem comprovante'}
               </Summary>
               <Summary title="Titular" onEdit={() => goTo(1)}>
                 {holder.name.trim()} · CPF {holder.cpf}{holder.birth && ` · ${brDate(holder.birth)}`}<br />
