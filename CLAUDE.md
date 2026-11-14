@@ -682,6 +682,12 @@ Regras:
   `whatsapp-hub-purchases/<org>/nfe/<chave>.xml`. Sem `SEFAZ_CA_PEM` (cadeia ICP-Brasil) a conexão não
   confere o certificado do servidor da SEFAZ — configurar na Vercel para validação estrita.
 
+- Busca automática na SEFAZ (14/11/2026, `20261114170000_sefaz_auto_sync.sql`): pg_cron `sefaz-auto-sync` (06:40–06:55 e
+  12:40–12:55 no Acre, de 5 em 5 min) → `POST /api/sefaz {action:'cron_sync'}` com `x-cron-secret` (Vault `sefaz_cron_secret` = Vercel
+  `SEFAZ_CRON_SECRET`, ≥ 32 caracteres, comparação em tempo constante). Roda o mesmo `sync` em contexto de sistema (`ctx.system`: sem
+  `requirePerm`, grava com service role e `org_id` explícito no `pur_invoice_import`) para cada empresa com a busca ligada em org ativa.
+  Resultado em `pur_sefaz_state.last_status` ("Busca automática HH:MM: …").
+
 ## Atendimento: citar, encaminhar, SLA, assinatura (07/10/2026)
 
 - `messages.reply_to_id` / `platform_message_id` ("wamid", do webhook Zernio) /

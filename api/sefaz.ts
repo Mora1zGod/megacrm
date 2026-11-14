@@ -13,7 +13,14 @@
 // O certificado e a senha ficam em public.org_settings (AES-256-GCM, CRYPTO_KEY):
 //   sefaz_cert_pfx:<empresa>, sefaz_cert_pass:<empresa>. Nunca voltam para a tela.
 // As gravações de notas usam a SESSÃO DO USUÁRIO (RLS + permissões valem).
+//
+// Busca automática (14/11/2026): POST /api/sefaz { action: 'cron_sync' } com o cabeçalho x-cron-secret = SEFAZ_CRON_SECRET
+// (variável da Vercel; o mesmo valor fica no Vault do banco como 'sefaz_cron_secret'). Chamada pelo pg_cron do banco
+// (job sefaz-auto-sync, 06:40–06:55 e 12:40–12:55 no horário do Acre). Roda o mesmo `sync` para toda empresa com a busca
+// ligada, sem sessão de usuário (contexto de sistema: grava com a service role e org_id explícito). As regras da SEFAZ
+// continuam valendo: com "aguarde 1 hora" a chamada não vai à SEFAZ.
 import https from 'node:https';
+import { timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import forge from 'node-forge';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -59,7 +66,7 @@ function asUser(token: string): SupabaseClient<any, any, any> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Ctx { token: string; userId: string; orgId: string; db: SupabaseClient<any, any, any>; sys: SupabaseClient; canSup?: boolean }
+interface Ctx { token: string; userId: string; orgId: string; db: SupabaseClient<any, any, any>; sys: SupabaseClient; canSup?: boolean; system?: boolean }
 
 async function auth(req: ApiRequest): Promise<Ctx> {
   const h = req.headers?.authorization ?? req.headers?.Authorization;
@@ -75,6 +82,7 @@ async function auth(req: ApiRequest): Promise<Ctx> {
 }
 
 async function requirePerm(ctx: Ctx, key: string, what: string) {
+  if (ctx.system) return; // busca automática (cron): sem usuário, a chave secreta já foi conferida
   const { data, error } = await ctx.db.rpc('has_perm', { p_key: key });
   if (error) throw new HttpError(500, 'Não foi possível conferir sua permissão.');
   if (data !== true) throw new HttpError(403, `Seu perfil não permite ${what}. Peça ao administrador para liberar.`);
@@ -234,7 +242,7 @@ async function storeXml(ctx: Ctx, key: string, xml: string): Promise<string | nu
 
 async function importPayload(ctx: Ctx, p: InvoicePayload, extra: Record<string, unknown>, xml?: string): Promise<string> {
   const { supplier, ...rest } = p;
-  const { data, error } = await ctx.db.rpc('pur_invoice_import', { p: { ...rest, ...extra } });
+  const { data, error } = await ctx.db.rpc('pur_invoice_import', { p: { ...rest, ...extra, org_id: ctx.orgId } });
   if (error) throw new HttpError(400, error.message);
   const id = String(data);
   // XML guardado só DEPOIS de importar, e nunca por cima de um já guardado.
@@ -504,8 +512,53 @@ async function importXml(ctx: Ctx, b: Record<string, unknown>) {
   return { ok: true, id, number: p.number, supplier: p.supplier_name, total_cents: p.total_cents };
 }
 
+// ------------------------------------------------------------------ busca automática
+function cronAllowed(req: ApiRequest): boolean {
+  const h = req.headers?.['x-cron-secret'];
+  const got = Buffer.from(String(Array.isArray(h) ? h[0] : h ?? ''));
+  const want = Buffer.from(process.env.SEFAZ_CRON_SECRET ?? '');
+  return want.length >= 32 && got.length === want.length && timingSafeEqual(got, want);
+}
+
+async function cronSync() {
+  const sys = admin();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false }, db: { schema: 'whatsapp_hub' } }) as SupabaseClient<any, any, any>;
+  const w = sys.schema('whatsapp_hub');
+  const { data: states } = await w.from('pur_sefaz_state').select('company_id, org_id').eq('enabled', true);
+  const list = (states ?? []) as Array<{ company_id: string; org_id: string }>;
+  const { data: orgs } = list.length
+    ? await w.from('organizations').select('id').in('id', [...new Set(list.map((x) => x.org_id))]).eq('status', 'active')
+    : { data: [] };
+  const active = new Set(((orgs ?? []) as Array<{ id: string }>).map((o) => o.id));
+  const started = Date.now();
+  const results: Array<Record<string, unknown>> = [];
+  for (const st of list) {
+    if (!active.has(st.org_id)) continue;
+    if (Date.now() - started > 30_000) { results.push({ company_id: st.company_id, skipped: 'fica para a próxima chamada' }); continue; }
+    const ctx: Ctx = { token: '', userId: '', orgId: st.org_id, db, sys, canSup: true, system: true };
+    const hora = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Rio_Branco', hour: '2-digit', minute: '2-digit' });
+    try {
+      const r = await sync(ctx, { company_id: st.company_id }) as { waiting?: boolean; message?: string; notas?: number; completas?: number };
+      if (!(r.waiting && !r.notas && !r.completas)) await setState(ctx, st.company_id, { last_status: `Busca automática ${hora}: ${r.message ?? ''}`.slice(0, 300) });
+      results.push({ company_id: st.company_id, ...r });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('sefaz cron', st.company_id, msg);
+      await setState(ctx, st.company_id, { last_status: `Busca automática ${hora} falhou: ${msg}`.slice(0, 300) }).catch(() => undefined);
+      results.push({ company_id: st.company_id, error: msg });
+    }
+  }
+  return { ok: true, results };
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Use POST.' });
+  if (req.headers?.['x-cron-secret'] !== undefined) {
+    if (!cronAllowed(req)) return res.status(401).json({ message: 'Chave inválida.' });
+    try { return res.status(200).json(await cronSync()); }
+    catch (e) { console.error('sefaz cron', e instanceof Error ? e.message : e); return res.status(500).json({ message: 'Falha na busca automática.' }); }
+  }
   try {
     const ctx = await auth(req);
     const b = (req.body && typeof req.body === 'object' ? req.body : JSON.parse(String(req.body ?? '{}'))) as Record<string, unknown>;

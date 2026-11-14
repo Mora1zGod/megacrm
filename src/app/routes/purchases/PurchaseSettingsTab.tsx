@@ -92,6 +92,11 @@ export function SefazSettings({ companyId }: { companyId?: string } = {}) {
                 {c.next_sync_after && new Date(c.next_sync_after).getTime() > Date.now() && <div className="text-xs text-[var(--color-text-muted)]">próxima liberada {fmtDateTime(c.next_sync_after)}</div>}
               </div>
             </div>
+            {c.has_cert && c.enabled && (
+              <p className="mt-3 text-xs text-[var(--color-text-muted)]">
+                Busca automática: todo dia por volta das 06:40 e das 12:40 (horário do Acre).
+              </p>
+            )}
             {(expired || soon || invalid) && (
               <p className={`mt-3 flex items-center gap-2 rounded-lg border p-2.5 text-xs font-medium ${expired || invalid ? 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.06)] text-[var(--color-error)]' : 'border-[rgba(245,158,11,0.4)] bg-[rgba(245,158,11,0.06)] text-[var(--inbox-warn-text,#B45309)]'}`}>
                 <ShieldAlert className="h-4 w-4 shrink-0" />
