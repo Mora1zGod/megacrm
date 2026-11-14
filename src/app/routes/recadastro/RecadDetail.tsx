@@ -145,7 +145,7 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
   const needsCert = files.some((f) => f.kind === 'certidao_casamento') || (people ?? []).some((p) => ['conjuge', 'sogro', 'sogra'].includes(p.relationship));
   const checkpoints = useMemo(() => {
     const list: { key: string; label: string; files: FileRow[] }[] = [
-      { key: 'pass', label: 'Passaporte / comprovante', files: files.filter((f) => !f.person_id && f.kind === 'passaporte') },
+      { key: 'pass', label: 'Passaporte/contrato ou comprovante', files: files.filter((f) => !f.person_id && f.kind === 'passaporte') },
       { key: 'doc', label: 'RG / CNH do titular', files: files.filter((f) => !f.person_id && f.kind === 'documento') },
     ];
     if (needsCert) list.push({ key: 'cert', label: 'Certidão de casamento / união', files: files.filter((f) => f.kind === 'certidao_casamento') });
@@ -241,7 +241,7 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
             <h3 className={cn(sectionTitle, 'mb-2')}>Passaporte</h3>
             <div className="grid gap-2 sm:grid-cols-2">
               <CopyField label="Passaporte informado" value={`${PLAN[sub.plan]}${sub.people_count ? ` — ${sub.people_count} pessoa(s)` : ''}`} field="plano" />
-              <CopyField label="Nº passaporte / contrato" value={sub.passport_number ?? ''} field="numero_passaporte" />
+              <CopyField label="Nº passaporte/contrato" value={sub.passport_number ?? ''} field="numero_passaporte" />
             </div>
           </section>
 

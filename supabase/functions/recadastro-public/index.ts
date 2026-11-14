@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
       if (pv.length >= MAX_FILES) return fail('Limite de arquivos atingido.');
       if (pv.reduce((a, f) => a + (f.size_bytes ?? 0), 0) + bytes.length > MAX_TOTAL_BYTES) return fail('Os arquivos deste envio passaram de 60 MB.');
       if (pv.filter((f) => f.kind === kind && f.person_id === personId).length >= MAX_PER_KIND[kind]) {
-        return fail(kind === 'passaporte' ? 'Do passaporte/título, mande só a frente e o verso (2 fotos) ou 1 PDF.' : 'Arquivos demais para este documento.');
+        return fail(kind === 'passaporte' ? 'Do passaporte/contrato, mande só a frente e o verso (2 fotos) ou 1 PDF.' : 'Arquivos demais para este documento.');
       }
 
       const who = personId ? `dep${body.person_position}` : 'titular';
@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
       ]);
       const fl = (files ?? []) as Array<{ kind: string; person_id: string | null }>;
       const missing: string[] = [];
-      if (!fl.some((f) => f.kind === 'passaporte')) missing.push('foto do passaporte, título, contrato ou comprovante de pagamento');
+      if (!fl.some((f) => f.kind === 'passaporte')) missing.push('foto do passaporte/contrato (ou título ou comprovante de pagamento)');
       if (!fl.some((f) => f.kind === 'documento' && f.person_id == null)) missing.push('RG ou CNH do titular');
       for (const p of (people ?? []) as Array<{ id: string; position: number; name: string; relationship: string }>) {
         if (!fl.some((f) => f.kind === 'documento' && f.person_id === p.id)) missing.push(`documento de ${p.name.split(' ')[0]}`);

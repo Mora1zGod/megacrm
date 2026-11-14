@@ -285,7 +285,7 @@ function PhotoPicker({ label, hint, files, onChange, max = 6 }: { label: string;
   );
 }
 
-const STEPS = ['Passaporte', 'Titular', 'Documentos', 'Dependentes', 'Conferência'] as const;
+const STEPS = ['Passaporte/contrato', 'Titular', 'Documentos', 'Dependentes', 'Conferência'] as const;
 
 function relLabel(p: Person) {
   if (p.relationship === 'outro') return p.relationshipOther || 'Outro';
@@ -367,7 +367,7 @@ export default function RecadastroPage() {
     if (s === 0) {
       if (!plan) return 'Escolha o seu passaporte (AMAI 10 ou AMAI INFINITY).';
       if (plan === 'amai10' && !(Number(peopleCount) >= 1 && Number(peopleCount) <= 10)) return 'No AMAI 10, diga para quantas pessoas foi a compra (de 1 a 10, contando você).';
-      if (!passportFiles.length) return 'Envie a foto do passaporte, título, contrato ou comprovante de pagamento.';
+      if (!passportFiles.length) return 'Envie a foto do passaporte/contrato (ou do título ou comprovante de pagamento).';
     }
     if (s === 1) {
       const name = holder.name.trim();
@@ -538,7 +538,7 @@ export default function RecadastroPage() {
         {step === 0 && (
           <>
             <ReviewNotice />
-            <Card title="Seu passaporte" hint="Leva uns 5 minutos. Tenha em mãos a foto do passaporte (ou do comprovante de pagamento) e o RG ou CNH de todos.">
+            <Card title="Seu passaporte/contrato" hint="Leva uns 5 minutos. Tenha em mãos a foto do passaporte/contrato (serve qualquer um dos dois, ou o comprovante de pagamento) e o RG ou CNH de todos.">
               <Choice value={plan} cols={3} onChange={setPlan}
                 options={[['amai10', 'AMAI 10'], ['infinity', 'AMAI INFINITY'], ['nao_sei', 'Não sei']] as const} />
               {plan === 'amai10' && (
@@ -550,10 +550,10 @@ export default function RecadastroPage() {
                 </Field>
               )}
               {plan === 'infinity' && <p className="text-sm text-[var(--color-text-secondary)]">O AMAI INFINITY é familiar: podem entrar pai, mãe, sogro, sogra, esposo(a) e filhos.</p>}
-              <Field label="Número do passaporte ou contrato" optional>
+              <Field label="Número do passaporte/contrato" optional>
                 <input className={inputCls} value={passportNumber} maxLength={40} onChange={(e) => setPassportNumber(e.target.value)} />
               </Field>
-              <PhotoPicker label="Foto do passaporte, título, contrato ou comprovante de pagamento"
+              <PhotoPicker label="Foto do passaporte/contrato (ou título ou comprovante de pagamento)"
                 hint="Fotografe o documento inteiro, com os dados legíveis. Também pode ser o print ou PDF do comprovante."
                 files={passportFiles} onChange={setPassportFiles} max={2} />
             </Card>
@@ -667,7 +667,7 @@ export default function RecadastroPage() {
         {step === 4 && (
           <>
             <Card title="Confira antes de enviar">
-              <Summary title="Passaporte" onEdit={() => goTo(0)}>
+              <Summary title="Passaporte/contrato" onEdit={() => goTo(0)}>
                 {plan === 'amai10' ? `AMAI 10 · ${peopleCount} pessoa(s)` : plan === 'infinity' ? 'AMAI INFINITY' : 'Não sei'}
                 {passportNumber.trim() && ` · nº ${passportNumber.trim()}`} · {passportFiles.length} foto(s)
               </Summary>
