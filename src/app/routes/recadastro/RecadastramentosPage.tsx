@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Copy, ExternalLink, IdCard, Link2, Loader2, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Copy, ExternalLink, IdCard, Link2, Loader2, RefreshCw, Search, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
@@ -14,14 +14,16 @@ import { PLAN, SUB_COLS, StatusChip, copy, fmtDateTime, type Status, type Submis
 // Os valores têm data-pocket="…" e os botões data-pocket-action="…" (extensão do navegador que copia para o Pocket).
 // Layout por container (@container): ≥1040 px = 3 colunas; ≥760 px = lista + cadastro; abaixo = lista OU cadastro.
 
-const FILTERS: [string, Status[] | null][] = [
+// [rótulo, status aceitos | 'pend' (com pendência aberta) | null (todos menos incompletos)]
+const FILTERS: [string, Status[] | 'pend' | null][] = [
+  ['Todos', null],
   ['A conferir', ['novo', 'em_analise']],
   ['Aguardando retorno', ['pendente']],
-  ['Prontos para lançar', ['conferido']],
+  ['Com pendência', 'pend'],
+  ['Prontos', ['conferido']],
   ['Lançados', ['lancado']],
   ['Recusados', ['recusado']],
   ['Incompletos', ['enviando']],
-  ['Todos', null],
 ];
 
 function LinkCard({ canManage }: { canManage: boolean }) {
@@ -118,25 +120,27 @@ export default function RecadastramentosPage() {
     };
   }, [loadSubs, loadCounts]);
 
+  const match = useCallback((r: Submission, f: Status[] | 'pend' | null) =>
+    f === null ? r.status !== 'enviando' : f === 'pend' ? (openCount[r.id] ?? 0) > 0 : f.includes(r.status), [openCount]);
   const statuses = FILTERS[filter][1];
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const qd = qq.replace(/\D/g, '');
-    return (rows ?? []).filter((r) => (!statuses || statuses.includes(r.status)) && (!qq
+    return (rows ?? []).filter((r) => match(r, statuses) && (!qq
       || r.holder_name.toLowerCase().includes(qq) || String(r.protocol).includes(qq) || (PLAN[r.plan] ?? '').toLowerCase().includes(qq)
       || (qd.length >= 3 && (r.holder_cpf.includes(qd) || (r.holder_phone ?? '').includes(qd)))));
-  }, [rows, statuses, q]);
-  const counts = useMemo(() => FILTERS.map(([, st]) => (rows ?? []).filter((r) => (st ? st.includes(r.status) : r.status !== 'enviando')).length), [rows]);
+  }, [rows, statuses, q, match]);
+  const counts = useMemo(() => FILTERS.map(([, st]) => (rows ?? []).filter((r) => match(r, st)).length), [rows, match]);
   const metrics: [string, number, typeof ClipboardList, number | null][] = [
-    ['Solicitações', counts[6], ClipboardList, 6],
-    ['A conferir', counts[0], AlertTriangle, 0],
-    ['Aguardando retorno', counts[1], Clock, 1],
-    ['Prontos para lançar', counts[2], CheckCircle2, 2],
+    ['Solicitações', counts[0], ClipboardList, 0],
+    ['A conferir', counts[1], AlertTriangle, 1],
+    ['Aguardando retorno', counts[2], Clock, 2],
+    ['Prontos para lançar', counts[4], CheckCircle2, 4],
   ];
   const current = (rows ?? []).find((r) => r.id === selected) ?? null;
 
   return (
-    <div className="@container flex h-full min-h-0 flex-col gap-3">
+    <div className="@container/page flex h-full min-h-0 flex-col gap-3">
       <div className={cn('flex flex-wrap items-center justify-between gap-x-4 gap-y-2', current && 'hidden @min-[760px]:flex')}>
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-subtle)] text-[var(--accent-primary)]"><IdCard className="h-5 w-5" /></span>
@@ -170,7 +174,7 @@ export default function RecadastramentosPage() {
           current && 'hidden @min-[760px]:flex')} aria-label="Solicitações">
           <div className="space-y-2 border-b border-[var(--color-border-card)] p-2.5">
             <div className="flex items-baseline justify-between">
-              <span className="text-sm font-semibold text-[var(--color-text-primary)]">Solicitações</span>
+              <span className="text-sm font-semibold text-[var(--color-text-primary)]">Fila de solicitações</span>
               <span className="text-xs text-[var(--color-text-muted)]">{list.length}</span>
             </div>
             <div className="relative">
@@ -194,19 +198,19 @@ export default function RecadastramentosPage() {
               const n = openCount[r.id] ?? 0;
               return (
                 <button key={r.id} type="button" onClick={() => setSelected(r.id)} data-pocket-item={r.protocol} data-pocket-status={r.status}
-                  className={cn('block w-full border-b border-l-2 border-b-[var(--color-border-soft)] px-3 py-2.5 text-left hover:bg-[var(--color-surface-hover)]',
+                  className={cn('flex w-full items-center gap-2.5 border-b border-l-2 border-b-[var(--color-border-soft)] px-3 py-2.5 text-left hover:bg-[var(--color-surface-hover)]',
                     selected === r.id ? 'border-l-[var(--accent-primary)] bg-[var(--color-accent-subtle)]' : 'border-l-transparent')}>
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text-primary)]">{r.holder_name}</span>
-                    <StatusChip status={r.status} />
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">#{r.protocol} · {fmtDateTime(r.completed_at ?? r.created_at)}</div>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <span className="truncate text-xs text-[var(--color-text-secondary)]">{PLAN[r.plan]}{r.people_count ? ` · ${r.people_count} pess.` : ''}</span>
-                    {centralReady && (n
-                      ? <span className="shrink-0 rounded-full bg-[rgba(239,68,68,0.12)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-error)]">{n} pendência{n > 1 ? 's' : ''}</span>
-                      : <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">sem pendências</span>)}
-                  </div>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]"><UserRound className="h-4 w-4" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text-primary)]">{r.holder_name}</span>
+                      <StatusChip status={r.status} />
+                    </span>
+                    <span className="mt-0.5 flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-xs text-[var(--color-text-muted)]">#{r.protocol} · {PLAN[r.plan]} · {fmtDateTime(r.completed_at ?? r.created_at)}</span>
+                      {centralReady && n > 0 && <span className="shrink-0 rounded-full bg-[rgba(239,68,68,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-error)]">{n} pend.</span>}
+                    </span>
+                  </span>
                 </button>
               );
             })}

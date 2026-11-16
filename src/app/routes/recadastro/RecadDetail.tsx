@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { zip } from 'fflate';
 import {
   AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, ExternalLink, FileText, History,
-  Info, Loader2, Lock, MessageCircle, Paperclip, Pencil, Plus, RotateCcw, Trash2, Users, X,
+  Download, Layers, LayoutGrid, Loader2, Lock, MessageCircle, Paperclip, Pencil, Plus, UserRound, Zap, RotateCcw, Trash2, Users, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -20,6 +21,7 @@ const QUICK = [
   ['Contrato', 'Enviar foto do título, passaporte ou contrato do AMAI Park.'],
   ['Dados divergentes', 'Confirmar dados que estão diferentes do cadastro.'],
   ['Certidão', 'Enviar certidão de casamento ou de união estável.'],
+  ['Foto ilegível', 'Reenviar a foto do documento: a enviada está ilegível.'],
 ] as const;
 
 const WA_GREEN = 'bg-[#16a34a] text-white hover:bg-[#15803d] disabled:opacity-60';
@@ -50,6 +52,8 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
   const [notesOpen, setNotesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [filesVer, setFilesVer] = useState(0);
+  const [tab, setTab] = useState<'resumo' | 'titular' | 'dependentes' | 'documentos'>('resumo');
+  const [recent, setRecent] = useState<EventRow[]>([]);
   const [editSub, setEditSub] = useState(false);
   const [editPerson, setEditPerson] = useState<PersonRow | 'new' | null>(null);
 
@@ -79,14 +83,16 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
   const loadSide = useCallback(async () => {
     if (!centralReady) return;
     const sb = getSupabase();
-    const [{ data: i }, { data: n }] = await Promise.all([
+    const [{ data: i }, { data: n }, { data: ev }] = await Promise.all([
       sb.from('recad_issues').select('id, submission_id, text, status, created_by, created_at, resolved_by, resolved_at, deleted_at')
         .eq('submission_id', sub.id).is('deleted_at', null).order('created_at'),
       sb.from('recad_notes').select('id, submission_id, text, created_by, created_at').eq('submission_id', sub.id).order('created_at', { ascending: false }),
+      sb.from('recad_events').select('id, kind, actor, at, meta').eq('submission_id', sub.id).order('at', { ascending: false }).limit(4),
     ]);
     // guarda contra resposta atrasada de outro cadastro
     setIssues(((i ?? []) as Issue[]).filter((x) => x.submission_id === sub.id));
     setNotes(((n ?? []) as Note[]).filter((x) => x.submission_id === sub.id));
+    setRecent((ev ?? []) as EventRow[]);
   }, [sub.id, centralReady]);
   useEffect(() => { void loadSide(); }, [loadSide, tick]);
 
@@ -158,129 +164,180 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
   const openFile = (f: FileRow) => setViewer(files.findIndex((x) => x.id === f.id));
 
   const blocked = openIssues.length > 0;
+  const fileLabel = (f: FileRow) => {
+    const who = f.person_id ? (people ?? []).find((p) => p.id === f.person_id)?.name.split(' ')[0] ?? 'dependente' : 'Titular';
+    return f.kind === 'passaporte' ? 'Passaporte/contrato' : f.kind === 'certidao_casamento' ? 'Certidão de casamento' : `RG/CNH (${who})`;
+  };
+  async function downloadAll() {
+    if (!files.length) return;
+    const t = toast.loading('Preparando os arquivos…');
+    try {
+      const entries: Record<string, Uint8Array> = {};
+      for (const [k, f] of files.entries()) {
+        if (!f.url) continue;
+        const buf = new Uint8Array(await (await fetch(f.url)).arrayBuffer());
+        const ext = f.mime === 'application/pdf' ? 'pdf' : f.mime === 'image/png' ? 'png' : f.mime === 'image/webp' ? 'webp' : 'jpg';
+        entries[`${String(k + 1).padStart(2, '0')}-${fileLabel(f).replace(/[^\w\-() ]+/g, '').replace(/\s+/g, '_')}.${ext}`] = buf;
+      }
+      const data = await new Promise<Uint8Array>((res, rej) => zip(entries, { level: 0 }, (err, out) => (err ? rej(err) : res(out))));
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'application/zip' }));
+      a.download = `recadastro-${sub.protocol}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast.success('Arquivos baixados', { id: t });
+    } catch {
+      toast.error('Não foi possível baixar os arquivos', { id: t });
+    }
+  }
+  const TABS = [
+    ['resumo', 'Resumo', LayoutGrid, null],
+    ['titular', 'Titular', UserRound, null],
+    ['dependentes', 'Dependentes', Users, people?.length ?? 0],
+    ['documentos', 'Documentos', FileText, files.length],
+  ] as const;
+  const row = 'grid grid-cols-[120px_minmax(0,1fr)] items-center gap-2 border-b border-[var(--color-border-soft)] py-1.5 text-sm last:border-0';
+  const rowLabel = 'text-xs text-[var(--color-text-muted)]';
+  const rowVal = 'min-w-0 truncate text-[var(--color-text-primary)]';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto @min-[1040px]:flex-row @min-[1040px]:overflow-visible">
       {/* ============ CENTRO ============ */}
-      <section className={cn(box, 'flex min-w-0 flex-col @min-[1040px]:min-h-0 @min-[1040px]:flex-1')} aria-label="Dados do cadastro selecionado">
-        <div className="space-y-2.5 border-b border-[var(--color-border-card)] p-3 sm:p-4">
+      <section className={cn(box, '@container flex min-w-0 flex-col @min-[1040px]:min-h-0 @min-[1040px]:flex-1')} aria-label="Dados do cadastro selecionado">
+        <div className="border-b border-[var(--color-border-card)] px-3 pt-3 sm:px-4 sm:pt-4">
           <div className="flex items-start gap-2">
             <button type="button" aria-label="Voltar para a lista" onClick={onClose}
-              className="-ml-1 rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] @min-[760px]:hidden"><ArrowLeft className="h-5 w-5" /></button>
+              className="-ml-1 rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] @min-[760px]/page:hidden"><ArrowLeft className="h-5 w-5" /></button>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                Protocolo #{sub.protocol} · recebido em {fmtDateTime(sub.completed_at ?? sub.created_at)}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="min-w-0 break-words text-lg font-semibold text-[var(--color-text-primary)]">{sub.holder_name}</h2>
+              <div className="text-xs text-[var(--color-text-muted)]">Protocolo #{sub.protocol} · Recebido em {fmtDateTime(sub.completed_at ?? sub.created_at)}</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <h2 className="min-w-0 break-words text-xl font-semibold text-[var(--color-text-primary)]">{sub.holder_name}</h2>
                 <StatusChip status={sub.status} />
               </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-text-secondary)]">
+                <span className="inline-flex items-center gap-1"><Layers className="h-3.5 w-3.5" /> Produto: <strong className="text-[var(--accent-primary)]">{PLAN[sub.plan]}</strong></span>
+                <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> Titular{sub.people_count ? <> · <strong className="text-[var(--color-text-primary)]">{sub.people_count} pessoas</strong></> : ` + ${people?.length ?? 0} dependente(s)`}</span>
+                {(sub.checked_at || sub.launched_at) && (
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    {sub.checked_at && <>Conferido em {fmtDateTime(sub.checked_at)}</>}
+                    {sub.checked_at && sub.launched_at && ' · '}
+                    {sub.launched_at && <>Lançado no Pocket em {fmtDateTime(sub.launched_at)}</>}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex max-w-full flex-wrap items-center gap-2">
-            {canManage ? (
-              <select value={sub.status} disabled={saving} aria-label="Status do recadastramento"
-                onChange={(e) => void saveSub({ status: e.target.value as Status }, 'Status atualizado')}
-                className="h-9 min-w-0 max-w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)]">
-                {(Object.keys(STATUS) as Status[])
-                  .filter((s) => (s !== 'enviando' || sub.status === 'enviando') && (s !== 'lancado' || sub.status === 'conferido' || sub.status === 'lancado'))
-                  .map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
-              </select>
-            ) : null}
-            <Button size="sm" className={WA_GREEN} onClick={() => setWhatsOpen(true)}><MessageCircle className="h-3.5 w-3.5" /> Conversar no WhatsApp</Button>
-            {canManage && ['novo', 'em_analise', 'pendente'].includes(sub.status) && (
-              <Button size="sm" disabled={saving} variant={blocked ? 'outline' : 'default'} data-pocket-action="conferir"
-                title={blocked ? 'Resolva as pendências em aberto antes' : undefined}
-                onClick={() => void saveSub({ status: 'conferido' }, 'Marcado como conferido — pronto para lançar')}>
-                {blocked ? <Lock className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />} Marcar como conferido
-              </Button>
-            )}
-            {canManage && sub.status === 'conferido' && (
-              <Button size="sm" disabled={saving} data-pocket-action="marcar-lancado" onClick={() => void saveSub({ status: 'lancado' }, 'Marcado como lançado no Pocket')}>
-                <Check className="h-3.5 w-3.5" /> Marcar como lançado no Pocket
-              </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={() => void copy(allText, 'Dados copiados')}><Copy className="h-3.5 w-3.5" /> Copiar tudo</Button>
-            {centralReady && <Button size="sm" variant="ghost" onClick={() => setHistoryOpen(true)}><History className="h-3.5 w-3.5" /> Histórico</Button>}
+          <div role="tablist" aria-label="Seções do cadastro" className="mt-3 flex max-w-full flex-wrap gap-x-1">
+            {TABS.map(([k, label, Icon, n]) => (
+              <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+                className={cn('inline-flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-medium',
+                  tab === k ? 'border-[var(--accent-primary)] text-[var(--accent-primary)]' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]')}>
+                <Icon className="h-4 w-4" /> {label}{n !== null ? ` (${n})` : ''}
+              </button>
+            ))}
           </div>
-          {(sub.checked_at || sub.launched_at) && (
-            <div className="text-xs text-[var(--color-text-muted)]">
-              {sub.checked_at && <>Conferido em {fmtDateTime(sub.checked_at)}</>}
-              {sub.checked_at && sub.launched_at && ' · '}
-              {sub.launched_at && <>Lançado no Pocket em {fmtDateTime(sub.launched_at)}</>}
-            </div>
-          )}
         </div>
 
-        <div className="space-y-5 p-3 sm:p-4 @min-[1040px]:min-h-0 @min-[1040px]:flex-1 @min-[1040px]:overflow-y-auto" data-pocket-protocol={sub.protocol} data-pocket-status={sub.status}>
-          <div className="flex items-start gap-2 rounded-[var(--radius-control)] bg-[var(--color-accent-subtle)] p-2.5 text-xs text-[var(--color-text-secondary)]">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent-primary)]" />
-            <span>Dados e arquivos enviados pelo próprio associado. <strong>Enviado não é validado:</strong> confira cada documento antes de marcar como conferido.</span>
-          </div>
+        <div className="p-3 sm:p-4 @min-[1040px]:min-h-0 @min-[1040px]:flex-1 @min-[1040px]:overflow-y-auto" data-pocket-protocol={sub.protocol} data-pocket-status={sub.status}>
           {sub.status === 'enviando' && (
-            <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2 text-sm text-[var(--color-text-primary)]">
-              <span className="min-w-0 flex-1">O associado começou mas não terminou de enviar os documentos. Complete abaixo (dados, dependentes e anexos) e conclua.</span>
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2 text-sm text-[var(--color-text-primary)]">
+              <span className="min-w-0 flex-1">O associado começou mas não terminou de enviar os documentos. Complete (dados, dependentes e anexos) e conclua.</span>
               {canManage && <Button size="sm" variant="outline" disabled={saving} onClick={() => void saveSub({ status: 'novo' }, 'Envio concluído pela equipe — agora está em "Novo"')}>Concluir envio</Button>}
             </div>
           )}
 
-          <section>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className={sectionTitle}>Titular</h3>
-              {canManage && <Button size="sm" variant="ghost" onClick={() => setEditSub(true)}><Pencil className="h-3.5 w-3.5" /> Editar dados</Button>}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <CopyField label="Nome completo" value={sub.holder_name} field="titular_nome" wide />
-              <CopyField label="CPF" value={fmtCpf(sub.holder_cpf)} field="titular_cpf" />
-              <CopyField label="Nascimento" value={fmtDate(sub.holder_birth)} field="titular_nascimento" />
-              <CopyField label="E-mail" value={sub.holder_email ?? ''} field="titular_email" />
-              <CopyField label="WhatsApp" value={sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : ''} field="titular_whatsapp" />
-              <CopyField label="Acesso ao portal" value="WhatsApp e e-mail" field="acesso_portal" />
-            </div>
-            {canManage && <PhoneEditor key={sub.holder_phone ?? ''} current={sub.holder_phone} disabled={saving}
-              onSave={(digits) => saveSub({ holder_phone: digits }, 'WhatsApp do titular salvo')} />}
-            {sub.contact_id && (
-              <Link to={`/contacts/${sub.contact_id}`} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent-primary)] hover:underline">
-                <ExternalLink className="h-3.5 w-3.5" /> Abrir contato / conversa no CRM
-              </Link>
-            )}
-          </section>
-
-          <section>
-            <h3 className={cn(sectionTitle, 'mb-2')}>Passaporte</h3>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <CopyField label="Passaporte informado" value={`${PLAN[sub.plan]}${sub.people_count ? ` — ${sub.people_count} pessoa(s)` : ''}`} field="plano" />
-              <CopyField label="Nº passaporte/contrato" value={sub.passport_number ?? ''} field="numero_passaporte" />
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className={sectionTitle}>Documentos</h3>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {people === null ? 'carregando…' : `${checkpoints.filter((c) => c.files.length).length} de ${checkpoints.length} pontos com arquivo`}
-              </span>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {checkpoints.map((c) => (
-                <div key={c.key} className={cn('min-w-0 rounded-[var(--radius-control)] border p-2.5',
-                  c.files.length ? 'border-[var(--color-border-soft)]' : 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.05)]')}>
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-xs font-semibold text-[var(--color-text-primary)]" title={c.label}>{c.label}</span>
-                    {c.key === 'pass' && sub.no_proof
-                      ? <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">declarou que não tem</span>
-                      : c.files.length
-                      ? <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">● enviado · conferir</span>
-                      : <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">○ não enviado</span>}
-                  </div>
-                  <Thumbs list={c.files} onOpen={openFile} />
-                  {canManage && <AddFiles sub={sub} kind={c.kind} personId={c.personId} onDone={() => setFilesVer((v) => v + 1)} />}
+          {/* ---------- RESUMO ---------- */}
+          <div className={cn('space-y-3', tab !== 'resumo' && 'hidden')}>
+            <div className="grid gap-3 @min-[640px]:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+              <div className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] p-3">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h3 className={cn(sectionTitle, 'inline-flex items-center gap-1.5')}><UserRound className="h-4 w-4 text-[var(--accent-primary)]" /> Dados do titular</h3>
+                  {canManage && <Button size="sm" variant="outline" onClick={() => setEditSub(true)}><Pencil className="h-3.5 w-3.5" /> Editar</Button>}
                 </div>
-              ))}
+                <div className={row}><span className={rowLabel}>Nome completo</span><span className={rowVal}>{sub.holder_name}</span></div>
+                <div className={row}><span className={rowLabel}>CPF</span><span className={rowVal}>{fmtCpf(sub.holder_cpf)}</span></div>
+                <div className={row}><span className={rowLabel}>Nascimento</span><span className={rowVal}>{fmtDate(sub.holder_birth)}{ageOf(sub.holder_birth)}</span></div>
+                <div className={row}><span className={rowLabel}>E-mail</span><span className={rowVal}>{sub.holder_email ?? '—'}</span></div>
+                <div className={row}><span className={rowLabel}>WhatsApp</span>
+                  <span className={cn(rowVal, 'inline-flex items-center gap-1')}><MessageCircle className="h-3.5 w-3.5 text-[#16a34a]" />{sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : '—'}</span></div>
+                <div className={row}><span className={rowLabel}>Acesso ao portal</span><span className={rowVal}>WhatsApp e e-mail</span></div>
+              </div>
+              <div className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] p-3">
+                <h3 className={cn(sectionTitle, 'mb-1 inline-flex items-center gap-1.5')}><Layers className="h-4 w-4 text-[var(--accent-primary)]" /> Resumo do cadastro</h3>
+                <div className={row}><span className={rowLabel}>Status atual</span><span><StatusChip status={sub.status} /></span></div>
+                <div className={row}><span className={rowLabel}>Pendências</span>
+                  <span>{openIssues.length
+                    ? <span className="rounded-full bg-[rgba(239,68,68,0.12)] px-2 py-0.5 text-xs font-semibold text-[var(--color-error)]">{openIssues.length} {openIssues.length > 1 ? 'itens' : 'item'}</span>
+                    : <span className="text-sm text-[var(--color-text-muted)]">nenhuma</span>}</span></div>
+                <div className={row}><span className={rowLabel}>Dependentes</span><span className={rowVal}>{people?.length ?? '…'} cadastrado(s)</span></div>
+                <div className={row}><span className={rowLabel}>Documentos</span><span className={rowVal}>{files.length} enviado(s) · {checkpoints.filter((c) => c.files.length).length}/{checkpoints.length} pontos</span></div>
+                <div className={row}><span className={rowLabel}>Produto</span><span className={cn(rowVal, 'font-semibold')}>{PLAN[sub.plan]}</span></div>
+                <div className={row}><span className={rowLabel}>Nº passaporte</span><span className={rowVal}>{sub.no_proof ? 'declarou que não tem' : sub.passport_number ?? '—'}</span></div>
+              </div>
             </div>
-          </section>
+            <div className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className={cn(sectionTitle, 'inline-flex items-center gap-1.5')}><FileText className="h-4 w-4 text-[var(--accent-primary)]" /> Documentos enviados ({files.length})</h3>
+                <div className="flex gap-2">
+                  {checkpoints.some((c) => !c.files.length) && <Button size="sm" variant="ghost" onClick={() => setTab('documentos')}>Ver faltantes</Button>}
+                  {files.length > 0 && <Button size="sm" variant="outline" onClick={() => void downloadAll()}><Download className="h-3.5 w-3.5" /> Baixar todos</Button>}
+                </div>
+              </div>
+              {people === null ? <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-primary)]" />
+                : files.length === 0 ? <p className="text-sm text-[var(--color-text-muted)]">Nenhum arquivo enviado.</p>
+                : (
+                  <div className="grid grid-cols-2 gap-2 @min-[560px]:grid-cols-3 @min-[820px]:grid-cols-4">
+                    {files.map((f) => (
+                      <button key={f.id} type="button" onClick={() => openFile(f)} title="Abrir documento"
+                        className="min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] p-2 text-left hover:border-[var(--accent-primary)]">
+                        <div className="flex h-24 items-center justify-center overflow-hidden rounded-md bg-[var(--color-surface-hover)]">
+                          {f.mime.startsWith('image/') && f.url
+                            ? <img src={f.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                            : <span className="flex flex-col items-center text-xs text-[var(--color-text-secondary)]"><FileText className="h-7 w-7" />PDF</span>}
+                        </div>
+                        <div className="mt-1.5 truncate text-xs font-medium text-[var(--color-text-primary)]">{fileLabel(f)}</div>
+                        <span className="mt-1 inline-block rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-primary)]">Enviado · conferir</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+            </div>
+          </div>
 
-          <section>
+          {/* ---------- TITULAR (campos com data-pocket para a extensão) ---------- */}
+          <div className={cn('space-y-5', tab !== 'titular' && 'hidden')}>
+            <section>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className={sectionTitle}>Titular</h3>
+                {canManage && <Button size="sm" variant="ghost" onClick={() => setEditSub(true)}><Pencil className="h-3.5 w-3.5" /> Editar dados</Button>}
+              </div>
+              <div className="grid gap-2 @min-[520px]:grid-cols-2">
+                <CopyField label="Nome completo" value={sub.holder_name} field="titular_nome" wide />
+                <CopyField label="CPF" value={fmtCpf(sub.holder_cpf)} field="titular_cpf" />
+                <CopyField label="Nascimento" value={fmtDate(sub.holder_birth)} field="titular_nascimento" />
+                <CopyField label="E-mail" value={sub.holder_email ?? ''} field="titular_email" />
+                <CopyField label="WhatsApp" value={sub.holder_phone ? formatPhoneDisplay(sub.holder_phone) : ''} field="titular_whatsapp" />
+                <CopyField label="Acesso ao portal" value="WhatsApp e e-mail" field="acesso_portal" />
+              </div>
+              {canManage && <PhoneEditor key={sub.holder_phone ?? ''} current={sub.holder_phone} disabled={saving}
+                onSave={(digits) => saveSub({ holder_phone: digits }, 'WhatsApp do titular salvo')} />}
+              {sub.contact_id && (
+                <Link to={`/contacts/${sub.contact_id}`} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent-primary)] hover:underline">
+                  <ExternalLink className="h-3.5 w-3.5" /> Abrir contato / conversa no CRM
+                </Link>
+              )}
+            </section>
+            <section>
+              <h3 className={cn(sectionTitle, 'mb-2')}>Passaporte</h3>
+              <div className="grid gap-2 @min-[520px]:grid-cols-2">
+                <CopyField label="Passaporte informado" value={`${PLAN[sub.plan]}${sub.people_count ? ` — ${sub.people_count} pessoa(s)` : ''}`} field="plano" />
+                <CopyField label="Nº passaporte/contrato" value={sub.passport_number ?? ''} field="numero_passaporte" />
+              </div>
+            </section>
+          </div>
+
+          {/* ---------- DEPENDENTES ---------- */}
+          <div className={cn(tab !== 'dependentes' && 'hidden')}>
             <div className="mb-2 flex items-center justify-between gap-2">
               <h3 className={sectionTitle}>Dependentes ({people?.length ?? 0})</h3>
               {canManage && people !== null && <Button size="sm" variant="ghost" onClick={() => setEditPerson('new')}><Plus className="h-3.5 w-3.5" /> Adicionar dependente</Button>}
@@ -299,7 +356,7 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
                         className="shrink-0 rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]"><Pencil className="h-3.5 w-3.5" /></button>
                     )}
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 @min-[520px]:grid-cols-2">
                     <CopyField label="Nome" value={p.name} field="dep_nome" wide />
                     <CopyField label="Nascimento" value={fmtDate(p.birth_date)} field="dep_nascimento" />
                     <CopyField label="Parentesco" value={relLabel(p)} field="dep_parentesco" />
@@ -309,89 +366,151 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
                 </div>
               ))}
             </div>
-          </section>
+          </div>
+
+          {/* ---------- DOCUMENTOS (pontos de conferência + anexar) ---------- */}
+          <div className={cn(tab !== 'documentos' && 'hidden')}>
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className={sectionTitle}>Documentos</h3>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                {people === null ? 'carregando…' : `${checkpoints.filter((c) => c.files.length).length} de ${checkpoints.length} pontos com arquivo`}
+              </span>
+            </div>
+            <div className="grid gap-2 @min-[520px]:grid-cols-2">
+              {checkpoints.map((c) => (
+                <div key={c.key} className={cn('min-w-0 rounded-[var(--radius-control)] border p-2.5',
+                  c.files.length ? 'border-[var(--color-border-soft)]' : 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.05)]')}>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs font-semibold text-[var(--color-text-primary)]" title={c.label}>{c.label}</span>
+                    {c.key === 'pass' && sub.no_proof
+                      ? <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">declarou que não tem</span>
+                      : c.files.length
+                      ? <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">● enviado · conferir</span>
+                      : <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">○ não enviado</span>}
+                  </div>
+                  <Thumbs list={c.files} onOpen={openFile} />
+                  {canManage && <AddFiles sub={sub} kind={c.kind} personId={c.personId} onDone={() => setFilesVer((v) => v + 1)} />}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ============ DIREITA ============ */}
-      <aside className={cn(box, 'flex min-w-0 flex-col @min-[1040px]:min-h-0 @min-[1040px]:w-[320px] @min-[1040px]:shrink-0')} aria-label="Pendências e observações">
-        <div className="space-y-2.5 border-b border-[var(--color-border-card)] p-3 sm:p-4">
-          <div className="text-sm font-semibold text-[var(--color-text-primary)]">Pendências e observações</div>
+      {/* ============ DIREITA: AÇÕES E PENDÊNCIAS ============ */}
+      <aside className={cn(box, 'flex min-w-0 flex-col @min-[1040px]:min-h-0 @min-[1040px]:w-[320px] @min-[1040px]:shrink-0')} aria-label="Ações e pendências">
+        <div className="space-y-4 p-3 sm:p-4 @min-[1040px]:min-h-0 @min-[1040px]:flex-1 @min-[1040px]:overflow-y-auto">
+          <h2 className="inline-flex items-center gap-1.5 text-base font-semibold text-[var(--color-text-primary)]"><Zap className="h-4 w-4 text-[#f59e0b]" /> Ações e pendências</h2>
+          {canManage && (
+            <label className="block">
+              <span className="text-xs font-medium text-[var(--color-text-secondary)]">Status do cadastro</span>
+              <select value={sub.status} disabled={saving} aria-label="Status do recadastramento"
+                onChange={(e) => void saveSub({ status: e.target.value as Status }, 'Status atualizado')}
+                className="mt-1 h-10 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)]">
+                {(Object.keys(STATUS) as Status[])
+                  .filter((s) => (s !== 'enviando' || sub.status === 'enviando') && (s !== 'lancado' || sub.status === 'conferido' || sub.status === 'lancado'))
+                  .map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
+              </select>
+            </label>
+          )}
+          <div className="space-y-2">
+            <Button className={cn('h-10 w-full', WA_GREEN)} onClick={() => setWhatsOpen(true)}>
+              <MessageCircle className="h-4 w-4" /> {openIssues.length ? 'Enviar pendências pelo WhatsApp' : 'Conversar no WhatsApp'}
+            </Button>
+            {canManage && ['novo', 'em_analise', 'pendente'].includes(sub.status) && (
+              <Button className="h-10 w-full" disabled={saving} variant={blocked ? 'outline' : 'default'} data-pocket-action="conferir"
+                title={blocked ? 'Resolva as pendências em aberto antes' : undefined}
+                onClick={() => void saveSub({ status: 'conferido' }, 'Marcado como conferido — pronto para lançar')}>
+                {blocked ? <Lock className="h-4 w-4" /> : <Check className="h-4 w-4" />} Marcar como conferido
+              </Button>
+            )}
+            {canManage && sub.status === 'conferido' && (
+              <Button className="h-10 w-full" disabled={saving} data-pocket-action="marcar-lancado" onClick={() => void saveSub({ status: 'lancado' }, 'Marcado como lançado no Pocket')}>
+                <Check className="h-4 w-4" /> Marcar como lançado no Pocket
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="w-full" onClick={() => void copy(allText, 'Dados copiados')}><Copy className="h-3.5 w-3.5" /> Copiar tudo (para o Pocket)</Button>
+          </div>
+
           {!centralReady ? (
             <div className="rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2.5 text-xs text-[var(--color-text-primary)]">
               Pendências e observações ainda não foram instaladas no banco (SQL <code>20261113090000_recad_central</code>).
             </div>
-          ) : openIssues.length ? (
-            <div className="flex items-start gap-2 rounded-[var(--radius-control)] border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.07)] p-2.5 text-xs text-[var(--color-text-primary)]">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-error)]" />
-              <span><strong>{openIssues.length} pendência{openIssues.length > 1 ? 's' : ''} em aberto.</strong> Não dá para marcar como conferido ou lançado até resolver.</span>
-            </div>
           ) : (
-            <div className="flex items-start gap-2 rounded-[var(--radius-control)] border border-[rgba(34,197,94,0.3)] bg-[rgba(34,197,94,0.07)] p-2.5 text-xs text-[var(--color-text-primary)]">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-success)]" />
-              <span><strong>Sem pendências abertas.</strong> Confira os documentos antes de prosseguir.</span>
-            </div>
-          )}
-          <Button className={cn('w-full', WA_GREEN)} onClick={() => setWhatsOpen(true)}>
-            <MessageCircle className="h-4 w-4" /> Enviar pendências pelo WhatsApp
-          </Button>
-          <p className="text-[11px] text-[var(--color-text-muted)]">A mensagem abre para revisão no WhatsApp; nada é enviado automaticamente.</p>
-        </div>
-
-        <div className="space-y-5 p-3 sm:p-4 @min-[1040px]:min-h-0 @min-[1040px]:flex-1 @min-[1040px]:overflow-y-auto">
-          {centralReady && (
             <>
-              <section>
-                <div className="mb-2 flex items-baseline justify-between gap-2">
-                  <h3 className={sectionTitle}>Pendências do cadastro</h3>
-                  <span className="text-xs text-[var(--color-text-muted)]">{openIssues.length} em aberto</span>
+              <section className={cn('rounded-[var(--radius-card)] border',
+                openIssues.length ? 'border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.05)]' : 'border-[rgba(34,197,94,0.3)] bg-[rgba(34,197,94,0.05)]')}>
+                <div className={cn('flex items-center gap-1.5 px-3 py-2 text-sm font-semibold',
+                  openIssues.length ? 'text-[var(--color-error)]' : 'text-[var(--color-success)]')}>
+                  {openIssues.length ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {openIssues.length ? `Pendências do cadastro (${openIssues.length})` : 'Sem pendências abertas'}
                 </div>
-                {sortedIssues.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">Nenhuma pendência registrada.</p>}
-                <div className="space-y-1.5">
-                  {sortedIssues.map((i) => (
-                    <div key={i.id} className={cn('flex items-start gap-2 rounded-[var(--radius-control)] border p-2',
-                      i.status === 'aberta' ? 'border-[rgba(239,68,68,0.3)]' : 'border-[var(--color-border-soft)] opacity-75')}>
-                      <input type="checkbox" checked={i.status === 'resolvida'} disabled={!canManage}
-                        aria-label={i.status === 'aberta' ? `Resolver: ${i.text}` : `Reabrir: ${i.text}`}
-                        onChange={() => void setIssue(i.id, { status: i.status === 'aberta' ? 'resolvida' : 'aberta' })}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
-                      <div className="min-w-0 flex-1">
-                        <div className={cn('break-words text-sm text-[var(--color-text-primary)]', i.status === 'resolvida' && 'line-through')}>{i.text}</div>
-                        <div className="text-[11px] text-[var(--color-text-muted)]">
-                          {i.status === 'resolvida'
-                            ? <>Resolvida por {nameOf(i.resolved_by)} em {fmtDateTime(i.resolved_at)}</>
-                            : <>Aberta por {nameOf(i.created_by)} em {fmtDateTime(i.created_at)}</>}
+                {sortedIssues.length > 0 && (
+                  <div className="space-y-1 px-2 pb-2">
+                    {sortedIssues.map((i) => (
+                      <div key={i.id} className={cn('flex items-start gap-2 rounded-md p-1.5', i.status === 'resolvida' && 'opacity-70')}>
+                        <input type="checkbox" checked={i.status === 'resolvida'} disabled={!canManage}
+                          aria-label={i.status === 'aberta' ? `Resolver: ${i.text}` : `Reabrir: ${i.text}`}
+                          onChange={() => void setIssue(i.id, { status: i.status === 'aberta' ? 'resolvida' : 'aberta' })}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-fill)]" />
+                        <div className="min-w-0 flex-1">
+                          <div className={cn('break-words text-sm text-[var(--color-text-primary)]', i.status === 'resolvida' && 'line-through')}>{i.text}</div>
+                          <div className="text-[11px] text-[var(--color-text-muted)]">
+                            {i.status === 'resolvida'
+                              ? <>Resolvida por {nameOf(i.resolved_by)} em {fmtDateTime(i.resolved_at)}</>
+                              : <>Aberta por {nameOf(i.created_by)} em {fmtDateTime(i.created_at)}</>}
+                          </div>
                         </div>
+                        {canManage && i.status === 'resolvida' && (
+                          <button type="button" title="Reabrir" aria-label="Reabrir pendência" onClick={() => void setIssue(i.id, { status: 'aberta' })}
+                            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]"><RotateCcw className="h-3.5 w-3.5" /></button>
+                        )}
+                        {canManage && (
+                          <button type="button" title="Excluir pendência" aria-label="Excluir pendência"
+                            onClick={() => { if (window.confirm('Excluir esta pendência? Ela continua registrada no histórico.')) void setIssue(i.id, { deleted_at: new Date().toISOString() }); }}
+                            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[rgba(239,68,68,0.1)] hover:text-[var(--color-error)]"><Trash2 className="h-3.5 w-3.5" /></button>
+                        )}
                       </div>
-                      {canManage && i.status === 'resolvida' && (
-                        <button type="button" title="Reabrir" aria-label="Reabrir pendência" onClick={() => void setIssue(i.id, { status: 'aberta' })}
-                          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]"><RotateCcw className="h-3.5 w-3.5" /></button>
-                      )}
-                      {canManage && (
-                        <button type="button" title="Excluir pendência" aria-label="Excluir pendência"
-                          onClick={() => { if (window.confirm('Excluir esta pendência? Ela continua registrada no histórico.')) void setIssue(i.id, { deleted_at: new Date().toISOString() }); }}
-                          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[rgba(239,68,68,0.1)] hover:text-[var(--color-error)]"><Trash2 className="h-3.5 w-3.5" /></button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {canManage && <IssueAdder onAdd={addIssue} />}
+                    ))}
+                  </div>
+                )}
               </section>
+              {canManage && <IssueAdder onAdd={addIssue} />}
 
               <section>
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <h3 className={sectionTitle}>Observações da equipe</h3>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-primary)]"><Users className="h-3 w-3" /> Interno</span>
+                  <h3 className={cn(sectionTitle, 'inline-flex items-center gap-1.5')}><Users className="h-4 w-4 text-[var(--accent-primary)]" /> Observações da equipe</h3>
+                  <span className="rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-primary)]">Interno</span>
                 </div>
                 <p className="mb-2 text-[11px] text-[var(--color-text-muted)]">Só a equipe vê. Não vão para o WhatsApp, o formulário nem o portal.</p>
                 {canManage && <NoteAdder subId={sub.id} onSaved={() => void loadSide()} />}
-                {notes.length === 0 && <p className="mt-2 text-xs text-[var(--color-text-muted)]">Nenhuma observação registrada.</p>}
                 {notes[0] && <NoteCard n={notes[0]} nameOf={nameOf} />}
                 {notes.length > 1 && (
                   <button type="button" onClick={() => setNotesOpen(true)} className="mt-1.5 text-xs font-semibold text-[var(--accent-primary)] hover:underline">
                     Ver todas as {notes.length} observações
                   </button>
                 )}
+              </section>
+
+              <section>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className={cn(sectionTitle, 'inline-flex items-center gap-1.5')}><History className="h-4 w-4 text-[var(--accent-primary)]" /> Histórico de ações</h3>
+                  <button type="button" onClick={() => setHistoryOpen(true)} className="text-xs font-semibold text-[var(--accent-primary)] hover:underline">Ver completo</button>
+                </div>
+                <ol className="relative space-y-3 border-l border-[var(--color-border-card)] pl-4">
+                  {recent.map((e, k) => (
+                    <li key={e.id} className="relative">
+                      <span className={cn('absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full', k === 0 ? 'bg-[var(--accent-fill)]' : 'bg-[var(--color-border-card)]')} />
+                      <div className="break-words text-sm text-[var(--color-text-primary)]">{eventText(e)}</div>
+                      <div className="text-[11px] text-[var(--color-text-muted)]">{fmtDateTime(e.at)} · {e.actor ? nameOf(e.actor) : 'Sistema'}</div>
+                    </li>
+                  ))}
+                  <li className="relative">
+                    <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-[var(--color-border-card)]" />
+                    <div className="text-sm text-[var(--color-text-primary)]">Solicitação recebida</div>
+                    <div className="text-[11px] text-[var(--color-text-muted)]">{fmtDateTime(sub.completed_at ?? sub.created_at)} · Associado</div>
+                  </li>
+                </ol>
               </section>
             </>
           )}
@@ -412,6 +531,14 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
       {historyOpen && <HistoryDialog subId={sub.id} title={`Protocolo #${sub.protocol} — ${sub.holder_name}`} nameOf={nameOf} onClose={() => setHistoryOpen(false)} />}
     </div>
   );
+}
+
+function ageOf(d: string | null): string {
+  if (!d) return '';
+  const b = new Date(`${d.slice(0, 10)}T12:00:00`), n = new Date();
+  let a = n.getFullYear() - b.getFullYear();
+  if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) a--;
+  return a >= 0 && a < 130 ? ` (${a} anos)` : '';
 }
 
 function Thumbs({ list, onOpen }: { list: FileRow[]; onOpen: (f: FileRow) => void }) {

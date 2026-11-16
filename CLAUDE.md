@@ -1051,6 +1051,12 @@ Regras:
   banco). Nada se apaga. Histórico: `dados_editados`, `dependente_incluido/editado`, `documento_equipe`. Nos triggers SECURITY DEFINER o
   teste de "é a equipe" é `auth.uid() IS NOT NULL` (lá `current_user` é o dono, nunca 'authenticated').
 
+- Tela nova (16/11/2026): centro com abas Resumo · Titular · Dependentes · Documentos (as abas fechadas ficam no DOM com `hidden`, então
+  os `data-pocket` continuam lá para a extensão — ler por `textContent`); direita "Ações e pendências" (status, WhatsApp, conferir/lançar,
+  pendências com caixinha, atalhos, observações, últimas 4 ações do histórico). O centro é `@container` (grades por largura do centro); a
+  raiz da página é `@container/page` (o voltar do celular usa `@min-[760px]/page:hidden`). "Baixar todos" = zip no navegador (`fflate`).
+  Lista: filtros Todos · A conferir · Aguardando retorno · Com pendência · Prontos · Lançados · Recusados · Incompletos (padrão: Todos).
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do

@@ -76,7 +76,7 @@ export function buildWhatsMessage(sub: Pick<Submission, 'holder_name' | 'protoco
 
 export function CopyField({ label, value, field, wide }: { label: string; value: string; field: string; wide?: boolean }) {
   return (
-    <div className={wide ? 'min-w-0 sm:col-span-2' : 'min-w-0'}>
+    <div className={wide ? 'min-w-0 @min-[520px]:col-span-2' : 'min-w-0'}>
       <div className="text-[11px] font-medium text-[var(--color-text-muted)]">{label}</div>
       <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] bg-[var(--color-bg-primary)] px-2 py-1.5">
         <span data-pocket={field} className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)]" title={value}>{value || '—'}</span>
