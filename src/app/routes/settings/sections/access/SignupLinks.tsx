@@ -7,6 +7,7 @@ import { getSupabase } from '@/lib/supabase';
 import { Field, inputCls } from './ui';
 import { invokeManage, memberLabel, type AccessRole, type Member, type Team } from './useAccessData';
 import { formatPhone } from '@/lib/format';
+import { useAppUser } from '@/app/providers/AppUserProvider';
 
 interface SignupLink {
   id: string;
@@ -181,14 +182,22 @@ export function ApproveSignupDialog({ member, roles, teams, canGrantAdmin, onClo
 }) {
   const [roleId, setRoleId] = useState(member.access_role_id ?? defaultRole(roles)?.id ?? '');
   const [teamId, setTeamId] = useState(member.team_id ?? '');
+  const [job, setJob] = useState(member.job_title ?? '');
+  const { orgId } = useAppUser();
   const [busy, setBusy] = useState(false);
 
   const approve = async () => {
     if (!roleId) { toast.error('Escolha o perfil de acesso.'); return; }
     setBusy(true);
     const err = await invokeManage({ action: 'approve', user_id: member.user_id, access_role_id: roleId, team_id: teamId || null });
+    if (err) { setBusy(false); toast.error('Não foi possível aprovar', { description: err }); return; }
+    // Cargo é decisão de quem aprova (o cadastro pelo link não pede mais).
+    if (job.trim() !== (member.job_title ?? '')) {
+      const { error: jobErr } = await getSupabase().from('app_users').update({ job_title: job.trim() || null })
+        .eq('user_id', member.user_id).eq('org_id', orgId ?? '');
+      if (jobErr) toast.error('Aprovado, mas o cargo não foi salvo', { description: jobErr.message });
+    }
     setBusy(false);
-    if (err) { toast.error('Não foi possível aprovar', { description: err }); return; }
     toast.success(`${memberLabel(member)} foi aprovado e já pode entrar.`, {
       description: `O sistema não manda e-mail: avise a pessoa que é só entrar em ${window.location.origin} com o e-mail ${member.email ?? ''} e a senha que ela criou no cadastro.`,
       duration: 12000,
@@ -210,6 +219,9 @@ export function ApproveSignupDialog({ member, roles, teams, canGrantAdmin, onClo
           <select id="ap-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} className={inputCls}>
             {roles.filter((r) => canGrantAdmin || !r.is_admin).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
+        </Field>
+        <Field label="Cargo" htmlFor="ap-job">
+          <input id="ap-job" value={job} onChange={(e) => setJob(e.target.value)} maxLength={80} className={inputCls} placeholder="Ex.: Atendente" />
         </Field>
         <Field label="Equipe / setor" htmlFor="ap-team">
           <select id="ap-team" value={teamId} onChange={(e) => setTeamId(e.target.value)} className={inputCls}>

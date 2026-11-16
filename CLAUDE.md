@@ -624,6 +624,9 @@ Regras:
 - Aprovação em Usuários e acessos (`manage-team-member` `approve` / `reject`): aprovar define
   perfil+equipe, tira o ban e põe `status='active'`; recusar apaga a linha e a conta.
 - `list_operators()` esconde pendentes; `status='pending'` já não passa no `current_org_active()`.
+- Tela nova (16/11/2026, `SelfSignupPage.tsx`): visual do parque (céu, palmeiras, piscina — SVG/CSS, cores fixas, não segue o tema),
+  campos Nome · E-mail · Celular/WhatsApp (obrigatório) · Senha · Repita. **Sem cargo**: quem decide é o admin no convite (UserDrawer)
+  ou na aprovação (`ApproveSignupDialog` grava `app_users.job_title` depois do `approve`).
 
 ## Financeiro (08/10/2026) — `20261008140000_finance_module.sql`, rota `/financeiro`
 
