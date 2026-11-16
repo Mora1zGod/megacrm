@@ -189,7 +189,7 @@ export default function SelfSignupPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (state.s !== 'form') return;
-    if (name.trim().split(/\s+/).length < 2) { toast.error('Informe seu nome completo.'); return; }
+    if (name.trim().length < 3) { toast.error('Informe seu nome.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { toast.error('E-mail inválido.'); return; }
     if (phone.replace(/\D/g, '').length < 10) { toast.error('Informe o celular com DDD.'); return; }
     if (password.length < 8) { toast.error('A senha precisa ter pelo menos 8 caracteres.'); return; }
@@ -253,7 +253,7 @@ export default function SelfSignupPage() {
       <Card>
         <CardHeader title={`Cadastro • ${state.org.name.toUpperCase()}`} subtitle="Preencha seus dados para realizar o cadastro." icon={<UserPlus className="h-7 w-7" />} />
         <form onSubmit={(e) => void submit(e)} className="space-y-4" noValidate>
-          <Row icon={<User className="h-5 w-5" />} label="Nome completo" htmlFor="su-name">
+          <Row icon={<User className="h-5 w-5" />} label="Nome" htmlFor="su-name">
             <input id="su-name" autoFocus required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Ex.: Maria da Silva" />
           </Row>
           <Row icon={<Mail className="h-5 w-5" />} label="E-mail" htmlFor="su-email">
