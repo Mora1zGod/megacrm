@@ -3,7 +3,8 @@
 // da empresa (AMAI: naoresponda@amaipark.com, Hostinger, smtp.hostinger.com:465 SSL).
 //
 // Credenciais em public.org_settings (cifradas, só service role):
-//   system_smtp_user, system_smtp_pass, [system_smtp_host], [system_smtp_port], [system_smtp_from_name]
+//   system_smtp_user (login), system_smtp_pass, [system_smtp_from] (remetente: pode ser um apelido/alias da caixa do login,
+//   ex.: login diretoria@ e remetente naoresponda@), [system_smtp_host], [system_smtp_port], [system_smtp_from_name]
 // Procura primeiro na org do aviso; sem nada lá, usa a da primeira org que tiver (uma caixa
 // atende a instância inteira, como o e-mail do login). Sem nenhuma: não envia (só registra no log).
 //
@@ -22,7 +23,7 @@ export interface SystemMail {
   replyTo?: string;
 }
 
-interface SmtpConf { host: string; port: number; user: string; pass: string; fromName: string }
+interface SmtpConf { host: string; port: number; user: string; pass: string; fromName: string; from?: string }
 
 let confCache: { orgId: string; conf: SmtpConf | null; at: number } | null = null;
 
@@ -41,10 +42,10 @@ async function loadConf(orgId: string | null): Promise<SmtpConf | null> {
       const r = rows.find((x) => x.org_id === owner && x.key === k);
       return r ? await decryptValue(r.value_encrypted) : null;
     };
-    const [user, pass, host, port, fromName] = await Promise.all([
-      get('system_smtp_user'), get('system_smtp_pass'), get('system_smtp_host'), get('system_smtp_port'), get('system_smtp_from_name'),
+    const [user, pass, host, port, fromName, from] = await Promise.all([
+      get('system_smtp_user'), get('system_smtp_pass'), get('system_smtp_host'), get('system_smtp_port'), get('system_smtp_from_name'), get('system_smtp_from'),
     ]);
-    if (user && pass) conf = { user, pass, host: host || 'smtp.hostinger.com', port: Number(port) || 465, fromName: fromName || 'AMAI Park' };
+    if (user && pass) conf = { user, pass, from: from || user, host: host || 'smtp.hostinger.com', port: Number(port) || 465, fromName: fromName || 'AMAI Park' };
   }
   confCache = { orgId: key, conf, at: Date.now() };
   return conf;
@@ -121,10 +122,11 @@ async function smtpSend(conf: SmtpConf, m: SystemMail, connect: (host: string, p
     await cmd('AUTH LOGIN', [334]);
     await cmd(b64(conf.user), [334], true);
     await cmd(b64(conf.pass), [235], true);
-    await cmd(`MAIL FROM:<${conf.user}>`, [250]);
+    const sender = conf.from || conf.user;
+    await cmd(`MAIL FROM:<${sender}>`, [250]);
     await cmd(`RCPT TO:<${m.to}>`, [250, 251]);
     await cmd('DATA', [354]);
-    const body = buildMime({ name: conf.fromName, email: conf.user }, m).replace(/\r\n\./g, '\r\n..');
+    const body = buildMime({ name: conf.fromName, email: sender }, m).replace(/\r\n\./g, '\r\n..');
     await cmd(`${body}\r\n.`, [250]);
     try { await cmd('QUIT', [221]); } catch { /* tanto faz */ }
   } finally {

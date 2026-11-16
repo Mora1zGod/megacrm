@@ -1065,7 +1065,8 @@ Regras:
   Storage, a tela filtra `deleted_at is null` e o histórico grava `documento_excluido`.
 
 ## E-mail do sistema (16/11/2026) — `_shared/system-mail.ts`, `public/email/*.html`
-- Remetente `naoresponda@amaipark.com` (Hostinger, smtp.hostinger.com:465 SSL). Duas pontas, mesma caixa:
+- Remetente `naoresponda@amaipark.com` = APELIDO (alias) da caixa `diretoria@amaipark.com`: o login SMTP é a diretoria, o remetente é o
+  naoresponda (`system_smtp_from`; no GoTrue `SMTP_USER`=diretoria, `SMTP_ADMIN_EMAIL`=naoresponda). Hostinger, smtp.hostinger.com:465 SSL. Duas pontas:
   1. **Login (GoTrue)**: convite, esqueci senha, confirmação → `.env` da VPS (`SMTP_*`) + no compose do auth
      `GOTRUE_MAILER_SUBJECTS_*` (português) e `GOTRUE_MAILER_TEMPLATES_*` = `https://crm.amaipark.com/email/<convite|senha|confirmar|link|troca>.html`
      (Go template, `{{ .ConfirmationURL }}`; gerados com `brandMail`). Sem SMTP o convite falha com "Error sending invite email" e nada é criado.
@@ -1073,7 +1074,7 @@ Regras:
      credenciais cifradas em `public.org_settings` (`system_smtp_user/pass/host/port/from_name`; usa a da org ou, sem ela, a primeira que
      houver). Nunca derruba quem chama. `brandMail()` = layout com logo/botão/rodapé "não responda".
      Usado em `public-signup` (cadastro recebido + aviso aos admins ativos, link só da credencial `app_url`) e `manage-team-member` approve
-     (acesso liberado). Configuração: script `email.py` na VPS (pede a senha com getpass, testa, guarda cifrada, ajusta auth, copia funções).
+     (acesso liberado). Configuração: script `emailcrm.py` na VPS (nunca `email.py`: esconde a biblioteca `email` do Python) (pede a senha com getpass, testa, guarda cifrada, ajusta auth, copia funções).
 
 ## Celular / PWA (16/11/2026)
 - Abaixo de 768 px (`useIsMobile`, `src/hooks/useIsMobile.ts`) o `Header` vira `MobileTop`: faixa da marca (logo + "ORG CRM" + curva
