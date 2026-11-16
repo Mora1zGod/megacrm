@@ -143,6 +143,8 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     return data.members.filter((m) => {
+      // "Todos" = quem está em uso; inativos ficam guardados na aba Inativos (reativar quando precisar).
+      if (status === 'all' && m.status !== 'active' && m.status !== 'pending') return false;
       if (status === 'active' && (m.status !== 'active' || m.invite_pending)) return false;
       if (status === 'inactive' && (m.status === 'active' || m.status === 'pending')) return false;
       if (status === 'approval' && m.status !== 'pending') return false;
@@ -151,6 +153,19 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
       return `${m.display_name ?? ''} ${m.email} ${m.job_title ?? ''} ${m.role_name ?? ''} ${m.team_name ?? ''}`.toLowerCase().includes(t);
     });
   }, [data.members, q, status]);
+
+  // Só para inativos: tira a pessoa desta organização (e apaga a conta se não estiver em outra).
+  const removeForever = async (m: Member) => {
+    setMenu(null);
+    if (!window.confirm(`Excluir ${memberLabel(m)} de vez?\n\nA pessoa sai da lista e, se não estiver em outra organização, a conta é apagada. Para só guardar, deixe inativo (fica na aba Inativos).`)) return;
+    setBusy(m.user_id);
+    const { data: res, error } = await getSupabase().functions.invoke('delete-team-member', { body: { user_id: m.user_id } });
+    setBusy(null);
+    const fail = (res as { ok?: boolean; error?: string } | null)?.ok === false ? (res as { error?: string }).error : error?.message;
+    if (fail) { toast.error('Não foi possível excluir', { description: fail }); return; }
+    toast.success(`${memberLabel(m)} foi excluído.`);
+    void data.reload();
+  };
 
   const act = async (m: Member, action: 'deactivate' | 'reactivate' | 'reset_password' | 'resend_invite') => {
     setMenu(null);
@@ -179,7 +194,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
   };
 
   const counts = {
-    all: data.members.length,
+    all: data.members.filter((m) => m.status === 'active' || m.status === 'pending').length,
     approval: data.members.filter((m) => m.status === 'pending').length,
     active: data.members.filter((m) => m.status === 'active' && !m.invite_pending).length,
     pending: data.members.filter((m) => m.status === 'active' && m.invite_pending).length,
@@ -268,6 +283,7 @@ function UsersTab({ data, onEdit, onHistory }: { data: Data; onEdit: (m: Member)
                       ? <MenuItem icon={UserX} label="Desativar" danger onClick={() => void act(m, 'deactivate')} />
                       : <MenuItem icon={UserCheck} label="Reativar" onClick={() => void act(m, 'reactivate')} />)}
                     {perms.can('audit.view') && <MenuItem icon={History} label="Ver histórico" onClick={() => { setMenu(null); onHistory(m); }} />}
+                    {canManage && perms.isAdmin && m.status !== 'active' && <MenuItem icon={Trash2} label="Excluir de vez" danger onClick={() => void removeForever(m)} />}
                   </div>
                 </>,
                 document.body,
