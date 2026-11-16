@@ -577,7 +577,7 @@ export function MessageInput({
                     ? 'Legenda (opcional)…'
                     : isPrivate
                       ? 'Anotação interna — só a equipe vê…'
-                      : narrow ? 'Digite uma mensagem...' : 'Digite uma mensagem... ("/" para respostas rápidas)'
+                      : narrow ? 'Mensagem' : 'Digite uma mensagem... ("/" para respostas rápidas)'
                 }
               />
             </div>

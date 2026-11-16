@@ -7,11 +7,14 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#062720",
-  "theme_color": "#0B3B2E",
+  "background_color": "#F3F5F9",
+  "theme_color": "#1D4ED8",
   "lang": "pt-BR",
   "dir": "ltr",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -34,16 +37,26 @@
   ],
   "shortcuts": [
     {
-      "name": "Inbox",
-      "short_name": "Inbox",
+      "name": "Atendimento",
+      "short_name": "Atendimento",
       "url": "/inbox",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "Visitas de hoje",
-      "short_name": "Visitas",
-      "url": "/visitas",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "name": "Agenda",
+      "short_name": "Agenda",
+      "url": "/agenda",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

@@ -21,7 +21,8 @@ function channelBadge(
   if (channel === 'instagram') {
     return { Icon: Instagram, label: 'Instagram', chip: 'bg-[var(--color-fill-subtle)] text-[var(--color-text-secondary)]' };
   }
-  const phoneLabel = channelPhone || channelLabel;
+  // Nome do número ("Amai Park") primeiro; sem nome, o telefone.
+  const phoneLabel = channelLabel || channelPhone;
   if (provider === 'uazapi') {
     return {
       Icon: MessageCircle,

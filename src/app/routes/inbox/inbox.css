@@ -94,7 +94,7 @@
 .inbox-composer-box { display: flex; align-items: flex-end; gap: 4px; border: 1px solid var(--color-border-card); border-radius: 16px; background: var(--color-surface); padding: 6px 6px 6px 8px; }
 .inbox-composer-box:focus-within { border-color: var(--accent-primary); }
 .inbox-composer-box.is-note { border-color: var(--color-note-border); background: var(--color-note-bg); }
-.inbox-composer textarea { flex: 1; min-height: 40px; max-height: 160px; border: 0; background: transparent; padding: 9px 6px; line-height: 1.45; font-size: 14.5px; resize: none; outline: none; color: var(--color-text-primary); }
+.inbox-composer textarea { flex: 1; min-width: 0; width: 100%; min-height: 40px; max-height: 160px; border: 0; background: transparent; padding: 9px 6px; line-height: 1.45; font-size: 14.5px; resize: none; outline: none; color: var(--color-text-primary); }
 .inbox-composer textarea::placeholder { color: var(--color-text-muted); }
 .inbox-icon-btn { display: inline-flex; height: 38px; width: 38px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; color: var(--color-text-secondary); transition: background var(--motion-fast), color var(--motion-fast); }
 .inbox-icon-btn:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text-primary); }
@@ -120,6 +120,17 @@
 @media (min-width: 1440px) {
   .inbox-panels { grid-template-columns: 360px minmax(0, 1fr) 360px; }
   .inbox-panels.inbox-details-collapsed { grid-template-columns: 360px minmax(0, 1fr) 48px; }
+}
+/* Celular (16/11/2026): conversas em cartões, botões da caixa de mensagem menores (cabem com o Enviar). */
+@media (max-width: 767px) {
+  .inbox-list-header { padding: 16px 14px 10px; }
+  .inbox-list-tools { padding: 0 12px 10px; }
+  .inbox-conversation-row { border: 1px solid var(--color-border-soft); border-radius: 18px; background: var(--color-surface); padding: 14px 12px; box-shadow: 0 1px 2px rgba(15, 27, 46, 0.05); }
+  .inbox-conversation-row + .inbox-conversation-row { margin-top: 10px; }
+  .inbox-conversation-row:active { background: var(--color-surface-hover); }
+  .inbox-icon-btn { height: 34px; width: 34px; }
+  .inbox-composer-box { padding: 4px 4px 4px 4px; gap: 0; }
+  .inbox-send-btn { height: 44px; width: 44px; }
 }
 @media (max-width: 639px) {
   .inbox-conversation-heading { padding: 10px 12px; min-height: 0; }

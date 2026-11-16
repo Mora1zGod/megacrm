@@ -1,7 +1,8 @@
+import { MOBILE_BTN, MOBILE_PANEL } from '@/app/layout/mobileChrome';
 import { useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { toast } from 'sonner';
-import { ArrowLeft, Bell, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
+import { AlarmClock, ArrowLeft, Bell, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppUser } from '@/app/providers/AppUserProvider';
 import { REMINDER_COLORS, toLocalInput, useReminders, type Reminder, type ReminderColor } from '@/hooks/useReminders';
@@ -22,7 +23,7 @@ function dueLabel(iso: string): { text: string; late: boolean } {
 
 // Botão "Lembretes" do topo: notas rápidas pessoais (ou da equipe), com cor e
 // data opcional. Com data, aparecem também na Agenda.
-export function RemindersPopover() {
+export function RemindersPopover({ mobile = false }: { mobile?: boolean } = {}) {
   const { userId } = useAppUser();
   const perms = usePermission();
   const { reminders, create, update, setDone, remove } = useReminders();
@@ -71,9 +72,10 @@ export function RemindersPopover() {
         onClick={() => { setOpen((v) => !v); reset(); setMode(reminders.length || !perms.can('reminders.create') ? 'list' : 'new'); }}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
+        aria-label="Lembretes"
+        className={mobile ? MOBILE_BTN : 'relative flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]'}
       >
-        <Bell className="h-4 w-4 text-[var(--accent-primary)]" />
+        {mobile ? <AlarmClock className="h-5 w-5 text-[var(--accent-primary)]" /> : <Bell className="h-4 w-4 text-[var(--accent-primary)]" />}
         <span className="hidden min-[1800px]:inline">Lembretes</span>
         {reminders.length > 0 && (
           <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent-fill)] px-1 text-[10px] font-bold text-white">{reminders.length}</span>
@@ -82,7 +84,7 @@ export function RemindersPopover() {
       {open && (
         <>
           <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-label="Lembretes" className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-[340px] max-w-[calc(100vw-24px)] rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-lg)]">
+          <div role="dialog" aria-label="Lembretes" className={`fade-scale-in ${mobile ? MOBILE_PANEL : 'absolute right-0 top-[calc(100%+6px)] w-[340px] max-w-[calc(100vw-24px)]'} z-[calc(var(--z-dropdown)+1)] rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-lg)]`}>
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
                 {mode === 'new' && reminders.length > 0 && (

@@ -1075,6 +1075,21 @@ Regras:
      Usado em `public-signup` (cadastro recebido + aviso aos admins ativos, link só da credencial `app_url`) e `manage-team-member` approve
      (acesso liberado). Configuração: script `email.py` na VPS (pede a senha com getpass, testa, guarda cifrada, ajusta auth, copia funções).
 
+## Celular / PWA (16/11/2026)
+- Abaixo de 768 px (`useIsMobile`, `src/hooks/useIsMobile.ts`) o `Header` vira `MobileTop`: faixa da marca (logo + "ORG CRM" + curva
+  azul/verde) · faixa de suporte em cartão (`SupportBanner variant="card"`) · botões quadrados (`MOBILE_BTN` em `layout/mobileChrome.ts`):
+  menu, Tarefas, Lembretes (ícone de despertador), Avisos, Nova venda, Criar. Monta SÓ uma das versões (celular OU computador) para não
+  dobrar carregamentos. O topo grava a altura em `--mh`; painéis dos botões (`mobile` prop) abrem `fixed` logo abaixo, largura da tela.
+- Menu do celular (`MobileNav`): marca, busca (evento `OPEN_SEARCH_EVENT`), grupos com ícone em bloco, rodapé com troca de org
+  (`OrgSwitcher inDrawer`), usuário, tema e sair (no celular o tema e o sair saíram do topo).
+- Altura: `AppLayout` usa `h-dvh` (não `h-screen`: no iPhone escondia a caixa de mensagem); área segura: topo no `MobileTop`
+  (`env(safe-area-inset-top)`), inferior no `<main>`. `theme-color` acompanha o tema (AppUserProvider). Manifest azul.
+- Atendimento no celular: conversas em cartões (`inbox.css` @max 767px), título com ícone e subtítulo, etiqueta do número = nome
+  do canal ("Amai Park") antes do telefone, cabeçalho da conversa compacto (nome em 2 linhas), caixa de mensagem com textarea
+  `min-width:0` (antes o botão Enviar saía da tela). Iniciais do `Avatar` com cor pelo nome (claro/escuro via `[[data-theme=dark]_&]` —
+  o `dark:` do Tailwind aqui segue o sistema, não o tema do CRM).
+- Teste de tela: `pw_mob.js` (scratchpad) simula sessão e dados do Atendimento em 390/360/768/1366.
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do

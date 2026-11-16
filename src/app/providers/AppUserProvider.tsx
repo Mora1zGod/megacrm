@@ -172,6 +172,9 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   const effectiveTheme: ThemeMode = themeOverride ?? themeMode;
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', effectiveTheme);
+    // Barra de status do celular/PWA acompanha o tema (antes ficava sempre escura).
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', effectiveTheme === 'dark' ? '#0A1120' : '#F3F5F9');
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', effectiveTheme);
   }, [effectiveTheme]);
 
   const toggleTheme = useCallback(() => {

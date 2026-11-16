@@ -1,3 +1,4 @@
+import { MOBILE_BTN } from '@/app/layout/mobileChrome';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AtSign, Bell, CheckCheck, Inbox, MessageSquare, UserRoundCog } from 'lucide-react';
@@ -24,7 +25,7 @@ function iconFor(type: NotificationRow['type']) {
   return Inbox;
 }
 
-export function NotificationsDropdown() {
+export function NotificationsDropdown({ mobile = false }: { mobile?: boolean } = {}) {
   const navigate = useNavigate();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
@@ -59,8 +60,9 @@ export function NotificationsDropdown() {
         size="icon"
         aria-label="Notificações"
         onClick={() => setOpen((v) => !v)}
+        className={mobile ? MOBILE_BTN : undefined}
       >
-        <Bell className="h-4.5 w-4.5" />
+        <Bell className={mobile ? 'h-5 w-5 text-[var(--accent-primary)]' : 'h-4.5 w-4.5'} />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-[var(--color-error)] text-white text-[10px] font-bold flex items-center justify-center px-1">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -69,7 +71,7 @@ export function NotificationsDropdown() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-1.5rem)] rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] shadow-2xl z-50 overflow-hidden max-h-[70vh] flex flex-col">
+        <div className={`${mobile ? 'fixed inset-x-3 top-[calc(var(--mh,120px)+6px)]' : 'absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-1.5rem)]'} rounded-xl border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] shadow-2xl z-50 overflow-hidden max-h-[70vh] flex flex-col`}>
           <div className="flex items-center justify-between p-3 border-b border-[var(--color-border-card)]">
             <div>
               <div className="text-label">Notificações</div>

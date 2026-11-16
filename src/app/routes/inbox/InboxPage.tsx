@@ -405,7 +405,15 @@ export default function InboxPage() {
           }`}
         >
           <div className="inbox-list-header flex items-center justify-between gap-3">
-            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Conversas</h2>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[rgba(34,197,94,0.14)] text-[var(--inbox-wa,#16A34A)] md:hidden" aria-hidden>
+                <MessageCircle className="h-6 w-6" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Conversas</h2>
+                <p className="mt-0.5 text-[13px] leading-snug text-[var(--color-text-secondary)] md:hidden">Seus atendimentos em um só lugar.</p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => setShowStartChat(true)}
@@ -492,20 +500,20 @@ export default function InboxPage() {
         >
           {selected ? (
             <>
-              <div className="inbox-conversation-heading flex items-center gap-3 sm:gap-4">
+              <div className="inbox-conversation-heading flex items-center gap-2 sm:gap-4">
                 <button
                   onClick={() => setSelectedId(null)}
                   aria-label="Voltar à lista"
-                  className="lg:hidden h-9 w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+                  className="lg:hidden h-9 w-8 sm:w-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
                 >
                   <ArrowLeft className="h-4.5 w-4.5" />
                 </button>
-                <Avatar src={selected.contact?.profile_pic_url} name={selected.contact?.name || selected.contact?.phone} size="lg" className="!h-12 !w-12 sm:!h-16 sm:!w-16" />
+                <Avatar src={selected.contact?.profile_pic_url} name={selected.contact?.name || selected.contact?.phone} size="lg" className="!h-10 !w-10 !text-sm sm:!h-16 sm:!w-16 sm:!text-lg" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-bold text-[var(--color-text-primary)]">
+                  <div className="line-clamp-2 break-words text-[16px] font-bold leading-tight text-[var(--color-text-primary)] sm:line-clamp-1 sm:text-lg">
                     {selected.contact?.name?.trim() || formatPhone(selected.contact?.phone) || '—'}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[15px] text-[var(--color-text-secondary)]">
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[13px] text-[var(--color-text-secondary)] sm:gap-1.5 sm:text-[15px]">
                     <span className="truncate">{selectedIsGroup ? 'Grupo do WhatsApp' : (instagramHandle(selected.contact)
                       ? [selected.contact?.phone ? formatPhoneDisplay(selected.contact.phone) : null, instagramHandle(selected.contact)].filter(Boolean).join(' · ')
                       : formatPhoneDisplay(selected.contact?.phone))}</span>
@@ -521,9 +529,10 @@ export default function InboxPage() {
                       </button>
                     )}
                   </div>
-                  <div className="mt-0.5 truncate text-[13px] text-[var(--color-text-muted)]">
-                    {lastActivityLabel(selected.last_message_at)}
-                    {' · '}Responsável: {operatorName(selected.assigned_to) ?? 'ninguém'}
+                  <div className="mt-0.5 truncate text-[12px] text-[var(--color-text-muted)] sm:text-[13px]">
+                    <span className="hidden sm:inline">{lastActivityLabel(selected.last_message_at)}{' · '}Responsável: </span>
+                    <span className="sm:hidden">{lastActivityLabel(selected.last_message_at).replace('Última atividade ', '')}{' · '}</span>
+                    {operatorName(selected.assigned_to) ?? 'ninguém'}
                   </div>
                 </div>
 
@@ -543,13 +552,13 @@ export default function InboxPage() {
                 </div>
 
                 {/* Abaixo de 1440px o painel some: Transferir/Concluir ficam aqui. */}
-                <div className="flex items-center gap-2 min-[1440px]:hidden">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 min-[1440px]:hidden">
                   {perms.can('inbox.transfer') && <TransferMenu
                     operators={operators}
                     assignedTo={selected.assigned_to}
                     userId={userId}
                     onAssign={(uid) => setAssigned(selected.id, uid)}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-card)] px-3 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
+                    className="inline-flex h-10 w-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border-card)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] sm:h-9 sm:w-auto sm:rounded-[var(--radius-control)] sm:px-3"
                   >
                     <ArrowRightLeft className="h-4 w-4" />
                     <span className="hidden xl:inline">Transferir</span>
@@ -558,7 +567,7 @@ export default function InboxPage() {
                     onClick={() => void toggleClosed()}
                     title={selected.status !== 'closed' ? 'Concluir atendimento' : 'Reabrir atendimento'}
                     className={cn(
-                      'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition-colors',
+                      'inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-colors sm:h-9 sm:w-auto sm:rounded-[var(--radius-control)] sm:px-3',
                       selected.status !== 'closed'
                         ? 'bg-[var(--accent-fill)] text-white hover:bg-[var(--accent-fill-hover)]'
                         : 'border border-[var(--color-border-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]',
@@ -576,7 +585,7 @@ export default function InboxPage() {
                     aria-label="Mais opções"
                     aria-haspopup="menu"
                     aria-expanded={moreOpen}
-                    className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+                    className="h-9 w-8 sm:w-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
                   >
                     <MoreVertical className="h-5 w-5" />
                   </button>

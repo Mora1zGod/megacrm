@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Menu, LogOut, Search, Plus, ChevronDown, User, Briefcase, CalendarDays, CheckSquare, Megaphone, Sun, Moon, BadgeDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { NotificationsDropdown } from '@/components/NotificationsDropdown';
 import { OrgSwitcher } from '@/app/layout/OrgSwitcher';
 import { CommandPalette } from '@/components/CommandPalette';
@@ -16,6 +17,12 @@ import { AmaiaStatusPill } from '@/components/ai/AmaiaStatusPill';
 import { DailyTasksPopover } from '@/components/header/DailyTasksPopover';
 import { RemindersPopover } from '@/components/header/RemindersPopover';
 import { OPEN_NEW_SALE_EVENT } from '@/hooks/useSales';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { SupportBanner } from './SupportBanner';
+import { MOBILE_BTN } from './mobileChrome';
+
+// Busca global aberta de fora do topo (ex.: menu do celular).
+export const OPEN_SEARCH_EVENT = 'megacrm:open-search';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -40,6 +47,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [criarOpen, setCriarOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
   const [saleContact, setSaleContact] = useState<{ id: string; name: string | null } | null>(null);
+  const mobile = useIsMobile();
 
   // Nova Venda pode ser aberta de qualquer tela (ex.: ficha do contato).
   useEffect(() => {
@@ -60,9 +68,77 @@ export function Header({ onMenuClick }: HeaderProps) {
         setSearchOpen(true);
       }
     };
+    const onOpenSearch = () => setSearchOpen(true);
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
+    };
   }, []);
+
+  const criarMenu = (compact: boolean) => (
+    criarItems.length > 0 && <div className={compact ? 'relative min-w-0 flex-1' : 'relative'}>
+          <Button onClick={() => setCriarOpen((v) => !v)} className={compact ? 'h-11 w-full rounded-xl px-3 text-[15px] shadow-[0_6px_16px_rgba(29,78,216,0.3)]' : 'min-h-10'}>
+            <Plus className="h-4 w-4" /> Criar <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${criarOpen ? 'rotate-180' : ''}`} />
+          </Button>
+          {criarOpen && (
+            <>
+              <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setCriarOpen(false)} />
+              <div className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-48 origin-top-right rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
+                {criarItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => { setCriarOpen(false); navigate(item.href); }}
+                      className="flex w-full min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-left text-sm text-[var(--color-text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--color-surface-hover)]"
+                    >
+                      <Icon className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+  );
+
+  const dialogs = (
+    <>
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <NewSaleDialog open={saleOpen} onClose={() => setSaleOpen(false)} initialContact={saleContact} />
+    </>
+  );
+
+  // ---------------------------------------------------------------- celular
+  if (mobile) {
+    return (
+      <MobileTop
+        onMenuClick={onMenuClick}
+        actions={
+          <>
+            <button type="button" onClick={onMenuClick} aria-label="Abrir menu" className={MOBILE_BTN}>
+              <Menu className="h-5 w-5" />
+            </button>
+            {perms.can('tasks.view') && <DailyTasksPopover mobile />}
+            {perms.can('reminders.view') && <RemindersPopover mobile />}
+            <NotificationsDropdown mobile />
+            {perms.can('financial.create') && (
+              <button type="button" aria-label="Nova venda" title="Nova venda" onClick={() => { setSaleContact(null); setSaleOpen(true); }}
+                className={cn(MOBILE_BTN, 'border-transparent bg-[rgba(34,197,94,0.16)] text-[var(--color-success)] hover:bg-[rgba(34,197,94,0.24)]')}>
+                <BadgeDollarSign className="h-5 w-5" />
+              </button>
+            )}
+            {criarMenu(true)}
+          </>
+        }
+      >
+        {dialogs}
+      </MobileTop>
+    );
+  }
 
   const handleLogout = async () => {
     await signOut();
@@ -109,31 +185,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         >
           <BadgeDollarSign className="h-4 w-4" /> <span className="hidden xl:inline">Nova venda</span>
         </Button>}
-        {criarItems.length > 0 && <div className="relative">
-          <Button onClick={() => setCriarOpen((v) => !v)} className="min-h-10">
-            <Plus className="h-4 w-4" /> Criar <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${criarOpen ? 'rotate-180' : ''}`} />
-          </Button>
-          {criarOpen && (
-            <>
-              <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setCriarOpen(false)} />
-              <div className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-48 origin-top-right rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-[var(--shadow-lg)]">
-                {criarItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.label}
-                      onClick={() => { setCriarOpen(false); navigate(item.href); }}
-                      className="flex w-full min-h-10 items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-left text-sm text-[var(--color-text-primary)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--color-surface-hover)]"
-                    >
-                      <Icon className="h-4 w-4 text-[var(--color-text-secondary)]" />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>}
+        {criarMenu(false)}
 
         <OrgSwitcher />
 
@@ -165,8 +217,49 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <NewSaleDialog open={saleOpen} onClose={() => setSaleOpen(false)} initialContact={saleContact} />
+      {dialogs}
+    </header>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Topo do celular: marca da organização · faixa de suporte (se houver) · barra de botões.
+// Grava a altura em --mh para os painéis (tarefas, lembretes, avisos) abrirem logo abaixo.
+// ---------------------------------------------------------------------------
+function MobileTop({ actions, children }: { onMenuClick?: () => void; actions: React.ReactNode; children: React.ReactNode }) {
+  const { orgName, orgLogoUrl } = useAppUser();
+  const ref = useRef<HTMLElement>(null);
+  const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty('--mh', `${Math.round(el.getBoundingClientRect().bottom)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => { ro.disconnect(); document.documentElement.style.removeProperty('--mh'); };
+  }, []);
+  const name = orgName?.trim() || 'Organização';
+  return (
+    <header ref={ref} role="banner" className="shrink-0 bg-[var(--color-bg-primary)] pt-[env(safe-area-inset-top)]">
+      <div className="relative flex h-14 items-center gap-3 overflow-hidden border-b border-[var(--color-border-soft)] bg-[var(--color-surface)] px-4">
+        {orgLogoUrl && !broken ? (
+          <img src={orgLogoUrl} alt="" onError={() => setBroken(true)} className="h-9 w-auto max-w-[72px] shrink-0 object-contain" />
+        ) : (
+          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--color-border-card)] text-sm font-bold">{name[0].toUpperCase()}</span>
+        )}
+        <span className="h-7 w-px shrink-0 bg-[var(--color-border-card)]" aria-hidden />
+        <div className="relative z-10 min-w-0 truncate text-[17px] font-extrabold tracking-[-0.01em] text-[var(--color-text-primary)]">
+          {name.toUpperCase()} <span className="font-normal text-[var(--color-text-muted)]">CRM</span>
+        </div>
+        <svg className="pointer-events-none absolute -right-2 top-0 h-full w-32" viewBox="0 0 128 56" preserveAspectRatio="none" aria-hidden>
+          <path d="M30 56 C 70 50 95 30 128 0 L128 56 Z" fill="#22C55E" />
+          <path d="M48 56 C 82 50 104 34 128 12 L128 56 Z" fill="#1D4ED8" />
+        </svg>
+      </div>
+      <SupportBanner variant="card" />
+      <div className="flex items-center gap-2 px-3 py-2.5">{actions}</div>
+      {children}
     </header>
   );
 }

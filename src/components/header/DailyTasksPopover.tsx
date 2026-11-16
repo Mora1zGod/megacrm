@@ -1,3 +1,4 @@
+import { MOBILE_BTN, MOBILE_PANEL } from '@/app/layout/mobileChrome';
 import { useCallback, useEffect, useState } from 'react';
 import { usePermission } from '@/app/providers/PermissionsProvider';
 import { Link } from 'react-router-dom';
@@ -44,7 +45,7 @@ function dayLabel(iso: string): string {
 // "Tarefas Diárias" no topo: minhas tarefas (ou sem responsável) em três abas — Hoje (contador feitas/total),
 // Próximas (pendentes dos próximos 30 dias, por dia) e Atrasadas (pendentes vencidas). Marcar como feita adianta
 // a tarefa (recorrente: a próxima continua contando da data marcada). Bolinha = pendentes de hoje + atrasadas.
-export function DailyTasksPopover() {
+export function DailyTasksPopover({ mobile = false }: { mobile?: boolean } = {}) {
   const { userId, orgId } = useAppUser();
   // Todas as empresas (mesma escolha da tela de Tarefas).
   const { companies, multi } = useTaskCompanies();
@@ -128,9 +129,10 @@ export function DailyTasksPopover() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]"
+        aria-label="Tarefas diárias"
+        className={mobile ? MOBILE_BTN : 'relative flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-soft)] px-3 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)]'}
       >
-        <ClipboardList className="h-4 w-4 text-[var(--accent-primary)]" />
+        <ClipboardList className={mobile ? 'h-5 w-5 text-[var(--accent-primary)]' : 'h-4 w-4 text-[var(--accent-primary)]'} />
         <span className="hidden min-[1800px]:inline">Tarefas Diárias</span>
         {pending > 0 && (
           <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-error)] px-1 text-[10px] font-bold text-white">{pending}</span>
@@ -139,7 +141,7 @@ export function DailyTasksPopover() {
       {open && (
         <>
           <div className="fixed inset-0 z-[var(--z-dropdown)]" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-label="Tarefas diárias" className="fade-scale-in absolute right-0 top-[calc(100%+6px)] z-[calc(var(--z-dropdown)+1)] w-[380px] max-w-[calc(100vw-24px)] rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-3 shadow-[var(--shadow-lg)]">
+          <div role="dialog" aria-label="Tarefas diárias" className={`fade-scale-in ${mobile ? MOBILE_PANEL : 'absolute right-0 top-[calc(100%+6px)] w-[380px] max-w-[calc(100vw-24px)]'} z-[calc(var(--z-dropdown)+1)] rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-3 shadow-[var(--shadow-lg)]`}>
             <div className="mb-2 flex items-center justify-between px-1">
               <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--color-text-primary)]">
                 Tarefas Diárias

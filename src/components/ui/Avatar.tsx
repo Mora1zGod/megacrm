@@ -37,6 +37,22 @@ function initialsFrom(name: string | null | undefined): string {
   return value.slice(0, 2).toUpperCase();
 }
 
+// Cor das iniciais pelo nome (sempre a mesma para a mesma pessoa) — lista mais fácil de bater o olho.
+const TINTS = [
+  'bg-[rgba(34,197,94,0.16)] text-[#15803D] [[data-theme=dark]_&]:text-[#4ADE80]',
+  'bg-[rgba(59,130,246,0.16)] text-[#1D4ED8] [[data-theme=dark]_&]:text-[#93C5FD]',
+  'bg-[rgba(245,158,11,0.18)] text-[#B45309] [[data-theme=dark]_&]:text-[#FBBF24]',
+  'bg-[rgba(139,92,246,0.16)] text-[#6D28D9] [[data-theme=dark]_&]:text-[#C4B5FD]',
+  'bg-[rgba(20,184,166,0.16)] text-[#0F766E] [[data-theme=dark]_&]:text-[#5EEAD4]',
+];
+function tintFor(name: string | null | undefined): string {
+  const v = (name ?? '').trim();
+  if (!v) return 'bg-[var(--color-surface-raised)] border border-[var(--color-border-card)] text-[var(--color-text-secondary)]';
+  let h = 0;
+  for (let i = 0; i < v.length; i += 1) h = (h * 31 + v.charCodeAt(i)) >>> 0;
+  return TINTS[h % TINTS.length];
+}
+
 export function Avatar({ online, ...props }: AvatarProps) {
   if (online === undefined) return <AvatarImage {...props} />;
   return (
@@ -78,7 +94,8 @@ function AvatarImage({ src: rawSrc, name, size = 'md', className }: Omit<AvatarP
   return (
     <div
       className={cn(
-        'rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-border-card)] flex items-center justify-center font-semibold text-[var(--color-text-secondary)] shrink-0',
+        'rounded-full flex items-center justify-center font-bold shrink-0',
+        tintFor(name),
         sizeClass,
         className,
       )}

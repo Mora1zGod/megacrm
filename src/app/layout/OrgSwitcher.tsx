@@ -19,7 +19,7 @@ interface OrgOption {
   status: 'active' | 'archived';
 }
 
-export function OrgSwitcher() {
+export function OrgSwitcher({ inDrawer = false }: { inDrawer?: boolean } = {}) {
   const { session } = useAuth();
   const { orgId, orgName, isSuperAdmin } = useAppUser();
   const [open, setOpen] = useState(false);
@@ -94,6 +94,7 @@ export function OrgSwitcher() {
 
   // Membro de uma org só: apenas o nome, sem dropdown.
   if (!isSuperAdmin && mine.length <= 1) {
+    if (inDrawer) return null;
     return <div className="hidden md:block pr-2 border-r border-[var(--color-border-card)]">{label}</div>;
   }
   const list: OrgOption[] | null = isSuperAdmin
@@ -101,20 +102,30 @@ export function OrgSwitcher() {
     : mine.map((o) => ({ id: o.id, name: o.name, slug: '', status: 'active' as const }));
 
   return (
-    <div ref={rootRef} className="relative hidden md:block pr-2 border-r border-[var(--color-border-card)]">
+    <div ref={rootRef} className={inDrawer ? 'relative' : 'relative hidden md:block pr-2 border-r border-[var(--color-border-card)]'}>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Trocar de organização"
-        className="flex items-center gap-1.5 rounded-[var(--radius-control)] px-2 py-1 -my-1 transition-colors duration-150 hover:bg-[var(--color-surface-hover)]"
+        className={inDrawer
+          ? 'flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-[var(--color-border-soft)] px-3 text-left transition-colors hover:bg-[var(--color-surface-hover)]'
+          : 'flex items-center gap-1.5 rounded-[var(--radius-control)] px-2 py-1 -my-1 transition-colors duration-150 hover:bg-[var(--color-surface-hover)]'}
       >
-        {label}
+        {inDrawer ? (
+          <>
+            <Building2 className="h-4.5 w-4.5 shrink-0 text-[var(--accent-primary)]" />
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[11px] text-[var(--color-text-muted)]">Trocar de organização</span>
+              <span className="block truncate text-sm font-semibold text-[var(--color-text-primary)]">{orgName ?? '—'}</span>
+            </span>
+          </>
+        ) : label}
         <ChevronDown
           className={`h-4 w-4 text-[var(--color-text-secondary)] transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open ? (
-        <div className="absolute right-2 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-lg">
+        <div className={`absolute z-50 ${inDrawer ? 'bottom-[calc(100%+8px)] left-0 right-0 max-h-[50dvh] overflow-y-auto' : 'right-2 top-[calc(100%+8px)] w-64'} overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface-raised)] p-1.5 shadow-lg`}>
           <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
             Organizações
           </div>
