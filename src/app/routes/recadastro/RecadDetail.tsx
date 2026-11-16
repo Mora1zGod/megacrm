@@ -64,7 +64,7 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
       const sb = getSupabase();
       const [{ data: p }, { data: f }] = await Promise.all([
         sb.from('recad_people').select('id, position, name, birth_date, relationship, relationship_other, cpf, email').eq('submission_id', sub.id).order('position'),
-        sb.from('recad_files').select('id, person_id, kind, path, mime').eq('submission_id', sub.id).order('created_at'),
+        sb.from('recad_files').select('id, person_id, kind, path, mime').eq('submission_id', sub.id).is('deleted_at', null).order('created_at'),
       ]);
       const fl = (f ?? []) as Omit<FileRow, 'url'>[];
       let urls: Record<string, string | null> = {};
@@ -162,6 +162,15 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
     return list;
   }, [files, people, needsCert]);
   const openFile = (f: FileRow) => setViewer(files.findIndex((x) => x.id === f.id));
+  // Excluir = exclusão lógica (20261116150000_recad_file_delete.sql): some da tela, o arquivo fica guardado e entra no histórico.
+  async function deleteFile(f: FileRow) {
+    if (!window.confirm('Excluir este documento do cadastro? Ele sai da tela e fica registrado no histórico.')) return;
+    const { error } = await getSupabase().from('recad_files').update({ deleted_at: new Date().toISOString() }).eq('id', f.id);
+    if (error) { toast.error('Não foi possível excluir', { description: error.message }); return; }
+    toast.success('Documento excluído');
+    setFilesVer((v) => v + 1);
+    void loadSide();
+  }
 
   const blocked = openIssues.length > 0;
   const fileLabel = (f: FileRow) => {
@@ -388,7 +397,7 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
                       ? <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">● enviado · conferir</span>
                       : <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">○ não enviado</span>}
                   </div>
-                  <Thumbs list={c.files} onOpen={openFile} />
+                  <Thumbs list={c.files} onOpen={openFile} onDelete={canManage ? deleteFile : undefined} />
                   {canManage && <AddFiles sub={sub} kind={c.kind} personId={c.personId} onDone={() => setFilesVer((v) => v + 1)} />}
                 </div>
               ))}
@@ -541,17 +550,25 @@ function ageOf(d: string | null): string {
   return a >= 0 && a < 130 ? ` (${a} anos)` : '';
 }
 
-function Thumbs({ list, onOpen }: { list: FileRow[]; onOpen: (f: FileRow) => void }) {
+function Thumbs({ list, onOpen, onDelete }: { list: FileRow[]; onOpen: (f: FileRow) => void; onDelete?: (f: FileRow) => void }) {
   if (!list.length) return <div className="text-[11px] text-[var(--color-text-muted)]">Peça o arquivo ao associado (pendência).</div>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {list.map((f) => (
-        <button key={f.id} type="button" onClick={() => onOpen(f)} title="Abrir documento"
-          className="block h-16 w-16 overflow-hidden rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-hover)] hover:ring-2 hover:ring-[var(--accent-primary)]">
-          {f.mime.startsWith('image/') && f.url
-            ? <img src={f.url} alt="Documento" loading="lazy" className="h-full w-full object-cover" />
-            : <span className="flex h-full w-full flex-col items-center justify-center text-[11px] text-[var(--color-text-secondary)]"><FileText className="h-5 w-5" />{f.mime === 'application/pdf' ? 'PDF' : 'Arquivo'}</span>}
-        </button>
+        <div key={f.id} className="group relative">
+          <button type="button" onClick={() => onOpen(f)} title="Abrir documento"
+            className="block h-16 w-16 overflow-hidden rounded-lg border border-[var(--color-border-card)] bg-[var(--color-surface-hover)] hover:ring-2 hover:ring-[var(--accent-primary)]">
+            {f.mime.startsWith('image/') && f.url
+              ? <img src={f.url} alt="Documento" loading="lazy" className="h-full w-full object-cover" />
+              : <span className="flex h-full w-full flex-col items-center justify-center text-[11px] text-[var(--color-text-secondary)]"><FileText className="h-5 w-5" />{f.mime === 'application/pdf' ? 'PDF' : 'Arquivo'}</span>}
+          </button>
+          {onDelete && (
+            <button type="button" title="Excluir documento" aria-label="Excluir documento" onClick={() => onDelete(f)}
+              className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-border-card)] bg-[var(--color-surface)] text-[var(--color-text-muted)] shadow-sm hover:border-[var(--color-error)] hover:text-[var(--color-error)]">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );

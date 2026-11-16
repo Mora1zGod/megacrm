@@ -108,6 +108,7 @@ export function eventText(e: EventRow): string {
     case 'dados_editados': return `Dados corrigidos pela equipe: ${Object.keys(e.meta ?? {}).join(', ')}`;
     case 'dependente_incluido': return `Dependente incluído pela equipe${t}`;
     case 'dependente_editado': return `Dependente corrigido pela equipe${t}`;
+    case 'documento_excluido': return `Documento excluído pela equipe (${({ passaporte: 'passaporte/contrato', documento: 'RG/CNH', certidao_casamento: 'certidão' } as Record<string, string>)[String(e.meta?.tipo)] ?? 'arquivo'})${t}`;
     case 'documento_equipe': return `Documento anexado pela equipe (${({ passaporte: 'passaporte/contrato', documento: 'RG/CNH', certidao_casamento: 'certidão' } as Record<string, string>)[String(e.meta?.tipo)] ?? 'arquivo'})${t}`;
     case 'whatsapp_aberto': {
       const n = Number(e.meta?.pendencias ?? 0);

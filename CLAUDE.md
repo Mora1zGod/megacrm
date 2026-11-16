@@ -1057,6 +1057,10 @@ Regras:
   raiz da página é `@container/page` (o voltar do celular usa `@min-[760px]/page:hidden`). "Baixar todos" = zip no navegador (`fflate`).
   Lista: filtros Todos · A conferir · Aguardando retorno · Com pendência · Prontos · Lançados · Recusados · Incompletos (padrão: Todos).
 
+- Excluir documento (16/11/2026, `20261116150000_recad_file_delete.sql`): lixeira em cada miniatura da aba Documentos (`recad.manage`).
+  Exclusão LÓGICA: `recad_files.deleted_at/deleted_by` (só essa coluna pode mudar, 1 vez; o banco põe now() e auth.uid()); o arquivo fica no
+  Storage, a tela filtra `deleted_at is null` e o histórico grava `documento_excluido`.
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do
