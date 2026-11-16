@@ -14,6 +14,44 @@
 
 import { getAdminClient, getAuthAdminClient } from '../_shared/supabase-admin.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
+import { getCredential } from '../_shared/credentials.ts';
+import { brandMail, sendSystemMail } from '../_shared/system-mail.ts';
+
+// E-mails do cadastro (16/11/2026): "recebemos" para a pessoa + aviso aos administradores ativos.
+// Link do CRM só da credencial app_url (nunca do navegador: o aviso vai para os admins).
+async function signupMails(db: ReturnType<typeof getAdminClient>, authAdmin: ReturnType<typeof getAuthAdminClient>,
+  org: { id: string; name: string; logo_url: string | null }, person: { name: string; email: string }) {
+  const base = ((await getCredential(org.id, 'app_url').catch(() => null)) ?? '').replace(/\/$/, '');
+  const first = person.name.split(' ')[0];
+  const toPerson = brandMail({
+    orgName: org.name, logoUrl: org.logo_url, title: 'Recebemos o seu cadastro',
+    paragraphs: [
+      `Olá, **${first}**! Seu cadastro no CRM da ${org.name} foi recebido.`,
+      'Agora é só aguardar: um administrador vai conferir e liberar o seu acesso. Você recebe outro e-mail quando estiver liberado.',
+      `Para entrar, use este e-mail (**${person.email}**) e a senha que você criou no cadastro.`,
+    ],
+  });
+  const jobs: Promise<unknown>[] = [sendSystemMail(org.id, { to: person.email, subject: `Cadastro recebido – ${org.name}`, ...toPerson })];
+
+  const { data: admins } = await db.from('app_users').select('user_id').eq('org_id', org.id).eq('status', 'active').eq('role', 'admin').limit(20);
+  for (const a of (admins ?? []) as Array<{ user_id: string }>) {
+    jobs.push((async () => {
+      const { data } = await authAdmin.auth.admin.getUserById(a.user_id);
+      const to = data?.user?.email;
+      if (!to) return;
+      const m = brandMail({
+        orgName: org.name, logoUrl: org.logo_url, title: 'Novo cadastro aguardando aprovação',
+        paragraphs: [
+          `**${person.name}** (${person.email}) se cadastrou pelo link e está aguardando a sua aprovação.`,
+          'Confira em Configurações → Equipe e acessos → Usuários, no filtro "Aguardando aprovação". Lá você escolhe o perfil, a equipe e o cargo.',
+        ],
+        button: base ? { label: 'Abrir Usuários e acessos', url: `${base}/configuracoes/equipe/usuarios` } : undefined,
+      });
+      await sendSystemMail(org.id, { to, subject: `Novo cadastro para aprovar: ${person.name}`, ...m });
+    })());
+  }
+  await Promise.allSettled(jobs);
+}
 
 const TOKEN_RE = /^[0-9a-f]{20,64}$/i;
 const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
@@ -94,7 +132,7 @@ Deno.serve(async (req) => {
     const phone = clean(body.phone, 30);
     const job = clean(body.job_title, 80);
     const password = typeof body.password === 'string' ? body.password : '';
-    if (!name || name.length < 3) return jsonResponse({ ok: false, error: 'Informe seu nome completo.' }, { status: 400 });
+    if (!name || name.length < 3) return jsonResponse({ ok: false, error: 'Informe seu nome (pelo menos 3 letras).' }, { status: 400 });
     if (!EMAIL_RE.test(email)) return jsonResponse({ ok: false, error: 'E-mail inválido.' }, { status: 400 });
     if (phone && phone.replace(/\D/g, '').length < 10) return jsonResponse({ ok: false, error: 'Telefone incompleto.' }, { status: 400 });
     if (password.length < 8 || password.length > 72) {
@@ -184,6 +222,11 @@ Deno.serve(async (req) => {
       p_meta: { ip, email, link_id: link!.id, user_agent: (req.headers.get('user-agent') ?? '').slice(0, 300) || null },
       p_actor: newId,
     });
+
+    // E-mails sem segurar a resposta (se o runtime deixar); falha de e-mail nunca desfaz o cadastro.
+    const mails = signupMails(db, authAdmin, org, { name, email }).catch((e) => console.error('signup mails', e));
+    const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(mails); else await mails;
 
     return jsonResponse({ ok: true });
   } catch (err) {

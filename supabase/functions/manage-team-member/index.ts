@@ -23,6 +23,7 @@ import { AuthError, callerCan, requireOrgCaller, type Caller } from '../_shared/
 import { getAdminClient, getAuthAdminClient } from '../_shared/supabase-admin.ts';
 import { getCredential } from '../_shared/credentials.ts';
 import { jsonResponse, preflight } from '../_shared/cors.ts';
+import { brandMail, sendSystemMail } from '../_shared/system-mail.ts';
 
 type OrgCaller = Caller & { orgId: string };
 type Action = 'invite' | 'deactivate' | 'reactivate' | 'reset_password' | 'resend_invite' | 'approve' | 'reject';
@@ -51,6 +52,9 @@ function translateAuthError(raw: string): string {
   if (/already.*registered|User already registered|already been registered/i.test(raw)) return 'Já existe um usuário com esse e-mail.';
   if (/rate limit/i.test(raw)) return 'Muitos envios em sequência. Aguarde alguns minutos e tente de novo.';
   if (/invalid email|invalid format/i.test(raw)) return 'E-mail inválido.';
+  if (/error sending .*email|sending (invite|recovery|confirmation)/i.test(raw)) {
+    return 'O servidor não conseguiu enviar o e-mail (e-mail do sistema não configurado ou recusado). Nada foi criado — tente de novo depois de configurar, ou mande o link de cadastro.';
+  }
   return raw;
 }
 
@@ -239,6 +243,23 @@ Deno.serve(async (req) => {
         .eq('user_id', userId).eq('org_id', caller.orgId);
       if (stErr) return jsonResponse({ ok: false, error: stErr.message }, { status: 500 });
       await stampActor(db, caller, userId);
+
+      // Avisa a pessoa por e-mail (best-effort: a aprovação já valeu).
+      if (email) {
+        const base = await appUrl(caller.orgId, body.app_url);
+        const { data: orgRow } = await db.from('organizations').select('name, logo_url').eq('id', caller.orgId).maybeSingle();
+        const org = (orgRow ?? { name: 'AMAI Park', logo_url: null }) as { name: string; logo_url: string | null };
+        const first = (member.display_name ?? '').trim().split(' ')[0];
+        const m = brandMail({
+          orgName: org.name, logoUrl: org.logo_url, title: 'Seu acesso foi liberado!',
+          paragraphs: [
+            `Olá${first ? `, **${first}**` : ''}! Seu cadastro no CRM da ${org.name} foi aprovado.`,
+            `Entre com o e-mail **${email}** e a senha que você criou no cadastro.`,
+          ],
+          button: base ? { label: 'Entrar no CRM', url: `${base}/auth/login` } : undefined,
+        });
+        await sendSystemMail(caller.orgId, { to: email, subject: `Acesso liberado – ${org.name}`, ...m });
+      }
       return jsonResponse({ ok: true });
     }
 

@@ -1064,6 +1064,17 @@ Regras:
   Exclusão LÓGICA: `recad_files.deleted_at/deleted_by` (só essa coluna pode mudar, 1 vez; o banco põe now() e auth.uid()); o arquivo fica no
   Storage, a tela filtra `deleted_at is null` e o histórico grava `documento_excluido`.
 
+## E-mail do sistema (16/11/2026) — `_shared/system-mail.ts`, `public/email/*.html`
+- Remetente `naoresponda@amaipark.com` (Hostinger, smtp.hostinger.com:465 SSL). Duas pontas, mesma caixa:
+  1. **Login (GoTrue)**: convite, esqueci senha, confirmação → `.env` da VPS (`SMTP_*`) + no compose do auth
+     `GOTRUE_MAILER_SUBJECTS_*` (português) e `GOTRUE_MAILER_TEMPLATES_*` = `https://crm.amaipark.com/email/<convite|senha|confirmar|link|troca>.html`
+     (Go template, `{{ .ConfirmationURL }}`; gerados com `brandMail`). Sem SMTP o convite falha com "Error sending invite email" e nada é criado.
+  2. **Avisos das Edge Functions**: `sendSystemMail(orgId, {to, subject, html, text})` — cliente SMTP próprio (TLS direto, AUTH LOGIN),
+     credenciais cifradas em `public.org_settings` (`system_smtp_user/pass/host/port/from_name`; usa a da org ou, sem ela, a primeira que
+     houver). Nunca derruba quem chama. `brandMail()` = layout com logo/botão/rodapé "não responda".
+     Usado em `public-signup` (cadastro recebido + aviso aos admins ativos, link só da credencial `app_url`) e `manage-team-member` approve
+     (acesso liberado). Configuração: script `email.py` na VPS (pede a senha com getpass, testa, guarda cifrada, ajusta auth, copia funções).
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do
