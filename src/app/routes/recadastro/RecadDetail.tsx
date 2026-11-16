@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, ExternalLink, FileText, History,
-  Info, Loader2, Lock, MessageCircle, Plus, RotateCcw, Trash2, Users, X,
+  Info, Loader2, Lock, MessageCircle, Paperclip, Pencil, Plus, RotateCcw, Trash2, Users, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 import { formatPhoneDisplay } from '@/lib/phone';
 import {
-  BUCKET, CopyField, PLAN, STATUS, SUB_COLS, StatusChip, buildWhatsMessage, copy, eventText, fmtCpf, fmtDate, fmtDateTime,
+  BUCKET, CopyField, PLAN, REL, uploadTeamFile, STATUS, SUB_COLS, StatusChip, buildWhatsMessage, copy, eventText, fmtCpf, fmtDate, fmtDateTime,
   relLabel, waNumber, type EventRow, type FileRow, type Issue, type Note, type PersonRow, type Status, type Submission,
 } from './recadShared';
 
@@ -49,6 +49,9 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
   const [whatsOpen, setWhatsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [filesVer, setFilesVer] = useState(0);
+  const [editSub, setEditSub] = useState(false);
+  const [editPerson, setEditPerson] = useState<PersonRow | 'new' | null>(null);
 
   // pessoas + arquivos (links assinados de 1 h)
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
       setFiles(fl.map((x) => ({ ...x, url: urls[x.path] ?? null })));
     })();
     return () => { cancelled = true; };
-  }, [sub.id]);
+  }, [sub.id, filesVer]);
 
   // pendências + observações (recarrega com o tempo real)
   const loadSide = useCallback(async () => {
@@ -144,12 +147,12 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
 
   const needsCert = files.some((f) => f.kind === 'certidao_casamento') || (people ?? []).some((p) => ['conjuge', 'sogro', 'sogra'].includes(p.relationship));
   const checkpoints = useMemo(() => {
-    const list: { key: string; label: string; files: FileRow[] }[] = [
-      { key: 'pass', label: 'Passaporte/contrato ou comprovante', files: files.filter((f) => !f.person_id && f.kind === 'passaporte') },
-      { key: 'doc', label: 'RG / CNH do titular', files: files.filter((f) => !f.person_id && f.kind === 'documento') },
+    const list: { key: string; label: string; files: FileRow[]; kind: FileRow['kind']; personId: string | null }[] = [
+      { key: 'pass', kind: 'passaporte', personId: null, label: 'Passaporte/contrato ou comprovante', files: files.filter((f) => !f.person_id && f.kind === 'passaporte') },
+      { key: 'doc', kind: 'documento', personId: null, label: 'RG / CNH do titular', files: files.filter((f) => !f.person_id && f.kind === 'documento') },
     ];
-    if (needsCert) list.push({ key: 'cert', label: 'Certidão de casamento / união', files: files.filter((f) => f.kind === 'certidao_casamento') });
-    for (const p of people ?? []) list.push({ key: p.id, label: `Documento — ${p.name.split(' ')[0]} (${relLabel(p)})`, files: files.filter((f) => f.person_id === p.id) });
+    if (needsCert) list.push({ key: 'cert', kind: 'certidao_casamento', personId: null, label: 'Certidão de casamento / união', files: files.filter((f) => f.kind === 'certidao_casamento') });
+    for (const p of people ?? []) list.push({ key: p.id, kind: 'documento', personId: p.id, label: `Documento — ${p.name.split(' ')[0]} (${relLabel(p)})`, files: files.filter((f) => f.person_id === p.id) });
     return list;
   }, [files, people, needsCert]);
   const openFile = (f: FileRow) => setViewer(files.findIndex((x) => x.id === f.id));
@@ -215,11 +218,17 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
             <span>Dados e arquivos enviados pelo próprio associado. <strong>Enviado não é validado:</strong> confira cada documento antes de marcar como conferido.</span>
           </div>
           {sub.status === 'enviando' && (
-            <p className="rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2 text-sm text-[var(--color-text-primary)]">O associado começou mas não terminou de enviar os documentos.</p>
+            <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] bg-[rgba(245,158,11,0.1)] p-2 text-sm text-[var(--color-text-primary)]">
+              <span className="min-w-0 flex-1">O associado começou mas não terminou de enviar os documentos. Complete abaixo (dados, dependentes e anexos) e conclua.</span>
+              {canManage && <Button size="sm" variant="outline" disabled={saving} onClick={() => void saveSub({ status: 'novo' }, 'Envio concluído pela equipe — agora está em "Novo"')}>Concluir envio</Button>}
+            </div>
           )}
 
           <section>
-            <h3 className={cn(sectionTitle, 'mb-2')}>Titular</h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className={sectionTitle}>Titular</h3>
+              {canManage && <Button size="sm" variant="ghost" onClick={() => setEditSub(true)}><Pencil className="h-3.5 w-3.5" /> Editar dados</Button>}
+            </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <CopyField label="Nome completo" value={sub.holder_name} field="titular_nome" wide />
               <CopyField label="CPF" value={fmtCpf(sub.holder_cpf)} field="titular_cpf" />
@@ -265,13 +274,17 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
                       : <span className="shrink-0 text-[11px] font-semibold text-[var(--color-error)]">○ não enviado</span>}
                   </div>
                   <Thumbs list={c.files} onOpen={openFile} />
+                  {canManage && <AddFiles sub={sub} kind={c.kind} personId={c.personId} onDone={() => setFilesVer((v) => v + 1)} />}
                 </div>
               ))}
             </div>
           </section>
 
           <section>
-            <h3 className={cn(sectionTitle, 'mb-2')}>Dependentes ({people?.length ?? 0})</h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className={sectionTitle}>Dependentes ({people?.length ?? 0})</h3>
+              {canManage && people !== null && <Button size="sm" variant="ghost" onClick={() => setEditPerson('new')}><Plus className="h-3.5 w-3.5" /> Adicionar dependente</Button>}
+            </div>
             {people === null && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-primary)]" />}
             {people?.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">Nenhum dependente informado.</p>}
             <div className="space-y-2.5">
@@ -281,6 +294,10 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-subtle)] text-[11px] font-bold text-[var(--accent-primary)]">{p.position}</span>
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--color-text-primary)]">{p.name}</span>
                     <span className="shrink-0 text-xs text-[var(--color-text-muted)]">{relLabel(p)}</span>
+                    {canManage && (
+                      <button type="button" title="Editar dependente" aria-label={`Editar ${p.name}`} onClick={() => setEditPerson(p)}
+                        className="shrink-0 rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--accent-primary)]"><Pencil className="h-3.5 w-3.5" /></button>
+                    )}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <CopyField label="Nome" value={p.name} field="dep_nome" wide />
@@ -389,6 +406,9 @@ export default function RecadDetail({ sub, canManage, centralReady, tick, nameOf
       <Dialog open={notesOpen} onClose={() => setNotesOpen(false)} title="Observações da equipe" description={`Protocolo #${sub.protocol} — ${sub.holder_name}`} opaque>
         <div className="space-y-2">{notes.map((n) => <NoteCard key={n.id} n={n} nameOf={nameOf} />)}</div>
       </Dialog>
+      {editSub && <SubEditDialog sub={sub} onClose={() => setEditSub(false)} onSaved={(s) => { onChanged(s); setEditSub(false); }} />}
+      {editPerson && <PersonDialog subId={sub.id} person={editPerson === 'new' ? null : editPerson}
+        onClose={() => setEditPerson(null)} onSaved={() => { setEditPerson(null); setFilesVer((v) => v + 1); }} />}
       {historyOpen && <HistoryDialog subId={sub.id} title={`Protocolo #${sub.protocol} — ${sub.holder_name}`} nameOf={nameOf} onClose={() => setHistoryOpen(false)} />}
     </div>
   );
@@ -594,6 +614,132 @@ function HistoryDialog({ subId, title, nameOf, onClose }: { subId: string; title
           </li>
         ))}
       </ol>
+    </Dialog>
+  );
+}
+
+// ------------------------------------------------------------------ equipe completando o cadastro
+function AddFiles({ sub, kind, personId, onDone }: { sub: Submission; kind: FileRow['kind']; personId: string | null; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function pick(list: FileList | null) {
+    const arr = Array.from(list ?? []);
+    if (!arr.length) return;
+    setBusy(true);
+    let ok = 0;
+    for (const f of arr.slice(0, 6)) {
+      try { await uploadTeamFile(sub, kind, personId, f); ok++; }
+      catch (e) { toast.error('Não foi possível anexar', { description: e instanceof Error ? e.message : String(e) }); }
+    }
+    setBusy(false);
+    if (ok) { toast.success(`${ok} arquivo(s) anexado(s)`); onDone(); }
+  }
+  return (
+    <label className={cn('mt-2 inline-flex cursor-pointer items-center gap-1 rounded-full border border-dashed border-[var(--color-border-card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)]',
+      busy && 'pointer-events-none opacity-60')}>
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />} {busy ? 'Anexando…' : 'Anexar arquivo'}
+      <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="sr-only"
+        onChange={(e) => { void pick(e.target.files); e.target.value = ''; }} />
+    </label>
+  );
+}
+
+const fieldCls = 'h-9 w-full rounded-[var(--radius-control)] border border-[var(--color-border-card)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--accent-primary)]';
+const labelCls = 'text-xs font-medium text-[var(--color-text-secondary)]';
+const onlyDigits = (v: string) => v.replace(/\D/g, '');
+const maskCpf = (v: string) => { const d = onlyDigits(v).slice(0, 11); return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'); };
+function cpfOk(raw: string) {
+  const d = onlyDigits(raw);
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const calc = (n: number) => { let s = 0; for (let i = 0; i < n; i++) s += Number(d[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
+}
+
+function SubEditDialog({ sub, onClose, onSaved }: { sub: Submission; onClose: () => void; onSaved: (s: Submission) => void }) {
+  const [f, setF] = useState({
+    name: sub.holder_name, cpf: maskCpf(sub.holder_cpf), birth: sub.holder_birth ?? '', email: sub.holder_email ?? '',
+    plan: sub.plan, people: String(sub.people_count ?? ''), passport: sub.passport_number ?? '',
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  async function save() {
+    if (f.name.trim().length < 3) return toast.error('Informe o nome completo.');
+    if (!cpfOk(f.cpf)) return toast.error('CPF inválido.');
+    if (f.plan === 'amai10' && !(Number(f.people) >= 1 && Number(f.people) <= 10)) return toast.error('No AMAI 10, informe de 1 a 10 pessoas.');
+    setBusy(true);
+    const { data, error } = await getSupabase().from('recad_submissions').update({
+      holder_name: f.name, holder_cpf: onlyDigits(f.cpf), holder_birth: f.birth || null, holder_email: f.email || null,
+      plan: f.plan, people_count: f.plan === 'amai10' ? Number(f.people) : null, passport_number: f.passport || null,
+    }).eq('id', sub.id).select(SUB_COLS).single();
+    setBusy(false);
+    if (error) return toast.error('Não foi possível salvar', { description: error.message });
+    toast.success('Dados corrigidos (registrado no histórico)');
+    onSaved(data as Submission);
+  }
+  return (
+    <Dialog open onClose={onClose} title="Editar dados do titular" description={`Protocolo #${sub.protocol} — a correção fica no histórico.`} opaque widthClass="max-w-lg">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="sm:col-span-2"><span className={labelCls}>Nome completo</span><input className={fieldCls} value={f.name} maxLength={120} onChange={set('name')} /></label>
+        <label><span className={labelCls}>CPF</span><input className={fieldCls} inputMode="numeric" value={f.cpf} onChange={(e) => setF({ ...f, cpf: maskCpf(e.target.value) })} /></label>
+        <label><span className={labelCls}>Nascimento</span><input className={fieldCls} type="date" value={f.birth} onChange={set('birth')} /></label>
+        <label className="sm:col-span-2"><span className={labelCls}>E-mail</span><input className={fieldCls} type="email" value={f.email} maxLength={254} onChange={set('email')} /></label>
+        <label><span className={labelCls}>Passaporte</span>
+          <select className={fieldCls} value={f.plan} onChange={(e) => setF({ ...f, plan: e.target.value as Submission['plan'] })}>
+            {Object.entries(PLAN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></label>
+        {f.plan === 'amai10'
+          ? <label><span className={labelCls}>Pessoas (com o titular)</span><input className={fieldCls} inputMode="numeric" value={f.people} onChange={(e) => setF({ ...f, people: onlyDigits(e.target.value).slice(0, 2) })} /></label>
+          : <div />}
+        <label className="sm:col-span-2"><span className={labelCls}>Nº passaporte/contrato</span><input className={fieldCls} value={f.passport} maxLength={40} onChange={set('passport')} /></label>
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>Cancelar</Button>
+        <Button disabled={busy} onClick={() => void save()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Salvar</Button>
+      </div>
+    </Dialog>
+  );
+}
+
+function PersonDialog({ subId, person, onClose, onSaved }: { subId: string; person: PersonRow | null; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({
+    name: person?.name ?? '', birth: person?.birth_date ?? '', rel: person?.relationship ?? 'filho', other: person?.relationship_other ?? '',
+    cpf: maskCpf(person?.cpf ?? ''), email: person?.email ?? '',
+  });
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    if (f.name.trim().length < 3) return toast.error('Informe o nome completo.');
+    if (!f.birth) return toast.error('Informe a data de nascimento.');
+    if (f.cpf && !cpfOk(f.cpf)) return toast.error('CPF inválido.');
+    if (f.rel === 'outro' && !f.other.trim()) return toast.error('Diga qual é o parentesco.');
+    setBusy(true);
+    const row = { name: f.name, birth_date: f.birth, relationship: f.rel, relationship_other: f.rel === 'outro' ? f.other.trim().slice(0, 40) : null,
+      cpf: onlyDigits(f.cpf) || null, email: f.email.trim() || null };
+    const sb = getSupabase();
+    const { error } = person
+      ? await sb.from('recad_people').update(row).eq('id', person.id)
+      : await sb.from('recad_people').insert({ ...row, submission_id: subId, position: 0 });
+    setBusy(false);
+    if (error) return toast.error('Não foi possível salvar', { description: error.message });
+    toast.success(person ? 'Dependente corrigido' : 'Dependente incluído — anexe o documento dele');
+    onSaved();
+  }
+  return (
+    <Dialog open onClose={onClose} title={person ? 'Editar dependente' : 'Adicionar dependente'} opaque widthClass="max-w-lg"
+      description="Fica registrado no histórico com o seu nome.">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="sm:col-span-2"><span className={labelCls}>Nome completo</span><input className={fieldCls} value={f.name} maxLength={120} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+        <label><span className={labelCls}>Nascimento</span><input className={fieldCls} type="date" value={f.birth} onChange={(e) => setF({ ...f, birth: e.target.value })} /></label>
+        <label><span className={labelCls}>Parentesco</span>
+          <select className={fieldCls} value={f.rel} onChange={(e) => setF({ ...f, rel: e.target.value })}>
+            {Object.entries(REL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></label>
+        {f.rel === 'outro' && <label className="sm:col-span-2"><span className={labelCls}>Qual parentesco?</span><input className={fieldCls} value={f.other} maxLength={40} onChange={(e) => setF({ ...f, other: e.target.value })} /></label>}
+        <label><span className={labelCls}>CPF (se tiver)</span><input className={fieldCls} inputMode="numeric" value={f.cpf} onChange={(e) => setF({ ...f, cpf: maskCpf(e.target.value) })} /></label>
+        <label><span className={labelCls}>E-mail (se tiver)</span><input className={fieldCls} type="email" value={f.email} maxLength={254} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>Cancelar</Button>
+        <Button disabled={busy} onClick={() => void save()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Salvar</Button>
+      </div>
     </Dialog>
   );
 }

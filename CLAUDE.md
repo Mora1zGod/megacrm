@@ -1044,6 +1044,13 @@ Regras:
   cria a pendência "Associado informou que não tem…" (trava Conferido/Lançado até a equipe/jurídico decidir). AMAIA (seção 7-0A e
   `lembrete_final`): manda o link com essa orientação, nunca confirma nada; processo/Procon/contrato → [JURIDICO].
 
+- Equipe completa o cadastro (16/11/2026, `20261116120000_recad_team_edit.sql`): com `recad.manage`, a Central anexa documentos em cada
+  ponto ("Anexar arquivo" → Storage `<org>/<envio>/equipe-<uuid>.<ext>`, policy de INSERT só nesse formato; `recad_files.uploaded_by`;
+  o trigger confere caminho, dono e que o arquivo existe), edita dados do titular/passaporte ("Editar dados"; travados: org, link, protocolo,
+  consentimento, IP, navegador, criação, no_proof), inclui/corrige dependentes e tira do "Incompleto" ("Concluir envio"; `completed_at` pelo
+  banco). Nada se apaga. Histórico: `dados_editados`, `dependente_incluido/editado`, `documento_equipe`. Nos triggers SECURITY DEFINER o
+  teste de "é a equipe" é `auth.uid() IS NOT NULL` (lá `current_user` é o dono, nunca 'authenticated').
+
 ## Jurídico (12/11/2026) — `20261112180000_juridico.sql`
 - Marcador `[JURIDICO]` na resposta da AMAIA (seção 7-B do modelo ativo: todo caso de inadimplência) = handoff para o jurídico:
   `process-ai-message::routeToLegal` põe a conversa com `app_settings.juridico_member` (se ativo; senão rodízio) no MESMO update do

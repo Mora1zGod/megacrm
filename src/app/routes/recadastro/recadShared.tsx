@@ -1,5 +1,6 @@
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { getSupabase } from '@/lib/supabase';
 
 // Tipos e utilitários da Central de Recadastramento (tela /recadastramentos).
 // Banco: 20261111200000_recadastramento.sql · 20261112170000_recad_conferido.sql · 20261113090000_recad_central.sql
@@ -8,14 +9,14 @@ export const BUCKET = 'whatsapp-hub-recadastro';
 
 export type Status = 'enviando' | 'novo' | 'em_analise' | 'pendente' | 'conferido' | 'lancado' | 'recusado';
 export interface Submission {
-  id: string; protocol: number; status: Status; plan: 'amai10' | 'infinity' | 'nao_sei'; people_count: number | null;
+  id: string; org_id: string; protocol: number; status: Status; plan: 'amai10' | 'infinity' | 'nao_sei'; people_count: number | null;
   passport_number: string | null; holder_name: string; holder_cpf: string; holder_birth: string | null; holder_email: string | null;
   holder_phone: string | null; portal_access: 'email' | 'whatsapp'; contact_id: string | null; team_notes: string | null;
   reviewed_at: string | null; completed_at: string | null; created_at: string;
   checked_at: string | null; launched_at: string | null;
   no_proof?: boolean;
 }
-export const SUB_COLS = 'id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at, no_proof';
+export const SUB_COLS = 'id, org_id, protocol, status, plan, people_count, passport_number, holder_name, holder_cpf, holder_birth, holder_email, holder_phone, portal_access, contact_id, team_notes, reviewed_at, completed_at, created_at, checked_at, launched_at, no_proof';
 
 export interface PersonRow { id: string; position: number; name: string; birth_date: string; relationship: string; relationship_other: string | null; cpf: string | null; email: string | null }
 export interface FileRow { id: string; person_id: string | null; kind: 'passaporte' | 'documento' | 'certidao_casamento'; path: string; mime: string; url: string | null }
@@ -36,7 +37,7 @@ export const STATUS: Record<Status, { label: string; cls: string }> = {
   recusado: { label: 'Recusado', cls: 'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]' },
 };
 export const PLAN: Record<string, string> = { amai10: 'AMAI 10', infinity: 'AMAI INFINITY', nao_sei: 'Não sabe' };
-const REL: Record<string, string> = { pai: 'Pai', mae: 'Mãe', sogro: 'Sogro', sogra: 'Sogra', conjuge: 'Cônjuge', filho: 'Filho(a)', outro: 'Outro' };
+export const REL: Record<string, string> = { pai: 'Pai', mae: 'Mãe', sogro: 'Sogro', sogra: 'Sogra', conjuge: 'Cônjuge', filho: 'Filho(a)', outro: 'Outro' };
 
 export const fmtCpf = (c: string | null) => (c && c.length === 11 ? `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}` : c ?? '');
 export const fmtDate = (d: string | null) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '');
@@ -104,6 +105,10 @@ export function eventText(e: EventRow): string {
     case 'pendencia_excluida': return `Pendência excluída${t}`;
     case 'observacao': return 'Observação registrada';
     case 'telefone': return 'WhatsApp do titular corrigido';
+    case 'dados_editados': return `Dados corrigidos pela equipe: ${Object.keys(e.meta ?? {}).join(', ')}`;
+    case 'dependente_incluido': return `Dependente incluído pela equipe${t}`;
+    case 'dependente_editado': return `Dependente corrigido pela equipe${t}`;
+    case 'documento_equipe': return `Documento anexado pela equipe (${({ passaporte: 'passaporte/contrato', documento: 'RG/CNH', certidao_casamento: 'certidão' } as Record<string, string>)[String(e.meta?.tipo)] ?? 'arquivo'})${t}`;
     case 'whatsapp_aberto': {
       const n = Number(e.meta?.pendencias ?? 0);
       return `Conversa do WhatsApp aberta para revisão${n ? ` (mensagem com ${n} pendência${n > 1 ? 's' : ''})` : ''}`;
@@ -115,4 +120,38 @@ export function eventText(e: EventRow): string {
     }
     default: return e.kind;
   }
+}
+
+// ------------------------------------------------------------------ anexos da equipe (20261116120000_recad_team_edit.sql)
+// Foto vira JPEG de até 1800 px (como no formulário público); PDF vai como está. Caminho <org>/<envio>/equipe-<uuid>.<ext>
+// (o banco só aceita nesse formato e confere que o arquivo existe no Storage antes de registrar).
+const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_BYTES = 8 * 1024 * 1024;
+
+async function shrinkImage(file: File): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('img'))), 'image/jpeg', 0.85));
+  } catch {
+    return file;
+  }
+}
+
+export async function uploadTeamFile(sub: { id: string; org_id: string }, kind: FileRow['kind'], personId: string | null, file: File): Promise<void> {
+  if (!ACCEPT.includes(file.type)) throw new Error(`${file.name}: envie foto (JPG, PNG, WEBP) ou PDF.`);
+  const isPdf = file.type === 'application/pdf';
+  const blob = isPdf ? file : await shrinkImage(file);
+  if (blob.size > MAX_BYTES) throw new Error(`${file.name}: arquivo maior que 8 MB.`);
+  const mime = isPdf ? 'application/pdf' : (blob.type || 'image/jpeg');
+  const path = `${sub.org_id}/${sub.id}/equipe-${crypto.randomUUID()}.${isPdf ? 'pdf' : mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'}`;
+  const sb = getSupabase();
+  const up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: mime, upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  const { error } = await sb.from('recad_files').insert({ submission_id: sub.id, person_id: personId, kind, path, mime, size_bytes: blob.size });
+  if (error) throw new Error(error.message);
 }
