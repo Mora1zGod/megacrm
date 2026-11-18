@@ -14,12 +14,14 @@ import { PLAN, SUB_COLS, StatusChip, copy, fmtDateTime, type Status, type Submis
 // Os valores têm data-pocket="…" e os botões data-pocket-action="…" (extensão do navegador que copia para o Pocket).
 // Layout por container (@container): ≥1040 px = 3 colunas; ≥760 px = lista + cadastro; abaixo = lista OU cadastro.
 
-// [rótulo, status aceitos | 'pend' (com pendência aberta) | null (todos menos incompletos)]
-const FILTERS: [string, Status[] | 'pend' | null][] = [
+// [rótulo, status aceitos | 'pend' (com pendência aberta) | 'rep' (mesmo CPF enviado mais de uma vez) | null (todos menos incompletos)]
+type F = Status[] | 'pend' | 'rep' | null;
+const FILTERS: [string, F][] = [
   ['Todos', null],
   ['A conferir', ['novo', 'em_analise']],
   ['Aguardando retorno', ['pendente']],
   ['Com pendência', 'pend'],
+  ['Repetidos', 'rep'],
   ['Prontos', ['conferido']],
   ['Lançados', ['lancado']],
   ['Recusados', ['recusado']],
@@ -120,15 +122,28 @@ export default function RecadastramentosPage() {
     };
   }, [loadSubs, loadCounts]);
 
-  const match = useCallback((r: Submission, f: Status[] | 'pend' | null) =>
-    f === null ? r.status !== 'enviando' : f === 'pend' ? (openCount[r.id] ?? 0) > 0 : f.includes(r.status), [openCount]);
+  // Mesmo CPF em mais de um envio concluído (incompleto e recusado não contam) — o formulário bloqueia desde 18/11/2026,
+  // os anteriores ficam marcados para a equipe recusar os repetidos.
+  const repeats = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const r of rows ?? []) if (r.status !== 'enviando' && r.status !== 'recusado') m[r.holder_cpf] = (m[r.holder_cpf] ?? 0) + 1;
+    return m;
+  }, [rows]);
+  const match = useCallback((r: Submission, f: F) =>
+    f === null ? r.status !== 'enviando'
+      : f === 'pend' ? (openCount[r.id] ?? 0) > 0
+        : f === 'rep' ? r.status !== 'enviando' && r.status !== 'recusado' && (repeats[r.holder_cpf] ?? 0) > 1
+          : f.includes(r.status), [openCount, repeats]);
   const statuses = FILTERS[filter][1];
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const qd = qq.replace(/\D/g, '');
-    return (rows ?? []).filter((r) => match(r, statuses) && (!qq
+    const out = (rows ?? []).filter((r) => match(r, statuses) && (!qq
       || r.holder_name.toLowerCase().includes(qq) || String(r.protocol).includes(qq) || (PLAN[r.plan] ?? '').toLowerCase().includes(qq)
       || (qd.length >= 3 && (r.holder_cpf.includes(qd) || (r.holder_phone ?? '').includes(qd)))));
+    // Repetidos: os envios do mesmo CPF ficam juntos, o mais antigo primeiro (normalmente é o que fica).
+    if (statuses === 'rep') out.sort((a, b) => a.holder_cpf.localeCompare(b.holder_cpf) || a.created_at.localeCompare(b.created_at));
+    return out;
   }, [rows, statuses, q, match]);
   const counts = useMemo(() => FILTERS.map(([, st]) => (rows ?? []).filter((r) => match(r, st)).length), [rows, match]);
   const metrics: [string, number, typeof ClipboardList, number | null][] = [
@@ -208,6 +223,11 @@ export default function RecadastramentosPage() {
                     </span>
                     <span className="mt-0.5 flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate text-xs text-[var(--color-text-muted)]">#{r.protocol} · {PLAN[r.plan]} · {fmtDateTime(r.completed_at ?? r.created_at)}</span>
+                      {r.status !== 'enviando' && r.status !== 'recusado' && (repeats[r.holder_cpf] ?? 0) > 1 && (
+                        <span title="O mesmo CPF enviou mais de uma vez: confira e recuse os repetidos" className="shrink-0 rounded-full bg-[rgba(245,158,11,0.16)] px-1.5 py-0.5 text-[10px] font-semibold text-[#b45309] [[data-theme=dark]_&]:text-[#fbbf24]">
+                          Enviou {repeats[r.holder_cpf]}x
+                        </span>
+                      )}
                       {centralReady && n > 0 && <span className="shrink-0 rounded-full bg-[rgba(239,68,68,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-error)]">{n} pend.</span>}
                     </span>
                   </span>

@@ -1064,6 +1064,11 @@ Regras:
   Exclusão LÓGICA: `recad_files.deleted_at/deleted_by` (só essa coluna pode mudar, 1 vez; o banco põe now() e auth.uid()); o arquivo fica no
   Storage, a tela filtra `deleted_at is null` e o histórico grava `documento_excluido`.
 
+- Bloqueio de repetição (18/11/2026): `recadastro-public` recusa novo envio de CPF que já tem recadastramento enviado (status novo, em_analise,
+  pendente, conferido ou lançado; recusado e incompleto não contam) — `check_cpf` na etapa do Titular (só sim/não, antes dos documentos) e de
+  novo no `submit` (`code: 'duplicate'`, 409). Tela "Você já fez o recadastramento" com "Digitei o CPF errado". Central: filtro "Repetidos"
+  (agrupa por CPF, mais antigo primeiro) e selo "Enviou Nx" nos envios antigos do mesmo CPF.
+
 ## E-mail do sistema (16/11/2026) — `_shared/system-mail.ts`, `public/email/*.html`
 - Remetente `naoresponda@amaipark.com` = APELIDO (alias) da caixa `diretoria@amaipark.com`: o login SMTP é a diretoria, o remetente é o
   naoresponda (`system_smtp_from`; no GoTrue `SMTP_USER`=diretoria, `SMTP_ADMIN_EMAIL`=naoresponda). Hostinger, smtp.hostinger.com:465 SSL. Duas pontas:

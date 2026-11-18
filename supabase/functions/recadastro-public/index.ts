@@ -149,6 +149,15 @@ async function loadPending(db: Db, orgId: string, body: Record<string, unknown>)
   return { sub: sub as { id: string; org_id: string; status: string; plan: string; protocol: number; holder_phone: string | null; no_proof: boolean | null } } as const;
 }
 
+// Recadastramento já enviado e em andamento/concluído (recusado e incompleto não contam).
+const SENT_STATUSES = ['novo', 'em_analise', 'pendente', 'conferido', 'lancado'];
+const DUP_MSG = 'Este CPF já tem um recadastramento enviado. Não precisa enviar de novo: a equipe vai conferir e dar retorno em até 5 dias úteis. Para corrigir algo ou mandar outro documento, fale no WhatsApp do AMAI.';
+async function alreadySent(db: ReturnType<typeof getAdminClient>, orgId: string, cpf: string): Promise<boolean> {
+  const { count } = await db.from('recad_submissions').select('id', { count: 'exact', head: true })
+    .eq('org_id', orgId).eq('holder_cpf', cpf).in('status', SENT_STATUSES);
+  return (count ?? 0) > 0;
+}
+
 Deno.serve(async (req) => {
   const pre = preflight(req);
   if (pre) return pre;
@@ -175,6 +184,15 @@ Deno.serve(async (req) => {
     // ------------------------------------------------------------------ info
     if (body.action === 'info') {
       return jsonResponse({ ok: true, org: { name: org.name, logo_url: org.logo_url } });
+    }
+
+    // ------------------------------------------------------------ check_cpf
+    // Bloqueio de repetição (18/11/2026): CPF que já tem recadastramento ENVIADO (não recusado) não envia de novo.
+    // Na etapa do titular o formulário pergunta antes de a pessoa mandar os documentos. Só diz sim/não (sem nome, sem protocolo).
+    if (body.action === 'check_cpf') {
+      const cpf = digits((body as { cpf?: unknown }).cpf);
+      if (!cpfValid(cpf)) return fail('CPF inválido.');
+      return jsonResponse({ ok: true, exists: !!(await alreadySent(db, org.id, cpf)) });
     }
 
     // ---------------------------------------------------------------- submit
@@ -263,6 +281,7 @@ Deno.serve(async (req) => {
           db.from('recad_submissions').select('id', { count: 'exact', head: true })
             .eq('link_id', link.id).gte('created_at', new Date(Date.now() - 3600_000).toISOString()),
         ]);
+        if (await alreadySent(db, org.id, holderCpf)) return jsonResponse({ ok: false, error: DUP_MSG, code: 'duplicate' }, { status: 409 });
         if ((byCpf ?? 0) >= MAX_PER_CPF_DAY) return fail('Já recebemos envios deste CPF hoje. Aguarde o retorno da equipe ou fale no WhatsApp do AMAI.', 429);
         if ((byLink ?? 0) >= MAX_PER_LINK_HOUR) return fail('Muitos envios agora. Tente de novo em alguns minutos.', 429);
       }

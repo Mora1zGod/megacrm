@@ -297,7 +297,8 @@ function brDate(iso: string) {
 
 export default function RecadastroPage() {
   const { token = '' } = useParams();
-  const [phase, setPhase] = useState<'loading' | 'invalid' | 'form' | 'sending' | 'done'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'invalid' | 'form' | 'sending' | 'done' | 'dup'>('loading');
+  const [checking, setChecking] = useState(false);
   const [invalidMsg, setInvalidMsg] = useState('');
   const [orgName, setOrgName] = useState('AMAI Park');
   const [logo, setLogo] = useState<string | null>(null);
@@ -399,9 +400,16 @@ export default function RecadastroPage() {
     window.scrollTo({ top: 0 });
   }
 
-  function next() {
+  async function next() {
     const pr = stepProblem(step);
     if (pr) { setError(pr); return; }
+    if (step === 1) {
+      // Bloqueio de repetição: CPF que já enviou o recadastramento não envia de novo (o servidor confere de novo no envio).
+      setChecking(true);
+      const r = await callFn({ action: 'check_cpf', token, cpf: holder.cpf });
+      setChecking(false);
+      if (r.ok && r.exists) { setPhase('dup'); window.scrollTo({ top: 0 }); return; }
+    }
     if (step === 3) setOpenKey(null);
     goTo(step + 1);
   }
@@ -451,6 +459,7 @@ export default function RecadastroPage() {
         cpf: p.cpf || null, email: p.email.trim() || null,
       })),
     });
+    if (!r.ok && r.code === 'duplicate') { setPhase('dup'); return; }
     if (!r.ok) { setError(r.error ?? 'Não foi possível enviar.'); setPhase('form'); return; }
     const passportUpload = await joinFrontBack(passportFiles);
     const queue: UploadItem[] = [
@@ -482,6 +491,30 @@ export default function RecadastroPage() {
     return (
       <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-10">
         <div className="mx-auto max-w-xl space-y-4">{header}<p className="rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-4 text-[var(--color-text-secondary)]">{invalidMsg}</p></div>
+      </div>
+    );
+  }
+
+  if (phase === 'dup') {
+    return (
+      <div className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-10">
+        <div className="mx-auto max-w-xl space-y-5">
+          {header}
+          <div className="space-y-3 rounded-[var(--radius-card)] border border-[var(--color-border-card)] bg-[var(--color-surface)] p-5 text-center">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-[var(--accent-primary)]" />
+            <h2 className="text-lg font-bold text-[var(--color-text-primary)]">Você já fez o recadastramento</h2>
+            <p className="text-[var(--color-text-secondary)]">
+              Já recebemos o recadastramento deste CPF. <b className="text-[var(--color-text-primary)]">Não precisa enviar de novo.</b>
+            </p>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              Nossa equipe vai conferir e dar retorno em até 5 dias úteis após o envio. Para corrigir algum dado ou mandar outro documento,
+              fale com a gente no WhatsApp do {orgName}.
+            </p>
+            <Button type="button" variant="outline" className="mt-1" onClick={() => { setPhase('form'); goTo(1); }}>
+              Digitei o CPF errado
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -716,8 +749,8 @@ export default function RecadastroPage() {
             </Button>
           )}
           {step < 4 ? (
-            <Button type="button" className="h-12 flex-1 text-base" onClick={next}>
-              Continuar <ChevronRight className="h-5 w-5" />
+            <Button type="button" className="h-12 flex-1 text-base" disabled={checking} onClick={() => void next()}>
+              {checking ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Continuar <ChevronRight className="h-5 w-5" /></>}
             </Button>
           ) : (
             <Button type="button" className="h-12 flex-1 text-base" disabled={sending} onClick={() => void send()}>
